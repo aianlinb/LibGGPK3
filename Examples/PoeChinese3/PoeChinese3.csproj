@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+	<Authors>aianlinb</Authors>
+	<Copyright>Copyright © 2022 aianlinb.</Copyright>
+	<Version>1.0.1</Version>
+	<DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\LibBundledGGPK3\LibBundledGGPK3.csproj" />
+    <ProjectReference Include="..\..\LibDat2\LibDat2.csproj" />
+  </ItemGroup>
+
+</Project>
