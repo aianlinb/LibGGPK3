@@ -107,9 +107,10 @@ namespace LibGGPK3 {
 			return bestNode;
 		}
 
-		/// <param name="progress">returns the number of FreeRecords remaining to be filled</param>
+		/// <param name="progress">returns the number of FreeRecords remaining to be filled.
+		/// This won't be always decreasing</param>
 		/// <returns>total length of remaining FreeRecords</returns>
-		public virtual Task FastDefragmentAsync(CancellationToken? cancellation = null, IProgress<int>? progress = null) {
+		public virtual Task FastCompactAsync(CancellationToken? cancellation = null, IProgress<int>? progress = null) {
 			return Task.Run(() => {
 				cancellation?.ThrowIfCancellationRequested();
 				FreeRecordConcat();
@@ -129,24 +130,24 @@ namespace LibGGPK3 {
 						var treeNode = treeNodes[i];
 						if (treeNode.Length > free.Length)
 							break;
-						else if (treeNode.Length != free.Length && treeNode.Length > free.Length - 16)
+						if (treeNode.Offset < free.Offset)
+							continue;
+						if (treeNode.Length != free.Length && treeNode.Length > free.Length - 16)
 							continue;
 
-						if (treeNode.Offset > free.Offset) {
-							treeNodes.RemoveAt(i);
-							if (treeNode is FileRecord file) {
-								var fileContent = file.ReadFileContent();
-								var newFree = file.MoveWithNewLength(file.Length, freeNode)?.Value;
-								FileStream.Seek(file.DataOffset, SeekOrigin.Begin);
-								FileStream.Write(fileContent);
-								FileStream.Flush();
-								if (newFree != null)
-									freeList.Enqueue(newFree, newFree.Offset);
-							} else {
-								var newFree = treeNode.MoveWithNewLength(treeNode.Length, freeNode)?.Value;
-								if (newFree != null && newFree != free)
-									freeList.Enqueue(newFree, newFree.Offset);
-							}
+						treeNodes.RemoveAt(i);
+						if (treeNode is FileRecord file) {
+							var fileContent = file.ReadFileContent();
+							var newFree = file.MoveWithNewLength(file.Length, freeNode)?.Value;
+							FileStream.Seek(file.DataOffset, SeekOrigin.Begin);
+							FileStream.Write(fileContent);
+							FileStream.Flush();
+							if (newFree != null && newFree != free)
+								freeList.Enqueue(newFree, newFree.Offset);
+						} else {
+							var newFree = treeNode.MoveWithNewLength(treeNode.Length, freeNode)?.Value;
+							if (newFree != null && newFree != free)
+								freeList.Enqueue(newFree, newFree.Offset);
 						}
 					}
 				}

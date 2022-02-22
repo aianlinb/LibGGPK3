@@ -24,14 +24,11 @@ namespace LibGGPK3.Records {
 			Offset = s.Position - 8;
 			var nameLength = s.ReadInt32();
 			s.Read(Hash, 0, 32);
-
 			var name = new char[nameLength - 1];
 			fixed (char* p = name)
 				s.Read(new(p, name.Length * 2));
-
 			Name = new(name);
 			s.Seek(2, SeekOrigin.Current); // Null terminator
-
 			DataOffset = s.Position;
 			DataLength = Length - (int)(s.Position - Offset);
 			s.Seek(DataLength, SeekOrigin.Current);
@@ -55,7 +52,6 @@ namespace LibGGPK3.Records {
 			s.Write(Hash);
 			fixed (char* p = Name)
 				s.Write(new(p, Name.Length * 2));
-
 			s.Write((short)0); // Null terminator
 			DataOffset = s.Position;
 			// Actual file content writing of FileRecord isn't here
@@ -72,7 +68,6 @@ namespace LibGGPK3.Records {
 			s.Seek(DataOffset, SeekOrigin.Begin);
 			for (var l = 0; l < DataLength;)
 				l += s.Read(buffer, l, DataLength - l);
-
 			return buffer;
 		}
 
@@ -82,10 +77,8 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		public virtual void ReplaceContent(ReadOnlySpan<byte> NewContent) {
 			var s = Ggpk.FileStream;
-
 			if (!Hash256.TryComputeHash(NewContent, Hash, out _))
 				throw new("Unable to compute hash of the content");
-
 			if (NewContent.Length != DataLength) { // Replace a FreeRecord
 				DataLength = NewContent.Length;
 				MoveWithNewLength(CaculateLength());

@@ -37,7 +37,7 @@ namespace GGPKFastCompact3 {
 				var prog = -1;
 				Console.WriteLine("Start compaction . . .");
 				Console.WriteLine();
-				var tsk = ggpk.FastDefragmentAsync(CancellationToken.None, new Progress<int>(i => {
+				var tsk = ggpk.FastCompactAsync(CancellationToken.None, new Progress<int>(i => {
 					prog = i;
 					if (prog > max)
 						max = prog;

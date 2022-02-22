@@ -10,15 +10,11 @@ namespace LibGGPK3 {
 		public readonly FileRecord Record;
 
 		protected MemoryStream? _Buffer;
-		protected MemoryStream Buffer {
+		protected virtual MemoryStream Buffer {
 			get {
 				if (_Buffer == null) {
 					_Buffer = new(Record.DataLength);
-					var b = new byte[Record.DataLength];
-					Record.Ggpk.FileStream.Seek(Record.DataOffset, SeekOrigin.Begin);
-					for (var l = 0; l < Record.DataLength;)
-						l += Record.Ggpk.FileStream.Read(b, l, Record.DataLength - l);
-					_Buffer.Write(b, 0, Record.DataLength);
+					_Buffer.Write(Record.ReadFileContent(), 0, Record.DataLength);
 					_Buffer.Seek(0, SeekOrigin.Begin);
 				}
 				return _Buffer;

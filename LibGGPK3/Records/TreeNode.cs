@@ -35,12 +35,13 @@ namespace LibGGPK3.Records {
 				var free = specify.Value;
 				if (free.Length < Length + 16 && free.Length != Length)
 					throw new ArgumentException("The length of specified FreeRecord must not be between Length and Length-16 (exclusive): " + free.Length, nameof(specify));
-				free.Length -= Length;
-				s.Seek(free.Offset + free.Length, SeekOrigin.Begin); // Write to the end of the FreeRecord
+				s.Seek(free.Offset, SeekOrigin.Begin);
 				WriteRecordData();
+				free.Length -= Length;
 				if (free.Length >= 16) { // Update length of FreeRecord
-					s.Seek(free.Offset, SeekOrigin.Begin);
-					s.Write(free.Length);
+					s.Seek(free.Offset + Length, SeekOrigin.Begin);
+					free.WriteRecordData();
+					free.UpdateOffset();
 				} else
 					free.RemoveFromList(specify);
 			}
@@ -63,7 +64,6 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		public virtual LinkedListNode<FreeRecord>? MarkAsFreeRecord() {
 			var s = Ggpk.FileStream;
-			s.Flush();
 			s.Seek(Offset, SeekOrigin.Begin);
 			LinkedListNode<FreeRecord>? rtn = null;
 			var length = Length;
@@ -98,17 +98,7 @@ namespace LibGGPK3.Records {
 			}
 
 			var free = new FreeRecord(Offset, length, 0, Ggpk);
-			var lastFree = Ggpk.FreeRecords.Last?.Value;
-			if (lastFree == null) { // No FreeRecord
-				Ggpk.GgpkRecord.FirstFreeRecordOffset = Offset;
-				s.Seek(Ggpk.GgpkRecord.Offset + 20, SeekOrigin.Begin);
-				s.Write(Offset);
-			} else {
-				lastFree.NextFreeOffset = Offset;
-				s.Seek(lastFree.Offset + 8, SeekOrigin.Begin);
-				s.Write(Offset);
-			}
-			return Ggpk.FreeRecords.AddLast(free);
+			return free.UpdateOffset();
 		}
 
 		/// <summary>

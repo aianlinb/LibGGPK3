@@ -22,11 +22,12 @@ namespace LibGGPK3.Records {
 		}
 
 		/// <summary>
-		/// Also calls the <see cref="WriteRecordData"/>
+		/// Also calls the <see cref="WriteRecordData"/>.
+		/// Please calls <see cref="UpdateOffset"/> after this to add the FreeRecord to <see cref="GGPK.FreeRecords"/>
 		/// </summary>
 		protected internal FreeRecord(long offset, int length, long nextFreeOffset, GGPK ggpk) : base(length, ggpk) {
-			Ggpk.FileStream.Seek(offset, SeekOrigin.Begin);
 			NextFreeOffset = nextFreeOffset;
+			Ggpk.FileStream.Seek(offset, SeekOrigin.Begin);
 			WriteRecordData();
 		}
 
@@ -72,6 +73,26 @@ namespace LibGGPK3.Records {
 			}
 			Ggpk.FreeRecords.Remove(node);
 			s.Flush();
+		}
+
+		/// <summary>
+		/// Update the link after the Offset of this FreeRecord is changed
+		/// </summary>
+		/// <param name="node">Node in <see cref="GGPK.FreeRecords"/> to remove</param>
+		public virtual LinkedListNode<FreeRecord> UpdateOffset(LinkedListNode<FreeRecord>? node = null) {
+			var s = Ggpk.FileStream;
+			node ??= Ggpk.FreeRecords.Find(this);
+			var lastFree = node == null ? Ggpk.FreeRecords.Last?.Value : node.Previous?.Value;
+			if (lastFree == null) { // First FreeRecord
+				Ggpk.GgpkRecord.FirstFreeRecordOffset = Offset;
+				s.Seek(Ggpk.GgpkRecord.Offset + 20, SeekOrigin.Begin);
+				s.Write(Offset);
+			} else {
+				lastFree.NextFreeOffset = Offset;
+				s.Seek(lastFree.Offset + 8, SeekOrigin.Begin);
+				s.Write(Offset);
+			}
+			return node ?? Ggpk.FreeRecords.AddLast(this);
 		}
 	}
 }
