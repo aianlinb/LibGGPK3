@@ -16,9 +16,9 @@ namespace LibGGPK3.Records {
 		protected internal long NextFreeOffset;
 
 		protected internal FreeRecord(int length, GGPK ggpk) : base(length, ggpk) {
-			Offset = ggpk.FileStream.Position - 8;
-			NextFreeOffset = ggpk.FileStream.ReadInt64();
-			ggpk.FileStream.Seek(Length - 16, SeekOrigin.Current);
+			Offset = ggpk.GGPKStream.Position - 8;
+			NextFreeOffset = ggpk.GGPKStream.ReadInt64();
+			ggpk.GGPKStream.Seek(Length - 16, SeekOrigin.Current);
 		}
 
 		/// <summary>
@@ -27,17 +27,16 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		protected internal FreeRecord(long offset, int length, long nextFreeOffset, GGPK ggpk) : base(length, ggpk) {
 			NextFreeOffset = nextFreeOffset;
-			Ggpk.FileStream.Seek(offset, SeekOrigin.Begin);
+			Ggpk.GGPKStream.Seek(offset, SeekOrigin.Begin);
 			WriteRecordData();
 		}
 
 		protected internal override void WriteRecordData() {
-			var s = Ggpk.FileStream;
+			var s = Ggpk.GGPKStream;
 			Offset = s.Position;
 			s.Write(Length);
 			s.Write(Tag);
 			s.Write(NextFreeOffset);
-			s.Flush();
 			s.Seek(Length - 16, SeekOrigin.Current);
 		}
 
@@ -46,7 +45,7 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		/// <param name="node">Node in <see cref="GGPK.FreeRecords"/> to remove</param>
 		public virtual void RemoveFromList(LinkedListNode<FreeRecord>? node = null) {
-			var s = Ggpk.FileStream;
+			var s = Ggpk.GGPKStream;
 			node ??= Ggpk.FreeRecords.Find(this);
 			if (node == null)
 				return;
@@ -80,7 +79,7 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		/// <param name="node">Node in <see cref="GGPK.FreeRecords"/> to remove</param>
 		public virtual LinkedListNode<FreeRecord> UpdateOffset(LinkedListNode<FreeRecord>? node = null) {
-			var s = Ggpk.FileStream;
+			var s = Ggpk.GGPKStream;
 			node ??= Ggpk.FreeRecords.Find(this);
 			var lastFree = node == null ? Ggpk.FreeRecords.Last?.Value : node.Previous?.Value;
 			if (lastFree == null) { // First FreeRecord

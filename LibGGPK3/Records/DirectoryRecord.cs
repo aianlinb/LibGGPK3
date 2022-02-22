@@ -37,7 +37,7 @@ namespace LibGGPK3.Records {
 		/// Read a DirectoryRecord from GGPK
 		/// </summary>
 		protected unsafe internal DirectoryRecord(int length, GGPK ggpk) : base(length, ggpk) {
-			var s = ggpk.FileStream;
+			var s = ggpk.GGPKStream;
 			Offset = s.Position - 8;
 			var nameLength = s.ReadInt32();
 			var totalEntries = s.ReadInt32();
@@ -114,8 +114,8 @@ namespace LibGGPK3.Records {
 					throw new("Unable to compute hash of the content");
 				file.Length += file.DataLength = content.Length;
 				file.WriteWithNewLength();
-				Ggpk.FileStream.Seek(file.DataOffset, SeekOrigin.Begin);
-				Ggpk.FileStream.Write(content);
+				Ggpk.GGPKStream.Seek(file.DataOffset, SeekOrigin.Begin);
+				Ggpk.GGPKStream.Write(content);
 			} else
 				file.WriteWithNewLength();
 			Children.Add(file);
@@ -156,7 +156,7 @@ namespace LibGGPK3.Records {
 		}
 
 		protected internal unsafe override void WriteRecordData() {
-			var s = Ggpk.FileStream;
+			var s = Ggpk.GGPKStream;
 			Offset = s.Position;
 			s.Write(Length);
 			s.Write(Tag);
@@ -171,7 +171,6 @@ namespace LibGGPK3.Records {
 				s.Write(entry.NameHash);
 				s.Write(entry.Offset);
 			}
-			s.Flush();
 		}
 
 		/// <summary>

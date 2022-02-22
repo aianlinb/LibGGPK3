@@ -9,7 +9,8 @@ using System.Threading.Tasks;
 
 namespace LibGGPK3 {
 	public class GGPK : IDisposable {
-		protected internal Stream FileStream;
+		protected bool LeaveOpen;
+		protected internal Stream GGPKStream;
 		public readonly GGPKRecord GgpkRecord;
 		public readonly DirectoryRecord Root;
 		protected LinkedList<FreeRecord>? _FreeRecords;
@@ -33,9 +34,11 @@ namespace LibGGPK3 {
 		public GGPK(string filePath) : this(File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read)) {
 		}
 
-		/// <param name="filePath">Stream of Content.ggpk</param>
-		public GGPK(Stream stream) {
-			FileStream = stream;
+		/// <param name="stream">Stream of Content.ggpk</param>
+		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> after this instance has been disposed</param>
+		public GGPK(Stream stream, bool leaveOpen = true) {
+			LeaveOpen = leaveOpen;
+			GGPKStream = stream;
 
 			// Read ROOT Directory Record
 			if (ReadRecord() is not GGPKRecord gr)
@@ -52,17 +55,17 @@ namespace LibGGPK3 {
 		[SkipLocalsInit]
 		public unsafe virtual BaseRecord ReadRecord(long? offset = null) {
 			if (offset.HasValue)
-				FileStream.Seek(offset.Value, SeekOrigin.Begin);
+				GGPKStream.Seek(offset.Value, SeekOrigin.Begin);
 
 			var buffer = stackalloc byte[8];
-			FileStream.Read(new(buffer, 8));
+			GGPKStream.Read(new(buffer, 8));
 			var length = *(int*)buffer;
 			return ((int*)buffer)[1] switch {
 				1162627398 => new FileRecord(length, this), // FILE
 				1380533328 => new DirectoryRecord(length, this), // PDIR
 				1162170950 => new FreeRecord(length, this), // FREE
 				1263552327 => new GGPKRecord(length, this), // GGPK
-				_ => throw new Exception("Invalid record tag at offset: " + (FileStream.Position - 4))
+				_ => throw new Exception("Invalid record tag at offset: " + (GGPKStream.Position - 4))
 			};
 		}
 
@@ -139,9 +142,8 @@ namespace LibGGPK3 {
 						if (treeNode is FileRecord file) {
 							var fileContent = file.ReadFileContent();
 							var newFree = file.MoveWithNewLength(file.Length, freeNode)?.Value;
-							FileStream.Seek(file.DataOffset, SeekOrigin.Begin);
-							FileStream.Write(fileContent);
-							FileStream.Flush();
+							GGPKStream.Seek(file.DataOffset, SeekOrigin.Begin);
+							GGPKStream.Write(fileContent);
 							if (newFree != null && newFree != free)
 								freeList.Enqueue(newFree, newFree.Offset);
 						} else {
@@ -152,6 +154,68 @@ namespace LibGGPK3 {
 					}
 				}
 				progress?.Report(freeList.Count);
+			});
+		}
+
+		public virtual Task FullCompactAsync(string pathToSave, CancellationToken? cancellation = null, IProgress<int>? progress = null) {
+			var f = File.Create(pathToSave);
+			return FullCompactAsync(f, cancellation, progress).ContinueWith(t => f.Close());
+		}
+
+		public virtual Task FullCompactAsync(Stream streamToSave, CancellationToken? cancellation = null, IProgress<int>? progress = null) {
+			return Task.Run(() => {
+				var oldStream = GGPKStream;
+				try {
+					cancellation?.ThrowIfCancellationRequested();
+					GGPKStream.Flush();
+					var nodes = RecursiveTree(Root).ToList();
+					var count = nodes.Count;
+					progress?.Report(count + 1);
+					cancellation?.ThrowIfCancellationRequested();
+					GGPKStream = streamToSave;
+					GGPKStream.Seek(0, SeekOrigin.Begin);
+
+					// Write GGPKRecord
+					GgpkRecord.RootDirectoryOffset = 28;
+					GgpkRecord.FirstFreeRecordOffset = 0;
+					GgpkRecord.WriteRecordData();
+
+					// Update Offsets in DirectoryRecords
+					var offset = GgpkRecord.Length + Root.Length;
+					foreach (var node in nodes) {
+						if (node.Parent is DirectoryRecord dr)
+							for (int i = 0; i < dr.Entries.Length; i++)
+								if (dr.Entries[i].Offset == node.Offset)
+									dr.Entries[i].Offset = offset;
+						offset += node.Length;
+					}
+					progress?.Report(count);
+
+					// Write other records
+					var buffer = new byte[104857600];
+					foreach (var node in nodes) {
+						cancellation?.ThrowIfCancellationRequested();
+						if (node is FileRecord fr) {
+							if (fr.Length > buffer.Length)
+								buffer = new byte[fr.Length];
+							oldStream.Seek(fr.DataOffset, SeekOrigin.Begin);
+							for (var l = 0; l < fr.DataLength;)
+								l += oldStream.Read(buffer, l, fr.DataLength - l);
+							node.WriteRecordData();
+							GGPKStream.Write(new(buffer, 0, fr.DataLength));
+						} else
+							node.WriteRecordData();
+						progress?.Report(--count);
+					}
+
+					GGPKStream.Flush();
+					if (!LeaveOpen)
+						oldStream.Close();
+				} catch (OperationCanceledException) {
+					GGPKStream.Close();
+					GGPKStream = oldStream;
+					throw;
+				}
 			});
 		}
 
@@ -169,13 +233,13 @@ namespace LibGGPK3 {
 					changed = true;
 				}
 				if (changed) {
-					FileStream.Seek(current.Offset, SeekOrigin.Begin);
-					FileStream.Write(current.Length);
+					GGPKStream.Seek(current.Offset, SeekOrigin.Begin);
+					GGPKStream.Write(current.Length);
 				}
 			}
-			if (current != null && current.Offset + current.Length >= FileStream.Length) {
-				FileStream.Flush();
-				FileStream.SetLength(current.Offset);
+			if (current != null && current.Offset + current.Length >= GGPKStream.Length) {
+				GGPKStream.Flush();
+				GGPKStream.SetLength(current.Offset);
 				current.RemoveFromList();
 			}
 		}
@@ -230,7 +294,8 @@ namespace LibGGPK3 {
 
 		public virtual void Dispose() {
 			GC.SuppressFinalize(this);
-			FileStream.Close();
+			if (!LeaveOpen)
+				GGPKStream.Close();
 		}
 
 		~GGPK() {

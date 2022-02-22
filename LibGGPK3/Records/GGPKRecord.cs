@@ -12,14 +12,14 @@
 		public long FirstFreeRecordOffset;
 
 		protected internal GGPKRecord(int length, GGPK ggpk) : base(length, ggpk) {
-			Offset = ggpk.FileStream.Position - 8;
-			GGPKVersion = (uint)ggpk.FileStream.ReadInt32(); // 3
-			RootDirectoryOffset = ggpk.FileStream.ReadInt64();
-			FirstFreeRecordOffset = ggpk.FileStream.ReadInt64();
+			Offset = ggpk.GGPKStream.Position - 8;
+			GGPKVersion = (uint)ggpk.GGPKStream.ReadInt32(); // 3
+			RootDirectoryOffset = ggpk.GGPKStream.ReadInt64();
+			FirstFreeRecordOffset = ggpk.GGPKStream.ReadInt64();
 		}
 
 		protected internal override void WriteRecordData() {
-			var s = Ggpk.FileStream;
+			var s = Ggpk.GGPKStream;
 			Offset = s.Position;
 			s.Write(Length); // 28
 			s.Write(Tag);

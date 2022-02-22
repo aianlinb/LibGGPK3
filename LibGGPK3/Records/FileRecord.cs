@@ -20,7 +20,7 @@ namespace LibGGPK3.Records {
 		public int DataLength;
 
 		protected unsafe internal FileRecord(int length, GGPK ggpk) : base(length, ggpk) {
-			var s = ggpk.FileStream;
+			var s = ggpk.GGPKStream;
 			Offset = s.Position - 8;
 			var nameLength = s.ReadInt32();
 			s.Read(Hash, 0, 32);
@@ -44,7 +44,7 @@ namespace LibGGPK3.Records {
 		}
 
 		protected internal unsafe override void WriteRecordData() {
-			var s = Ggpk.FileStream;
+			var s = Ggpk.GGPKStream;
 			Offset = s.Position;
 			s.Write(Length);
 			s.Write(Tag);
@@ -63,7 +63,7 @@ namespace LibGGPK3.Records {
 		/// <param name="ggpkStream">Stream of GGPK file</param>
 		public virtual byte[] ReadFileContent() {
 			var buffer = new byte[DataLength];
-			var s = Ggpk.FileStream;
+			var s = Ggpk.GGPKStream;
 			s.Flush();
 			s.Seek(DataOffset, SeekOrigin.Begin);
 			for (var l = 0; l < DataLength;)
@@ -76,7 +76,7 @@ namespace LibGGPK3.Records {
 		/// and move the record to the FreeRecord with most suitable size.
 		/// </summary>
 		public virtual void ReplaceContent(ReadOnlySpan<byte> NewContent) {
-			var s = Ggpk.FileStream;
+			var s = Ggpk.GGPKStream;
 			if (!Hash256.TryComputeHash(NewContent, Hash, out _))
 				throw new("Unable to compute hash of the content");
 			if (NewContent.Length != DataLength) { // Replace a FreeRecord

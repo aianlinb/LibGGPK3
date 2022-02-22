@@ -26,7 +26,7 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		/// <param name="specify">The length of specified FreeRecord must not be between Length and Length-16 (exclusive)</param>
 		protected internal virtual void WriteWithNewLength(LinkedListNode<FreeRecord>? specify = null) {
-			var s = Ggpk.FileStream;
+			var s = Ggpk.GGPKStream;
 			specify ??= Ggpk.FindBestFreeRecord(Length, out _);
 			if (specify == null) {
 				s.Seek(0, SeekOrigin.End); // Write to the end of GGPK
@@ -55,7 +55,6 @@ namespace LibGGPK3.Records {
 			Length = newLength;
 			WriteWithNewLength(specify);
 			UpdateOffset(oldOffset);
-			Ggpk.FileStream.Flush();
 			return free;
 		}
 
@@ -63,7 +62,7 @@ namespace LibGGPK3.Records {
 		/// Set the record to a FreeRecord
 		/// </summary>
 		public virtual LinkedListNode<FreeRecord>? MarkAsFreeRecord() {
-			var s = Ggpk.FileStream;
+			var s = Ggpk.GGPKStream;
 			s.Seek(Offset, SeekOrigin.Begin);
 			LinkedListNode<FreeRecord>? rtn = null;
 			var length = Length;
@@ -105,23 +104,23 @@ namespace LibGGPK3.Records {
 		/// Update the offset of this record in <see cref="Parent"/>.<see cref="DirectoryRecord.Entries"/>
 		/// </summary>
 		/// <param name="oldOffset">The original offset to be update</param>
-		protected virtual void UpdateOffset(long oldOffset) {
+		public virtual void UpdateOffset(long oldOffset) {
 			if (oldOffset == Offset)
 				return;
 			if (Parent is DirectoryRecord dr) {
 				for (int i = 0; i < dr.Entries.Length; i++) {
 					if (dr.Entries[i].Offset == oldOffset) {
 						dr.Entries[i].Offset = Offset;
-						Ggpk.FileStream.Seek(dr.EntriesBegin + i * 12 + 4, SeekOrigin.Begin);
-						Ggpk.FileStream.Write(Offset);
+						Ggpk.GGPKStream.Seek(dr.EntriesBegin + i * 12 + 4, SeekOrigin.Begin);
+						Ggpk.GGPKStream.Write(Offset);
 						return;
 					}
 				}
 				throw new(GetPath() + " update offset faild: " + oldOffset.ToString() + " => " + Offset.ToString());
 			} else if (this == Ggpk.Root) {
 				Ggpk.GgpkRecord.RootDirectoryOffset = Offset;
-				Ggpk.FileStream.Seek(Ggpk.GgpkRecord.Offset + 12, SeekOrigin.Begin);
-				Ggpk.FileStream.Write(Offset);
+				Ggpk.GGPKStream.Seek(Ggpk.GgpkRecord.Offset + 12, SeekOrigin.Begin);
+				Ggpk.GGPKStream.Write(Offset);
 			} else
 				throw new NullReferenceException(nameof(Parent));
 		}

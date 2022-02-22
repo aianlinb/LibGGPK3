@@ -82,12 +82,12 @@ namespace LibGGPK3 {
 			Modified = true;
 		}
 
-		public override bool CanRead => Record.Ggpk.FileStream.CanRead;
+		public override bool CanRead => Record.Ggpk.GGPKStream.CanRead;
 
 		/// <returns><see langword="true"/></returns>
 		public override bool CanSeek => true;
 
-		public override bool CanWrite => Record.Ggpk.FileStream.CanWrite;
+		public override bool CanWrite => Record.Ggpk.GGPKStream.CanWrite;
 
 		public override long Length => Buffer.Length;
 
