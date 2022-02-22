@@ -1,10 +1,9 @@
 ﻿using System;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace LibBundle3 {
-	public unsafe class Bundle : IDisposable {
+	public class Bundle : IDisposable {
 		[StructLayout(LayoutKind.Sequential, Size = 60, Pack = 1)]
 		public struct Header {
 			public int uncompressed_size;
@@ -37,24 +36,21 @@ namespace LibBundle3 {
 
 		public byte[]? CachedData;
 
-		public Bundle(string filePath) : this(File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read)) { }
+		public Bundle(string filePath) : this(File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false) { }
 
 		/// <param name="stream">Stream of the bundle</param>
 		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> after this instance has been disposed</param>
-		[SkipLocalsInit]
-		public Bundle(Stream stream, bool leaveOpen = false) {
+		public unsafe Bundle(Stream stream, bool leaveOpen = true) {
 			baseStream = stream ?? throw new ArgumentNullException(nameof(stream));
 			streamLeaveOpen = leaveOpen;
 			stream.Seek(0, SeekOrigin.Begin);
 
-			var p = stackalloc byte[60];
-
-			stream.Read(new(p, 60));
-			header = Marshal.PtrToStructure<Header>((IntPtr)p); // Read bundle header
+			fixed (Header *p = &header)
+				stream.Read(new(p, 60));
 
 			compressed_chunk_sizes = new int[header.chunk_count];
 			fixed (int* p2 = compressed_chunk_sizes)
-				stream.Read(new(p2, header.chunk_count << 2));
+				stream.Read(new(p2, header.chunk_count << 2)); // header.chunk_count * 4
 		}
 
 		/// <summary>
@@ -98,7 +94,7 @@ namespace LibBundle3 {
 		/// <param name="start">Index of a chunk</param>
 		/// <param name="count">Number of chunks to read</param>
 		/// <exception cref="ArgumentOutOfRangeException"></exception>
-		public virtual byte[] ReadChunks(int start, int count = 1) {
+		public virtual unsafe byte[] ReadChunks(int start, int count = 1) {
 			if (start < 0 || start >= compressed_chunk_sizes.Length)
 				throw new ArgumentOutOfRangeException(nameof(start));
 			if (count < 0 || start + count > compressed_chunk_sizes.Length)
@@ -136,7 +132,7 @@ namespace LibBundle3 {
 		/// <summary>
 		/// Save the bundle with new contents
 		/// </summary>
-		public virtual void SaveData(ReadOnlySpan<byte> newData, Oodle.CompressionLevel compressionLevel = Oodle.CompressionLevel.Normal) {
+		public virtual unsafe void SaveData(ReadOnlySpan<byte> newData, Oodle.CompressionLevel compressionLevel = Oodle.CompressionLevel.Normal) {
 			CachedData = null;
 
 			header.size_decompressed = header.uncompressed_size = newData.Length;
@@ -165,15 +161,16 @@ namespace LibBundle3 {
 			header.size_compressed = header.compressed_size;
 
 			baseStream.Seek(0, SeekOrigin.Begin);
-			var tmp = new byte[60];
-			fixed (byte* p = tmp)
-				Marshal.StructureToPtr(header, (IntPtr)p, false);
-			baseStream.Write(tmp, 0, 60);
+			//var tmp = new byte[60];
+			//fixed (byte* p = tmp)
+			//	Marshal.StructureToPtr(header, (IntPtr)p, false);
+			fixed (Header* h = &header)
+				baseStream.Write(new(h, 60));
 			fixed (int* p = chunkSizes)
 				baseStream.Write(new(p, chunkSizes.Length * sizeof(int)));
 
-			baseStream.SetLength(12 + header.head_size + header.compressed_size);
 			baseStream.Flush();
+			baseStream.SetLength(12 + header.head_size + header.compressed_size);
 		}
 
 		public virtual void Dispose() {

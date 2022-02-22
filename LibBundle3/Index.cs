@@ -105,7 +105,7 @@ namespace LibBundle3 {
 			if (!parsePaths)
 				return;
 
-			var directoryBundle = new Bundle(new MemoryStream(directoryBundleData));
+			var directoryBundle = new Bundle(new MemoryStream(directoryBundleData), false);
 			var directory = directoryBundle.ReadData();
 			directoryBundle.Dispose();
 			fixed (byte* p = directory) {
@@ -187,7 +187,7 @@ namespace LibBundle3 {
 		/// </summary>
 		/// <param name="node">Node to extract (recursively)</param>
 		/// <param name="pathToSave">Path on disk</param>
-		public virtual void Extract(Node node, string pathToSave) {
+		public virtual void Extract(BaseNode node, string pathToSave) {
 			pathToSave = pathToSave.Replace('\\', '/');
 			if (node is FileNode fn) {
 				var d = Path.GetDirectoryName(pathToSave);
@@ -285,7 +285,7 @@ namespace LibBundle3 {
 		/// <param name="node">Node to replace (recursively)</param>
 		/// <param name="pathToLoad">Path on disk</param>
 		/// <param name="dontChangeBundle">Whether to force all files to be written to their respective original bundle</param>
-		public virtual void Replace(Node node, string pathToLoad, bool dontChangeBundle = false) {
+		public virtual void Replace(BaseNode node, string pathToLoad, bool dontChangeBundle = false) {
 			if (node is FileNode fn) {
 				fn.Record.Write(File.ReadAllBytes(pathToLoad));
 				Save();
@@ -479,7 +479,7 @@ namespace LibBundle3 {
 
 		/// <param name="path">Relative path below <paramref name="parent"/></param>
 		/// <param name="parent">Node to start searching</param>
-		public virtual Node? FindNode(string path, DirectoryNode? parent = null) {
+		public virtual BaseNode? FindNode(string path, DirectoryNode? parent = null) {
 			parent ??= Root;
 			var SplittedPath = path.Split('/', '\\');
 			foreach (var name in SplittedPath) {
@@ -520,7 +520,7 @@ namespace LibBundle3 {
 		/// <param name="path">Path on disk which don't end with a slash</param>
 		/// <param name="list">A collection to save the results</param>
 		/// <param name="createDirectory">Whether to create the directories of the files</param>
-		public static void RecursiveList(Node node, string path, ICollection<FileRecord> list, bool createDirectory = false) {
+		public static void RecursiveList(BaseNode node, string path, ICollection<FileRecord> list, bool createDirectory = false) {
 			if (node is FileNode fn)
 				list.Add(fn.Record);
 			else if (node is DirectoryNode dn) {
@@ -551,8 +551,10 @@ namespace LibBundle3 {
 		/// <summary>
 		/// For sorting FileRecords with their bundle
 		/// </summary>
-		protected class BundleComparer : IComparer<FileRecord> {
-			public static BundleComparer Instance = new();
+		public sealed class BundleComparer : IComparer<FileRecord> {
+			public static readonly BundleComparer Instance = new();
+			private BundleComparer() {
+			}
 #pragma warning disable CS8767
 			public int Compare(FileRecord x, FileRecord y) {
 				return x.BundleRecord.BundleIndex - y.BundleRecord.BundleIndex;

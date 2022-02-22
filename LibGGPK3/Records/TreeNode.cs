@@ -83,6 +83,7 @@ namespace LibGGPK3.Records {
 				var rtnv = rtn.Value;
 				if (rtnv.Offset + rtnv.Length >= s.Length) {
 					rtnv.RemoveFromList(rtn);
+					s.Flush();
 					s.SetLength(rtnv.Offset);
 					return null;
 				}
@@ -91,6 +92,7 @@ namespace LibGGPK3.Records {
 				return rtn;
 			}
 			if (Offset + length >= s.Length) {
+				s.Flush();
 				s.SetLength(Offset);
 				return null;
 			}

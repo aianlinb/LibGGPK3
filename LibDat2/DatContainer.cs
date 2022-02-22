@@ -489,27 +489,28 @@ namespace LibDat2 {
 		}
 
 		/// <summary>
-		/// Reload DatDefinitions from a file
-		/// This won't affect the existing DatContainers
+		/// Reload DatDefinitions from DatDefinitions.json
+		/// This won't affect the existing instances of <see cref="DatContainer"/>
 		/// </summary>
-		public static void ReloadDefinitions(string filePath = "DatDefinitions.json") {
-			if (!Path.IsPathFullyQualified(filePath)) {
-				var path = Assembly.GetExecutingAssembly().Location;
-				if (string.IsNullOrEmpty(path))
-					path = Environment.ProcessPath;
-				path = Path.GetDirectoryName(path);
-				if (string.IsNullOrEmpty(path))
-					path = Environment.CurrentDirectory;
-				filePath = Path.GetFullPath(filePath, path);
-			}
-			var json = JsonDocument.Parse(File.ReadAllBytes(filePath), new() { CommentHandling = JsonCommentHandling.Skip });
-			try {
-				DatDefinitions = new();
-				foreach (var dat in json.RootElement.EnumerateObject())
-					DatDefinitions.Add(dat.Name, dat.Value.EnumerateObject().Select(p => new KeyValuePair<string, string>(p.Name, p.Value.GetString()!)).ToArray());
-			} finally {
-				json.Dispose();
-			}
+		public static void ReloadDefinitions() {
+			var path = Assembly.GetExecutingAssembly().Location;
+			if (string.IsNullOrEmpty(path))
+				path = Environment.ProcessPath;
+			path = Path.GetDirectoryName(path);
+			if (string.IsNullOrEmpty(path))
+				path = Environment.CurrentDirectory;
+			ReloadDefinitions(Path.GetFullPath("DatDefinitions.json", path));
+		}
+
+		/// <summary>
+		/// Reload DatDefinitions from a file
+		/// This won't affect the existing instances of <see cref="DatContainer"/>
+		/// </summary>
+		public static void ReloadDefinitions(string filePath) {
+			using var json = JsonDocument.Parse(File.ReadAllBytes(filePath), new() { CommentHandling = JsonCommentHandling.Skip });
+			DatDefinitions = new();
+			foreach (var dat in json.RootElement.EnumerateObject())
+				DatDefinitions.Add(dat.Name, dat.Value.EnumerateObject().Select(p => new KeyValuePair<string, string>(p.Name, p.Value.GetString()!)).ToArray());
 		}
 	}
 }

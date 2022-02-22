@@ -1,9 +1,9 @@
 ﻿namespace LibBundle3.Nodes {
-	public abstract class Node {
-		public Node? Parent;
+	public abstract class BaseNode {
+		public BaseNode? Parent;
 		public string Name;
 
-		public Node(string name) {
+		public BaseNode(string name) {
 			Name = name;
 		}
 
