@@ -110,9 +110,11 @@ namespace LibGGPK3 {
 			return bestNode;
 		}
 
+		/// <summary>
+		/// Compact the ggpk to reduce its size
+		/// </summary>
 		/// <param name="progress">returns the number of FreeRecords remaining to be filled.
 		/// This won't be always decreasing</param>
-		/// <returns>total length of remaining FreeRecords</returns>
 		public virtual Task FastCompactAsync(CancellationToken? cancellation = null, IProgress<int>? progress = null) {
 			return Task.Run(() => {
 				cancellation?.ThrowIfCancellationRequested();
@@ -157,38 +159,59 @@ namespace LibGGPK3 {
 			});
 		}
 
-		public virtual Task FullCompactAsync(string pathToSave, CancellationToken? cancellation = null, IProgress<int>? progress = null) {
+		/// <summary>
+		/// Full defragment the ggpk to remove all FreeRecords to reduce its size to the smallest possible size and save it to <paramref name="pathToSave"/>
+		/// </summary>
+		/// <param name="progress">returns the number of Records remaining to be written.</param>
+		public virtual async Task FullCompactAsync(string pathToSave, CancellationToken? cancellation = null, IProgress<int>? progress = null, IList<TreeNode>? nodes = null) {
+			await Task.Run(() => nodes ??= RecursiveTree(Root).ToList()).ConfigureAwait(false);
+			var lengths = nodes!.Sum(n => n.Length);
+			if (new DriveInfo(pathToSave[0..1]).AvailableFreeSpace < lengths)
+				throw new IOException("Not enough disk space");
 			var f = File.Create(pathToSave);
-			return FullCompactAsync(f, cancellation, progress).ContinueWith(t => f.Close());
+			try {
+				f.SetLength(lengths);
+				await FullCompactAsync(f, cancellation, progress, nodes);
+			} finally {
+				f.Close();
+			}
 		}
 
-		public virtual Task FullCompactAsync(Stream streamToSave, CancellationToken? cancellation = null, IProgress<int>? progress = null) {
+		/// <summary>
+		/// Full defragment the ggpk to remove all FreeRecords to reduce its size to the smallest possible size and save it to <paramref name="streamToSave"/>
+		/// </summary>
+		/// <param name="progress">returns the number of Records remaining to be written.</param>
+		public virtual Task FullCompactAsync(Stream streamToSave, CancellationToken? cancellation = null, IProgress<int>? progress = null, IList<TreeNode>? nodes = null) {
 			return Task.Run(() => {
 				var oldStream = GGPKStream;
 				try {
 					cancellation?.ThrowIfCancellationRequested();
 					GGPKStream.Flush();
-					var nodes = RecursiveTree(Root).ToList();
+					nodes ??= RecursiveTree(Root).ToList();
+					if (!nodes.Contains(Root))
+						throw new ArgumentException("The provided nodes contains no Root node", nameof(nodes));
 					var count = nodes.Count;
 					progress?.Report(count + 1);
 					cancellation?.ThrowIfCancellationRequested();
 					GGPKStream = streamToSave;
 					GGPKStream.Seek(0, SeekOrigin.Begin);
 
-					// Write GGPKRecord
-					GgpkRecord.RootDirectoryOffset = 28;
-					GgpkRecord.FirstFreeRecordOffset = 0;
-					GgpkRecord.WriteRecordData();
-
 					// Update Offsets in DirectoryRecords
 					var offset = GgpkRecord.Length + Root.Length;
 					foreach (var node in nodes) {
+						if (node.Ggpk != this)
+							throw new ArgumentException("The provided record not belongs to this GGPK instance", nameof(nodes));
 						if (node.Parent is DirectoryRecord dr)
 							for (int i = 0; i < dr.Entries.Length; i++)
 								if (dr.Entries[i].Offset == node.Offset)
 									dr.Entries[i].Offset = offset;
 						offset += node.Length;
 					}
+
+					// Write GGPKRecord
+					GgpkRecord.RootDirectoryOffset = Root.Offset;
+					GgpkRecord.FirstFreeRecordOffset = 0;
+					GgpkRecord.WriteRecordData();
 					progress?.Report(count);
 
 					// Write other records

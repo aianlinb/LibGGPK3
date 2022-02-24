@@ -149,7 +149,7 @@ namespace LibDat2 {
 					throw new KeyNotFoundException(Name + " was not defined in " + def);
 				FieldDefinitions = new(kvps);
 			} else {
-				def = "DatDefinitions";
+				def = "DatDefinitions.json";
 				if (!DatDefinitions.TryGetValue(Name, out var kvps))
 					throw new KeyNotFoundException(Name + " was not defined in " + def);
 				FieldDefinitions = new(kvps);
@@ -268,7 +268,7 @@ namespace LibDat2 {
 		/// <param name="fieldDatas">Contents of a dat file</param>
 		/// <param name="fileName">Name of the dat file</param>
 		/// <param name="SchemaMin">Whether to use schema.min.json</param>
-		public DatContainer(string fileName, List<IFieldData?[]?>? fieldDatas = null, bool SchemaMin = false) {
+		public DatContainer(string fileName, List<IFieldData?[]?>? fieldDatas, bool SchemaMin = false) {
 			this.SchemaMin = SchemaMin;
 			switch (Path.GetExtension(fileName)) {
 				case ".dat":
@@ -301,7 +301,7 @@ namespace LibDat2 {
 				FieldDefinitions = new(kvps);
 			} else {
 				if (!DatDefinitions.TryGetValue(Name, out var kvps))
-					throw new KeyNotFoundException(Name + " was not defined in DatDefinitions");
+					throw new KeyNotFoundException(Name + " was not defined in DatDefinitions.json");
 				FieldDefinitions = new(kvps);
 			}
 
