@@ -1,7 +1,10 @@
 ﻿using LibGGPK3;
+using LibGGPK3.Records;
 using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 
 namespace GGPKFullCompact3 {
@@ -9,44 +12,65 @@ namespace GGPKFullCompact3 {
 		private static readonly CancellationTokenSource cancel = new();
 		public static void Main(string[] args) {
 			try {
+				Console.OutputEncoding = Encoding.Unicode;
+				Console.InputEncoding = Encoding.Unicode;
 				var version = Assembly.GetExecutingAssembly().GetName().Version!;
-				Console.WriteLine($"GGPKFullCompact3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb."); // ©
+				Console.WriteLine($"GGPKFullCompact3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright © 2022 aianlinb.");
 				Console.WriteLine();
 				if (args.Length == 0) {
-					args = new string[1];
-					Console.Write("Path To GGPK: ");
+					args = new string[2];
+					Console.Write("Path to Content.ggpk: ");
 					args[0] = Console.ReadLine()!;
+					Console.Write("Path to save new GGPK: ");
+					args[1] = Console.ReadLine()!;
 					Console.WriteLine();
+				} else if (args.Length == 1) {
+					Console.WriteLine("Usage: GGPKFullCompact3.exe <Path to Content.ggpk> <Path to save new GGPK>");
+					Console.WriteLine("Enter to exit . . .");
+					Console.ReadLine();
+					return;
 				}
 				if (!File.Exists(args[0])) {
-					Console.WriteLine("File Not Found: " + args[0]);
+					Console.WriteLine("File Not Found: \"" + args[0] + "\"");
 					Console.WriteLine("Enter to exit . . .");
 					Console.ReadLine();
 					return;
 				}
 				args[0] = Path.GetFullPath(args[0]);
+				args[1] = Path.GetFullPath(args[1]);
+				if (args[0] == args[1])
+					throw new ArgumentException("The new ggpk path cannot be the same with the old ggpk path");
 
 				Console.WriteLine("GGPK path: " + args[0]);
-				var size = new FileInfo(args[0]).Length;
-				Console.WriteLine("GGPK size: " + size);
+				Console.WriteLine("New GGPK path: " + args[1]);
+				Console.WriteLine();
 				Console.WriteLine("Reading ggpk file . . .");
 
 				var ggpk = new GGPK(args[0]);
 				var max = -1;
 				var prog = -1;
+				var nodes = ggpk.RecursiveTree(ggpk.Root).ToList();
+				var size = new FileInfo(args[0]).Length;
+				var size2 = ggpk.GgpkRecord.Length + nodes.Sum(n => (long)n.Length);
+				Console.WriteLine("Old GGPK size: " + size);
+				Console.WriteLine("New GGPK size: " + size2);
+
 				Console.CancelKeyPress += OnCancelKeyPress;
 				Console.WriteLine("Start compaction . . .  (Ctrl + C to cancel)");
 				Console.WriteLine();
-				var tsk = ggpk.FullCompactAsync(args[0] + ".new", cancel.Token, new Progress<int>(i => {
+				var tsk = ggpk.FullCompactAsync(args[1], cancel.Token, new Progress<int>(i => {
 					prog = i;
 					if (prog > max)
 						max = prog;
-				}));
-				while (prog < 0)
-					Thread.Sleep(100);
+				}), nodes);
+				while (prog < 0) {
+					Thread.Sleep(200);
+					if (tsk.Exception != null)
+						throw tsk.Exception;
+				}
 				while (!tsk.IsCompleted) {
 					Console.WriteLine($"Remaining records to be written: {prog}/{max}");
-					Thread.Sleep(400);
+					Thread.Sleep(1500);
 				}
 				Console.CancelKeyPress -= OnCancelKeyPress;
 				Console.WriteLine($"Remaining records to be written: {prog}/{max}");
@@ -54,21 +78,13 @@ namespace GGPKFullCompact3 {
 				ggpk.Dispose();
 				cancel.Dispose();
 
-				if (tsk.IsCanceled) {
-					File.Delete(args[0] + ".new");
-					if (tsk.Exception != null)
-						throw tsk.Exception.InnerException!;
+				if (tsk.Exception != null)
+					throw tsk.Exception!;
+				if (tsk.IsCanceled)
 					Console.WriteLine("Cancelled!");
-				} else {
-					if (tsk.Exception != null)
-						throw tsk.Exception.InnerException!;
+				else {
 					Console.WriteLine("Done!");
-					File.Move(args[0], args[0] + ".bak");
-					File.Move(args[0] + ".new", args[0]);
-					var size2 = new FileInfo(args[0]).Length;
-					Console.WriteLine("GGPK size: " + size2);
 					Console.WriteLine("Reduced " + (size - size2) + " bytes");
-					Console.WriteLine("Old ggpk was saved as: " + args[0] + ".bak");
 				}
 			} catch (Exception e) {
 				Console.Error.WriteLine(e);

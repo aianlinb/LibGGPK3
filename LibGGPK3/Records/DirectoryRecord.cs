@@ -6,6 +6,10 @@ using System.Runtime.InteropServices;
 
 namespace LibGGPK3.Records {
 	public class DirectoryRecord : TreeNode {
+		/// <summary>PDIR</summary>
+		public const uint Tag = 0x52494450;
+
+		[StructLayout(LayoutKind.Sequential, Size = 12, Pack = 1)]
 		public struct Entry {
 			/// <summary>
 			/// Murmur2 hash of lowercase entry name
@@ -21,8 +25,6 @@ namespace LibGGPK3.Records {
 				Offset = offset;
 			}
 		}
-
-		public static readonly byte[] Tag = new byte[] { (byte)'P', (byte)'D', (byte)'I', (byte)'R' };
 
 		/// <summary>
 		/// Records (File/Directory) this directory contains.
@@ -52,8 +54,8 @@ namespace LibGGPK3.Records {
 
 			EntriesBegin = s.Position;
 			Entries = new Entry[totalEntries];
-			for (var i = 0; i < totalEntries; i++)
-				Entries[i] = new Entry((uint)s.ReadInt32(), s.ReadInt64());
+			fixed (Entry* p = Entries)
+				s.Read(new(p, totalEntries * 12));
 		}
 
 		protected internal DirectoryRecord(string name, GGPK ggpk) : base(default, ggpk) {
@@ -62,7 +64,7 @@ namespace LibGGPK3.Records {
 			Length = CaculateLength();
 		}
 
-		private SortedSet<TreeNode>? _Children;
+		protected SortedSet<TreeNode>? _Children;
 		/// <summary>
 		/// Do not add/remove any elements from here
 		/// </summary>
@@ -93,7 +95,7 @@ namespace LibGGPK3.Records {
 			dir.WriteWithNewLength();
 			Children.Add(dir);
 			Array.Resize(ref Entries, Entries.Length + 1);
-			Entries[^1] = new Entry(dir.GetNameHash(), dir.Offset);
+			Entries[^1] = new Entry(dir.NameHash, dir.Offset);
 			MoveWithNewLength(CaculateLength());
 			return dir;
 		}
@@ -120,7 +122,7 @@ namespace LibGGPK3.Records {
 				file.WriteWithNewLength();
 			Children.Add(file);
 			Array.Resize(ref Entries, Entries.Length + 1);
-			Entries[^1] = new Entry(file.GetNameHash(), file.Offset);
+			Entries[^1] = new Entry(file.NameHash, file.Offset);
 			MoveWithNewLength(CaculateLength());
 			return file;
 		}
@@ -134,7 +136,7 @@ namespace LibGGPK3.Records {
 			fileRecord.Parent = this;
 			Children.Add(fileRecord);
 			Array.Resize(ref Entries, Entries.Length + 1);
-			Entries[^1] = new Entry(fileRecord.GetNameHash(), fileRecord.Offset);
+			Entries[^1] = new Entry(fileRecord.NameHash, fileRecord.Offset);
 			MoveWithNewLength(CaculateLength());
 		}
 
@@ -167,10 +169,8 @@ namespace LibGGPK3.Records {
 				s.Write(new(p, Name.Length * 2));
 			s.Write((short)0); // Null terminator
 			EntriesBegin = s.Position;
-			foreach (var entry in Entries) {
-				s.Write(entry.NameHash);
-				s.Write(entry.Offset);
-			}
+			fixed (Entry* p = Entries)
+				s.Write(new(p, Entries.Length * 12));
 		}
 
 		/// <summary>

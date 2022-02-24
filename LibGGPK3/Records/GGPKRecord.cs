@@ -4,7 +4,8 @@
 	/// It must have excatly 2 entries - One goes to the root directory and the other to a FREE record.
 	/// </summary>
 	public class GGPKRecord : BaseRecord {
-		public static readonly byte[] Tag = new byte[] { (byte)'G', (byte)'G', (byte)'P', (byte)'K' };
+		/// <summary>GGPK</summary>
+		public const uint Tag = 0x4B504747;
 
 		public uint GGPKVersion = 3; // since POE 3.11.2
 

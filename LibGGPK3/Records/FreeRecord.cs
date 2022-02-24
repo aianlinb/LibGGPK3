@@ -8,7 +8,8 @@ namespace LibGGPK3.Records {
 	/// to remove a piece of data.
 	/// </summary>
 	public class FreeRecord : BaseRecord {
-		public static readonly byte[] Tag = new byte[] { (byte)'F', (byte)'R', (byte)'E', (byte)'E' };
+		/// <summary>FREE</summary>
+		public const uint Tag = 0x45455246;
 
 		/// <summary>
 		/// Offset of next FreeRecord

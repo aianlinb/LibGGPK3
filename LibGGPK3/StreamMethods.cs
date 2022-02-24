@@ -1,4 +1,6 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
+using System.Runtime.InteropServices;
 
 namespace LibGGPK3 {
 	public static class StreamMethods {
@@ -53,6 +55,14 @@ namespace LibGGPK3 {
 
 		public static unsafe void Write(this Stream stream, ulong value) {
 			stream.Write(new(&value, 8));
+		}
+
+		public static unsafe void Write(this Stream stream, nint value) {
+			stream.Write(new(&value, IntPtr.Size));
+		}
+
+		public static unsafe void Write<T>(this Stream stream, T value) where T : unmanaged {
+			stream.Write(new(&value, Marshal.SizeOf(value)));
 		}
 	}
 }

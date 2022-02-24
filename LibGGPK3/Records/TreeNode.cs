@@ -5,10 +5,29 @@ using System.IO;
 namespace LibGGPK3.Records {
 	public abstract class TreeNode : BaseRecord {
 		private static readonly byte[] HashOfEmpty = Convert.FromHexString("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855");
+
+		protected string _Name = "";
 		/// <summary>
 		/// File/Directory name
 		/// </summary>
-		public string Name = "";
+		public string Name {
+			get => _Name;
+			set {
+				_NameHash = null;
+				_Name = value;
+				if (Parent is DirectoryRecord dr) {
+					for (int i = 0; i < dr.Entries.Length; ++i) {
+						if (dr.Entries[i].NameHash == NameHash) {
+							dr.Entries[i].Offset = Offset;
+							Ggpk.GGPKStream.Seek(dr.EntriesBegin + i * 12 + 4, SeekOrigin.Begin);
+							Ggpk.GGPKStream.Write(Offset);
+							return;
+						}
+					}
+					throw new(GetPath() + " update namehash faild: " + Offset);
+				}
+			}
+		}
 		/// <summary>
 		/// SHA256 hash of the file content
 		/// </summary>
@@ -16,7 +35,7 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Parent node
 		/// </summary>
-		public TreeNode? Parent;
+		public DirectoryRecord? Parent;
 
 		protected TreeNode(int length, GGPK ggpk) : base(length, ggpk) {
 		}
@@ -50,11 +69,10 @@ namespace LibGGPK3.Records {
 		public virtual LinkedListNode<FreeRecord>? MoveWithNewLength(int newLength, LinkedListNode<FreeRecord>? specify = null) {
 			if (newLength == Length && specify == null)
 				return null;
-			var oldOffset = Offset;
 			var free = MarkAsFreeRecord();
 			Length = newLength;
 			WriteWithNewLength(specify);
-			UpdateOffset(oldOffset);
+			UpdateOffset();
 			return free;
 		}
 
@@ -104,19 +122,17 @@ namespace LibGGPK3.Records {
 		/// Update the offset of this record in <see cref="Parent"/>.<see cref="DirectoryRecord.Entries"/>
 		/// </summary>
 		/// <param name="oldOffset">The original offset to be update</param>
-		public virtual void UpdateOffset(long oldOffset) {
-			if (oldOffset == Offset)
-				return;
+		public virtual void UpdateOffset() {
 			if (Parent is DirectoryRecord dr) {
-				for (int i = 0; i < dr.Entries.Length; i++) {
-					if (dr.Entries[i].Offset == oldOffset) {
+				for (int i = 0; i < dr.Entries.Length; ++i) {
+					if (dr.Entries[i].NameHash == NameHash) {
 						dr.Entries[i].Offset = Offset;
 						Ggpk.GGPKStream.Seek(dr.EntriesBegin + i * 12 + 4, SeekOrigin.Begin);
 						Ggpk.GGPKStream.Write(Offset);
 						return;
 					}
 				}
-				throw new(GetPath() + " update offset faild: " + oldOffset.ToString() + " => " + Offset.ToString());
+				throw new(GetPath() + " update offset faild: " + Offset);
 			} else if (this == Ggpk.Root) {
 				Ggpk.GgpkRecord.RootDirectoryOffset = Offset;
 				Ggpk.GGPKStream.Seek(Ggpk.GgpkRecord.Offset + 12, SeekOrigin.Begin);
@@ -129,7 +145,7 @@ namespace LibGGPK3.Records {
 
 		/// <exception cref="NullReferenceException">thrown when <see cref="Parent"/> is null</exception>
 		public virtual void Remove() {
-			((DirectoryRecord)Parent!).RemoveChild(this, true);
+			Parent!.RemoveChild(this, true);
 		}
 
 		/// <summary>
@@ -139,11 +155,10 @@ namespace LibGGPK3.Records {
 			return this is FileRecord ? (Parent?.GetPath() ?? "") + Name : (Parent?.GetPath() ?? "") + Name + "/";
 		}
 
+		protected uint? _NameHash;
 		/// <summary>
 		/// Get the murmur hash of name of this File/Directory
 		/// </summary>
-		public virtual uint GetNameHash() {
-			return MurmurHash2Unsafe.Hash(Name.ToLower(), 0);
-		}
+		public virtual uint NameHash => _NameHash ??= MurmurHash2Unsafe.Hash(Name.ToLower(), 0);
 	}
 }

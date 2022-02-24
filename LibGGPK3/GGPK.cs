@@ -9,13 +9,12 @@ using System.Threading.Tasks;
 
 namespace LibGGPK3 {
 	public class GGPK : IDisposable {
-		protected bool LeaveOpen;
-		protected internal Stream GGPKStream;
+		public Stream GGPKStream;
+		public bool LeaveOpen;
 		public readonly GGPKRecord GgpkRecord;
 		public readonly DirectoryRecord Root;
 		protected LinkedList<FreeRecord>? _FreeRecords;
 		public LinkedList<FreeRecord> FreeRecords => _FreeRecords ??= BuildFreeRecordList();
-
 		protected LinkedList<FreeRecord> BuildFreeRecordList() {
 			var list = new LinkedList<FreeRecord>();
 			var offsets = new HashSet<long>();
@@ -39,12 +38,7 @@ namespace LibGGPK3 {
 		public GGPK(Stream stream, bool leaveOpen = true) {
 			LeaveOpen = leaveOpen;
 			GGPKStream = stream;
-
-			// Read ROOT Directory Record
-			if (ReadRecord() is not GGPKRecord gr)
-				throw new("The first record is not GGPKRecord");
-
-			GgpkRecord = gr;
+			GgpkRecord = (GGPKRecord)ReadRecord();
 			Root = (DirectoryRecord)ReadRecord(GgpkRecord.RootDirectoryOffset);
 		}
 
@@ -56,15 +50,14 @@ namespace LibGGPK3 {
 		public unsafe virtual BaseRecord ReadRecord(long? offset = null) {
 			if (offset.HasValue)
 				GGPKStream.Seek(offset.Value, SeekOrigin.Begin);
-
 			var buffer = stackalloc byte[8];
 			GGPKStream.Read(new(buffer, 8));
 			var length = *(int*)buffer;
-			return ((int*)buffer)[1] switch {
-				1162627398 => new FileRecord(length, this), // FILE
-				1380533328 => new DirectoryRecord(length, this), // PDIR
-				1162170950 => new FreeRecord(length, this), // FREE
-				1263552327 => new GGPKRecord(length, this), // GGPK
+			return ((uint*)buffer)[1] switch {
+				FileRecord.Tag => new FileRecord(length, this),
+				DirectoryRecord.Tag => new DirectoryRecord(length, this),
+				FreeRecord.Tag => new FreeRecord(length, this),
+				GGPKRecord.Tag => new GGPKRecord(length, this),
 				_ => throw new Exception("Invalid record tag at offset: " + (GGPKStream.Position - 4))
 			};
 		}
@@ -123,6 +116,8 @@ namespace LibGGPK3 {
 
 				var freeList = new PriorityQueue<FreeRecord, long>(FreeRecords.Select(f => (f, f.Offset)));
 				progress?.Report(freeList.Count);
+				if (freeList.Count == 0)
+					return;
 				var treeNodes = RecursiveTree(Root).ToList();
 				cancellation?.ThrowIfCancellationRequested();
 				treeNodes.Sort(Comparer<TreeNode>.Create((x, y) => y.Length.CompareTo(x.Length)));
@@ -164,10 +159,10 @@ namespace LibGGPK3 {
 		/// </summary>
 		/// <param name="progress">returns the number of Records remaining to be written.</param>
 		public virtual async Task FullCompactAsync(string pathToSave, CancellationToken? cancellation = null, IProgress<int>? progress = null, IList<TreeNode>? nodes = null) {
-			await Task.Run(() => nodes ??= RecursiveTree(Root).ToList()).ConfigureAwait(false);
-			var lengths = nodes!.Sum(n => n.Length);
+			nodes ??= await Task.Run(() => RecursiveTree(Root).ToList()).ConfigureAwait(false);
+			var lengths = GgpkRecord.Length + nodes!.Sum(n => (long)n.Length);
 			if (new DriveInfo(pathToSave[0..1]).AvailableFreeSpace < lengths)
-				throw new IOException("Not enough disk space");
+				throw new IOException("Not enough disk space, " + lengths + " Bytes required");
 			var f = File.Create(pathToSave);
 			try {
 				f.SetLength(lengths);
@@ -187,9 +182,19 @@ namespace LibGGPK3 {
 				try {
 					cancellation?.ThrowIfCancellationRequested();
 					GGPKStream.Flush();
-					nodes ??= RecursiveTree(Root).ToList();
-					if (!nodes.Contains(Root))
-						throw new ArgumentException("The provided nodes contains no Root node", nameof(nodes));
+					if (nodes != null) {
+						var root = false;
+						foreach (var node in nodes) {
+							if (node.Ggpk != this)
+								throw new ArgumentException("One of the provided record not belongs to this GGPK instance", nameof(nodes));
+							if (node == Root)
+								root = true;
+						}
+						if (!root)
+							throw new ArgumentException("The provided nodes contains no Root node", nameof(nodes));
+					} else
+						nodes = RecursiveTree(Root).ToList();
+
 					var count = nodes.Count;
 					progress?.Report(count + 1);
 					cancellation?.ThrowIfCancellationRequested();
@@ -197,14 +202,18 @@ namespace LibGGPK3 {
 					GGPKStream.Seek(0, SeekOrigin.Begin);
 
 					// Update Offsets in DirectoryRecords
-					var offset = GgpkRecord.Length + Root.Length;
+					var offset = (long)GgpkRecord.Length; // 28
 					foreach (var node in nodes) {
-						if (node.Ggpk != this)
-							throw new ArgumentException("The provided record not belongs to this GGPK instance", nameof(nodes));
-						if (node.Parent is DirectoryRecord dr)
-							for (int i = 0; i < dr.Entries.Length; i++)
-								if (dr.Entries[i].Offset == node.Offset)
+						if (node.Parent is DirectoryRecord dr) {
+							for (int i = 0; i < dr.Entries.Length; ++i)
+								if (dr.Entries[i].NameHash == node.NameHash) {
 									dr.Entries[i].Offset = offset;
+									break;
+								}
+						} else if (node == Root)
+							Root.Offset = offset;
+						else
+							throw new NullReferenceException("node.Parent is null\nnode.Name: " + node.Name + "node.Offset: " + node.Offset);
 						offset += node.Length;
 					}
 
@@ -224,7 +233,7 @@ namespace LibGGPK3 {
 							oldStream.Seek(fr.DataOffset, SeekOrigin.Begin);
 							for (var l = 0; l < fr.DataLength;)
 								l += oldStream.Read(buffer, l, fr.DataLength - l);
-							node.WriteRecordData();
+							fr.WriteRecordData();
 							GGPKStream.Write(new(buffer, 0, fr.DataLength));
 						} else
 							node.WriteRecordData();
@@ -243,14 +252,16 @@ namespace LibGGPK3 {
 		}
 
 		protected virtual void FreeRecordConcat() {
+			if (FreeRecords.Count == 0)
+				return;
 			var list = FreeRecords.ToList();
 			list.Sort(Comparer<FreeRecord>.Create((x, y) => x.Offset.CompareTo(y.Offset)));
-			var cont = true;
+			var continu = true;
 			FreeRecord? current = default;
-			for (var i = 0; cont;) {
+			for (var i = 0; continu;) {
 				var changed = false;
 				current = list[i];
-				while ((cont = ++i < list.Count) && current.Offset + current.Length == list[i].Offset) {
+				while ((continu = ++i < list.Count) && current.Offset + current.Length == list[i].Offset) {
 					current.Length += list[i].Length;
 					list[i].RemoveFromList();
 					changed = true;

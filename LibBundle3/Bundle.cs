@@ -44,10 +44,8 @@ namespace LibBundle3 {
 			baseStream = stream ?? throw new ArgumentNullException(nameof(stream));
 			streamLeaveOpen = leaveOpen;
 			stream.Seek(0, SeekOrigin.Begin);
-
 			fixed (Header *p = &header)
 				stream.Read(new(p, 60));
-
 			compressed_chunk_sizes = new int[header.chunk_count];
 			fixed (int* p2 = compressed_chunk_sizes)
 				stream.Read(new(p2, header.chunk_count << 2)); // header.chunk_count * 4

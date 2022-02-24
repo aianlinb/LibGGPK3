@@ -7,7 +7,8 @@ namespace LibGGPK3.Records {
 	/// Record contains the data of a file.
 	/// </summary>
 	public class FileRecord : TreeNode {
-		public static readonly byte[] Tag = new byte[] { (byte)'F', (byte)'I', (byte)'L', (byte)'E' };
+		/// <summary>FILE</summary>
+		public const uint Tag = 0x454C4946;
 		public static readonly SHA256 Hash256 = SHA256.Create();
 
 		/// <summary>
