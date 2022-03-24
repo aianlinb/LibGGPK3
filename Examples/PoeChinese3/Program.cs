@@ -10,9 +10,8 @@ namespace PoeChinese3 {
 	public class Program {
 		public static void Main(string[] args) {
 			try {
-				Console.TreatControlCAsInput = true;
-				var version = Assembly.GetExecutingAssembly().GetName().Version;
-				Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb."); // ©
+				var version = Assembly.GetExecutingAssembly().GetName().Version!;
+				Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb"); // ©
 				Console.WriteLine();
 				if (args.Length == 0) {
 					args = new string[1];

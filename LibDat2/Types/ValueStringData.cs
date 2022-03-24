@@ -36,10 +36,8 @@ namespace LibDat2.Types {
 				if (Dat.UTF32)
 					writer.Write(Encoding.UTF32.GetBytes(Value));
 				else
-					fixed (char* c = Value) { // string is stored in UTF-16 in C#, so we can directly get its bytes for writing
-						var p = (byte*)c;
-						writer.BaseStream.Write(new ReadOnlySpan<byte>(p, Value.Length * 2));
-					}
+					fixed (char* c = Value) // string is stored in UTF-16 in C#, so we can directly get its bytes for writing
+						writer.BaseStream.Write(new ReadOnlySpan<byte>(c, Value.Length * 2));
 			if (Dat.Name == "Languages")
 				writer.Write((short)0);
 			else

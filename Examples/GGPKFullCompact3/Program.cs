@@ -1,10 +1,8 @@
 ﻿using LibGGPK3;
-using LibGGPK3.Records;
 using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading;
 
 namespace GGPKFullCompact3 {
@@ -12,10 +10,8 @@ namespace GGPKFullCompact3 {
 		private static readonly CancellationTokenSource cancel = new();
 		public static void Main(string[] args) {
 			try {
-				Console.OutputEncoding = Encoding.Unicode;
-				Console.InputEncoding = Encoding.Unicode;
 				var version = Assembly.GetExecutingAssembly().GetName().Version!;
-				Console.WriteLine($"GGPKFullCompact3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright © 2022 aianlinb.");
+				Console.WriteLine($"GGPKFullCompact3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb");
 				Console.WriteLine();
 				if (args.Length == 0) {
 					args = new string[2];
@@ -26,12 +22,14 @@ namespace GGPKFullCompact3 {
 					Console.WriteLine();
 				} else if (args.Length == 1) {
 					Console.WriteLine("Usage: GGPKFullCompact3.exe <Path to Content.ggpk> <Path to save new GGPK>");
+					Console.WriteLine();
 					Console.WriteLine("Enter to exit . . .");
 					Console.ReadLine();
 					return;
 				}
 				if (!File.Exists(args[0])) {
 					Console.WriteLine("File Not Found: \"" + args[0] + "\"");
+					Console.WriteLine();
 					Console.WriteLine("Enter to exit . . .");
 					Console.ReadLine();
 					return;

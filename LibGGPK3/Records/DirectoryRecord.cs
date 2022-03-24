@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace LibGGPK3.Records {
 	public class DirectoryRecord : TreeNode {
@@ -41,17 +42,20 @@ namespace LibGGPK3.Records {
 		protected unsafe internal DirectoryRecord(int length, GGPK ggpk) : base(length, ggpk) {
 			var s = ggpk.GGPKStream;
 			Offset = s.Position - 8;
-			var nameLength = s.ReadInt32();
+			var nameLength = s.ReadInt32() - 1;
 			var totalEntries = s.ReadInt32();
 			s.Read(Hash, 0, 32);
-
-			var name = new char[nameLength - 1];
-			fixed (char* p = name)
-				s.Read(new(p, name.Length * 2));
-
-			Name = new(name);
-			s.Seek(2, SeekOrigin.Current); // Null terminator
-
+			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
+				var b = new byte[nameLength * 4];
+				s.Read(b, 0, b.Length);
+				Name = Encoding.UTF32.GetString(b);
+				s.Seek(4, SeekOrigin.Current); // Null terminator
+			} else {
+				Name = Extensions.FastAllocateString(nameLength);
+				fixed (char* p = Name)
+					s.Read(new(p, Name.Length * 2));
+				s.Seek(2, SeekOrigin.Current); // Null terminator
+			}
 			EntriesBegin = s.Position;
 			Entries = new Entry[totalEntries];
 			fixed (Entry* p = Entries)
@@ -154,7 +158,7 @@ namespace LibGGPK3.Records {
 		}
 
 		public override int CaculateLength() {
-			return Entries.Length * 12 + Name.Length * 2 + 50; // (4 + 4 + 4 + 4 + Entries.Length + Hash.Length + (Name + "\0").Length * 2) + Entries.Length * 12
+			return Entries.Length * 12 + (Name.Length + 1) * (Ggpk.GgpkRecord.GGPKVersion == 4 ? 4 : 2) + 48; // (4 + 4 + 4 + 4 + Entries.Length + Hash.Length + (Name + "\0").Length * 2) + Entries.Length * 12
 		}
 
 		protected internal unsafe override void WriteRecordData() {
@@ -165,9 +169,14 @@ namespace LibGGPK3.Records {
 			s.Write(Name.Length + 1);
 			s.Write(Entries.Length);
 			s.Write(Hash);
-			fixed (char* p = Name)
-				s.Write(new(p, Name.Length * 2));
-			s.Write((short)0); // Null terminator
+			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
+				s.Write(Encoding.UTF32.GetBytes(Name));
+				s.Write(0); // Null terminator
+			} else {
+				fixed (char* p = Name)
+					s.Write(new(p, Name.Length * 2));
+				s.Write((short)0); // Null terminator
+			}
 			EntriesBegin = s.Position;
 			fixed (Entry* p = Entries)
 				s.Write(new(p, Entries.Length * 12));

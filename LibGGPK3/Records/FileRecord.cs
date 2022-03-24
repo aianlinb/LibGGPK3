@@ -1,6 +1,9 @@
 ﻿using System;
 using System.IO;
+using System.Reflection;
 using System.Security.Cryptography;
+using System.Text;
+using System.Xml.Linq;
 
 namespace LibGGPK3.Records {
 	/// <summary>
@@ -23,13 +26,19 @@ namespace LibGGPK3.Records {
 		protected unsafe internal FileRecord(int length, GGPK ggpk) : base(length, ggpk) {
 			var s = ggpk.GGPKStream;
 			Offset = s.Position - 8;
-			var nameLength = s.ReadInt32();
+			var nameLength = s.ReadInt32() - 1;
 			s.Read(Hash, 0, 32);
-			var name = new char[nameLength - 1];
-			fixed (char* p = name)
-				s.Read(new(p, name.Length * 2));
-			Name = new(name);
-			s.Seek(2, SeekOrigin.Current); // Null terminator
+			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
+				var b = new byte[nameLength * 4];
+				s.Read(b, 0, b.Length);
+				Name = Encoding.UTF32.GetString(b);
+				s.Seek(4, SeekOrigin.Current); // Null terminator
+			} else {
+				Name = Extensions.FastAllocateString(nameLength);
+				fixed (char* p = Name)
+					s.Read(new(p, Name.Length * 2));
+				s.Seek(2, SeekOrigin.Current); // Null terminator
+			}
 			DataOffset = s.Position;
 			DataLength = Length - (int)(s.Position - Offset);
 			s.Seek(DataLength, SeekOrigin.Current);
@@ -41,7 +50,7 @@ namespace LibGGPK3.Records {
 		}
 
 		public override int CaculateLength() {
-			return Name.Length * 2 + 46 + DataLength; // (4 + 4 + 4 + Hash.Length + (Name + "\0").Length * 2) + DataLength
+			return (Name.Length + 1) * (Ggpk.GgpkRecord.GGPKVersion == 4 ? 4 : 2) + 44 + DataLength; // (4 + 4 + 4 + Hash.Length + (Name + "\0").Length * 2) + DataLength
 		}
 
 		protected internal unsafe override void WriteRecordData() {
@@ -51,9 +60,14 @@ namespace LibGGPK3.Records {
 			s.Write(Tag);
 			s.Write(Name.Length + 1);
 			s.Write(Hash);
-			fixed (char* p = Name)
-				s.Write(new(p, Name.Length * 2));
-			s.Write((short)0); // Null terminator
+			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
+				s.Write(Encoding.UTF32.GetBytes(Name));
+				s.Write(0); // Null terminator
+			} else {
+				fixed (char* p = Name)
+					s.Write(new(p, Name.Length * 2));
+				s.Write((short)0); // Null terminator
+			}
 			DataOffset = s.Position;
 			// Actual file content writing of FileRecord isn't here
 		}

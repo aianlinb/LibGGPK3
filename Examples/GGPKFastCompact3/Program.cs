@@ -11,10 +11,8 @@ namespace GGPKFastCompact3 {
 		private static readonly CancellationTokenSource cancel = new();
 		public static void Main(string[] args) {
 			try {
-				Console.OutputEncoding = Encoding.Unicode;
-				Console.InputEncoding = Encoding.Unicode;
 				var version = Assembly.GetExecutingAssembly().GetName().Version!;
-				Console.WriteLine($"GGPKFastCompact3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright © 2022 aianlinb.");
+				Console.WriteLine($"GGPKFastCompact3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb");
 				Console.WriteLine();
 				if (args.Length == 0) {
 					args = new string[1];
@@ -24,6 +22,7 @@ namespace GGPKFastCompact3 {
 				}
 				if (!File.Exists(args[0])) {
 					Console.WriteLine("File Not Found: \"" + args[0] + "\"");
+					Console.WriteLine();
 					Console.WriteLine("Enter to exit . . .");
 					Console.ReadLine();
 					return;

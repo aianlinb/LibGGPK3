@@ -3,29 +3,39 @@ using LibGGPK3.Records;
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Reflection;
 
 namespace PatchGGPK3 {
 	public class Program {
 		public static void Main(string[] args) {
-			Console.TreatControlCAsInput = true;
-			Console.WriteLine("PatchGGPK3  Copyright (C) 2021-2022 aianlinb."); // ©
+			var version = Assembly.GetExecutingAssembly().GetName().Version!;
+			Console.WriteLine($"PatchGGPK3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb"); // ©
 			Console.WriteLine();
 			if (args.Length == 0) {
 				args = new string[2];
-				Console.Write("Path To GGPK: ");
+				Console.Write("Path to Content.ggpk: ");
 				args[0] = Console.ReadLine()!;
-				Console.Write("Path To Zip File: ");
+				Console.Write("Path to zip file: ");
 				args[1] = Console.ReadLine()!;
 			} else if (args.Length != 2) {
 				Console.WriteLine("Usage: PatchGGPK3 <PathToGGPK> <ZipFile>");
+				Console.WriteLine();
+				Console.WriteLine("Enter to exit . . .");
+				Console.ReadLine();
 				return;
 			}
 			if (!File.Exists(args[0])) {
 				Console.WriteLine("FileNotFound: " + args[0]);
+				Console.WriteLine();
+				Console.WriteLine("Enter to exit . . .");
+				Console.ReadLine();
 				return;
 			}
 			if (!File.Exists(args[1])) {
 				Console.WriteLine("FileNotFound: " + args[1]);
+				Console.WriteLine();
+				Console.WriteLine("Enter to exit . . .");
+				Console.ReadLine();
 				return;
 			}
 
@@ -39,10 +49,8 @@ namespace PatchGGPK3 {
 			int successed = 0, failed = 0;
 			Console.WriteLine();
 			foreach (var e in zip.Entries) {
-				if (e.FullName.EndsWith('/')) {
+				if (e.FullName.EndsWith('/'))
 					continue;
-				}
-
 				Console.Write("Replacing " + e.FullName + " . . . ");
 				if (ggpk.FindNode(e.FullName) is not FileRecord fr) {
 					++failed;
@@ -52,10 +60,8 @@ namespace PatchGGPK3 {
 				}
 				var fs = e.Open();
 				var b = new byte[e.Length];
-				for (var l = 0; l < b.Length;) {
+				for (var l = 0; l < b.Length;)
 					l += fs.Read(b, l, b.Length - l);
-				}
-
 				fs.Close();
 				fr.ReplaceContent(b);
 				++successed;
@@ -64,6 +70,9 @@ namespace PatchGGPK3 {
 			Console.WriteLine();
 			Console.WriteLine("All finished!");
 			Console.WriteLine($"Replaced {successed} files, {failed} files failed");
+			Console.WriteLine();
+			Console.WriteLine("Enter to exit . . .");
+			Console.ReadLine();
 		}
 	}
 }
