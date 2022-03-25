@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace LibGGPK3.Records {
 	public abstract class TreeNode : BaseRecord {
@@ -142,12 +143,6 @@ namespace LibGGPK3.Records {
 		}
 
 		public abstract int CaculateLength();
-
-		/// <exception cref="NullReferenceException">thrown when <see cref="Parent"/> is null</exception>
-		public virtual void Remove() {
-			Parent!.RemoveChild(this, true);
-		}
-
 		/// <summary>
 		/// Get the full path in GGPK of this File/Directory
 		/// </summary>
@@ -159,6 +154,46 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Get the murmur hash of name of this File/Directory
 		/// </summary>
-		public virtual uint NameHash => _NameHash ??= MurmurHash2Unsafe.Hash(Name.ToLower(), 0);
+		public virtual uint NameHash => _NameHash ??= GetNameHash(Name);
+
+		public static uint GetNameHash(string name) => MurmurHash2Unsafe.Hash(name.ToLower(), 0);
+
+		/// <summary>
+		/// Use to sort the children of directory.
+		/// </summary>
+		public sealed class NodeComparer : IComparer<TreeNode> {
+			public static readonly IComparer<TreeNode> Instance = OperatingSystem.IsWindows() ? new NodeComparer_Windows() : new NodeComparer();
+
+#pragma warning disable CS8767
+			public int Compare(TreeNode x, TreeNode y) {
+				if (x is DirectoryRecord)
+					if (y is DirectoryRecord)
+						return string.Compare(x.Name, y.Name);
+					else
+						return -1;
+				else
+					if (y is DirectoryRecord)
+					return 1;
+				else
+					return string.Compare(x.Name, y.Name);
+			}
+
+			public sealed class NodeComparer_Windows : IComparer<TreeNode> {
+				[DllImport("shlwapi", CallingConvention = CallingConvention.Winapi, CharSet = CharSet.Unicode)]
+				public static extern int StrCmpLogicalW(string x, string y);
+				public int Compare(TreeNode x, TreeNode y) {
+					if (x is DirectoryRecord)
+						if (y is DirectoryRecord)
+							return StrCmpLogicalW(x.Name, y.Name);
+						else
+							return -1;
+					else
+						if (y is DirectoryRecord)
+						return 1;
+					else
+						return StrCmpLogicalW(x.Name, y.Name);
+				}
+			}
+		}
 	}
 }

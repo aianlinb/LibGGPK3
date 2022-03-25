@@ -1,11 +1,28 @@
 ﻿using System;
 using System.IO;
+using System.Net.Sockets;
+using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace LibGGPK3 {
 	public static class Extensions {
 		public static readonly Func<int, string> FastAllocateString = typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic)!.CreateDelegate<Func<int, string>>();
+
+		public static async Task<string> GetPatchServer(bool garena = false) {
+			var tcp = new Socket(SocketType.Stream, ProtocolType.Tcp);
+			if (garena)
+				await tcp.ConnectAsync(Dns.GetHostAddresses("login.tw.pathofexile.com"), 12999);
+			else
+				await tcp.ConnectAsync(Dns.GetHostAddresses("us.login.pathofexile.com"), 12995);
+			var b = new byte[256];
+			await tcp.SendAsync(new byte[] { 1, 4 }, SocketFlags.None);
+			await tcp.ReceiveAsync(b, SocketFlags.None);
+			tcp.Close();
+			return Encoding.Unicode.GetString(b, 35, b[34] * 2);
+		}
 
 		public static unsafe short ReadInt16(this Stream stream) {
 			var b = new byte[2];

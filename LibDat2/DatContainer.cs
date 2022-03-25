@@ -354,11 +354,11 @@ namespace LibDat2 {
 		/// <returns>Content of the csv file</returns>
 		public virtual string ToCsv() {
 			var f = new StringBuilder();
-			var reg = new Regex("\n|\r|,", RegexOptions.Compiled);
+			var reg = new Regex("\"|\n|\r|,", RegexOptions.Compiled);
 
 			// Field Names
 			foreach (var field in FieldDefinitions.Select(t => t.Key))
-				if (field.StartsWith('"') || reg.IsMatch(field))
+				if (reg.IsMatch(field))
 					f.Append("\"" + field.Replace("\"", "\"\"") + "\",");
 				else
 					f.Append(field + ",");
@@ -374,7 +374,7 @@ namespace LibDat2 {
 			foreach (var row in FieldDatas) {
 				foreach (var col in row!) {
 					var s = col!.ToString();
-					if (s.StartsWith('"') || reg.IsMatch(s))
+					if (reg.IsMatch(s))
 						f.Append("\"" + s.Replace("\"", "\"\"") + "\",");
 					else
 						f.Append(s + ",");

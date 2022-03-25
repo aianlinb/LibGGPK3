@@ -74,11 +74,9 @@ namespace LibGGPK3 {
 			foreach (var name in SplittedPath) {
 				if (name == "")
 					continue;
-
-				var next = parent.Children.FirstOrDefault(t => t.Name == name);
+				var next = parent[TreeNode.GetNameHash(name)];
 				if (next is not DirectoryRecord dr)
 					return next;
-
 				parent = dr;
 			}
 			return parent;

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -68,21 +69,28 @@ namespace LibGGPK3.Records {
 			Length = CaculateLength();
 		}
 
-		protected SortedSet<TreeNode>? _Children;
-		/// <summary>
-		/// Do not add/remove any elements from here
-		/// </summary>
-		public virtual SortedSet<TreeNode> Children {
+		protected Dictionary<uint, TreeNode>? _Children;
+
+		public TreeNode? this[uint NameHash] {
 			get {
-				if (_Children == null) {
-					_Children = new SortedSet<TreeNode>(NodeComparer.Instance);
-					foreach (var e in Entries) {
-						var b = (TreeNode)Ggpk.ReadRecord(e.Offset);
-						b.Parent = this;
-						_Children.Add(b);
-					}
-				}
-				return _Children;
+				_Children ??= new(Entries.Length);
+				if (!_Children.TryGetValue(NameHash, out var node))
+					foreach (var e in Entries)
+						if (e.NameHash == NameHash) {
+							node = (TreeNode)Ggpk.ReadRecord(e.Offset);
+							node.Parent = this;
+							_Children.Add(NameHash, node);
+							break;
+						}
+				return node;
+			}
+		}
+
+		public virtual IEnumerable<TreeNode> Children {
+			get {
+				if (_Children?.Count == Entries.Length)
+					return _Children.Values;
+				return Entries.Select(e => this[e.NameHash]!);
 			}
 		}
 
@@ -97,9 +105,10 @@ namespace LibGGPK3.Records {
 				dir.Length = dir.CaculateLength();
 			}
 			dir.WriteWithNewLength();
-			Children.Add(dir);
 			Array.Resize(ref Entries, Entries.Length + 1);
 			Entries[^1] = new Entry(dir.NameHash, dir.Offset);
+			_Children ??= new(Entries.Length);
+			_Children.Add(dir.NameHash, dir);
 			MoveWithNewLength(CaculateLength());
 			return dir;
 		}
@@ -124,36 +133,42 @@ namespace LibGGPK3.Records {
 				Ggpk.GGPKStream.Write(content);
 			} else
 				file.WriteWithNewLength();
-			Children.Add(file);
 			Array.Resize(ref Entries, Entries.Length + 1);
 			Entries[^1] = new Entry(file.NameHash, file.Offset);
+			_Children ??= new(Entries.Length);
+			_Children.Add(file.NameHash, file);
 			MoveWithNewLength(CaculateLength());
 			return file;
 		}
 
 		/// <summary>
-		/// Add a exist FileRecord to this directory
+		/// Add a exist TreeNode to this directory
 		/// </summary>
-		public virtual void AddFile(FileRecord fileRecord) {
+		public virtual void AddNode(TreeNode node) {
 			if (this == Ggpk.Root)
 				throw new InvalidOperationException("You can't add child elements to the root folder, otherwise it will break the GGPK when the game starts");
-			fileRecord.Parent = this;
-			Children.Add(fileRecord);
+			node.Parent = this;
 			Array.Resize(ref Entries, Entries.Length + 1);
-			Entries[^1] = new Entry(fileRecord.NameHash, fileRecord.Offset);
+			Entries[^1] = new Entry(node.NameHash, node.Offset);
+			_Children ??= new(Entries.Length);
+			_Children.Add(node.NameHash, node);
 			MoveWithNewLength(CaculateLength());
 		}
 
-		public virtual void RemoveChild(TreeNode node, bool markAsFree = false) {
-			Children.Remove(node);
-			if (markAsFree)
-				node.MarkAsFreeRecord();
-			var list = Entries.ToList();
-			var i = list.FindIndex(e => e.Offset == node.Offset);
-			if (i >= 0) {
-				list.RemoveAt(i);
-				Entries = list.ToArray();
-				MoveWithNewLength(CaculateLength());
+		public virtual unsafe void RemoveChild(uint nameHash) {
+			_Children?.Remove(nameHash);
+			for (var i = 0; i < Entries.Length ; ++i) {
+				if (Entries[i].NameHash == nameHash) {
+					var tmp = Entries;
+					Entries = new Entry[tmp.Length - 1];
+					fixed (Entry* old = tmp, e = Entries) {
+						var offset = i * sizeof(Entry);
+						Unsafe.CopyBlockUnaligned(e, old, (uint)offset);
+						Unsafe.CopyBlockUnaligned(e + offset, old + offset + sizeof(Entry), (uint)((tmp.Length - i) * sizeof(Entry)));
+					}
+					MoveWithNewLength(CaculateLength());
+					break;
+				}
 			}
 		}
 
@@ -182,42 +197,5 @@ namespace LibGGPK3.Records {
 				s.Write(new(p, Entries.Length * 12));
 		}
 
-		/// <summary>
-		/// Use to sort the children of directory.
-		/// </summary>
-		protected sealed class NodeComparer : IComparer<TreeNode> {
-			public static readonly IComparer<TreeNode> Instance = OperatingSystem.IsWindows() ? new NodeComparer_Windows() : new NodeComparer();
-
-#pragma warning disable CS8767
-			public int Compare(TreeNode x, TreeNode y) {
-				if (x is DirectoryRecord)
-					if (y is DirectoryRecord)
-						return string.Compare(x.Name, y.Name);
-					else
-						return -1;
-				else
-					if (y is DirectoryRecord)
-						return 1;
-					else
-						return string.Compare(x.Name, y.Name);
-			}
-
-			public sealed class NodeComparer_Windows : IComparer<TreeNode> {
-				[DllImport("shlwapi", CallingConvention = CallingConvention.Winapi, CharSet = CharSet.Unicode)]
-				public static extern int StrCmpLogicalW(string x, string y);
-				public int Compare(TreeNode x, TreeNode y) {
-					if (x is DirectoryRecord)
-						if (y is DirectoryRecord)
-							return StrCmpLogicalW(x.Name, y.Name);
-						else
-							return -1;
-					else
-						if (y is DirectoryRecord)
-							return 1;
-						else
-							return StrCmpLogicalW(x.Name, y.Name);
-				}
-			}
-		}
 	}
 }
