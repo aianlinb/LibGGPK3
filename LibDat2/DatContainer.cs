@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -493,13 +494,19 @@ namespace LibDat2 {
 		/// This won't affect the existing instances of <see cref="DatContainer"/>
 		/// </summary>
 		public static void ReloadDefinitions() {
-			var path = Assembly.GetExecutingAssembly().Location;
-			if (string.IsNullOrEmpty(path))
-				path = Environment.ProcessPath;
-			path = Path.GetDirectoryName(path);
-			if (string.IsNullOrEmpty(path))
-				path = Environment.CurrentDirectory;
-			ReloadDefinitions(Path.GetFullPath("DatDefinitions.json", path));
+			if (File.Exists("DatDefinitions.json"))
+				ReloadDefinitions("DatDefinitions.json");
+			else {
+				var path = Path.GetDirectoryName(Assembly.GetExecutingAssembly()?.Location);
+				if (string.IsNullOrEmpty(path))
+					path = AppContext.BaseDirectory;
+				if (string.IsNullOrEmpty(path))
+					path = Path.GetDirectoryName(Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName);
+				if (string.IsNullOrEmpty(path))
+					ReloadDefinitions("DatDefinitions.json"); // throws FileNotFoundException
+				else
+					ReloadDefinitions(Path.GetFullPath("DatDefinitions.json", path));
+			}
 		}
 
 		/// <summary>

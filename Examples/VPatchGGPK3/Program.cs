@@ -1,6 +1,5 @@
 using Eto.Forms;
 using System;
-using System.Configuration;
 
 namespace VPatchGGPK3 {
 	public static class Program {

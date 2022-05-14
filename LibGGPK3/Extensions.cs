@@ -9,8 +9,11 @@ using System.Threading.Tasks;
 
 namespace LibGGPK3 {
 	public static class Extensions {
+#if AOT
+		public static string FastAllocateString(int length) => new('\0', length);
+#else
 		public static readonly Func<int, string> FastAllocateString = typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic)!.CreateDelegate<Func<int, string>>();
-
+#endif
 		public static async Task<string> GetPatchServer(bool garena = false) {
 			var tcp = new Socket(SocketType.Stream, ProtocolType.Tcp);
 			if (garena)

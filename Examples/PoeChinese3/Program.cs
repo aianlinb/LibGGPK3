@@ -3,6 +3,8 @@ using LibDat2;
 using System;
 using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text;
 using Index = LibBundle3.Index;
 
 #nullable disable
@@ -10,17 +12,20 @@ namespace PoeChinese3 {
 	public class Program {
 		public static void Main(string[] args) {
 			try {
+				Console.OutputEncoding = Encoding.UTF8;
 				var version = Assembly.GetExecutingAssembly().GetName().Version!;
 				Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb"); // ©
+				Console.WriteLine($"流亡黯道 - 啟/禁用繁體中文語系  By aianlinb");
 				Console.WriteLine();
 				if (args.Length == 0) {
 					args = new string[1];
-					Console.Write("Path to Content.ggpk / _.index.bin: ");
-					args[0] = Console.ReadLine()!;
+					Console.WriteLine($"請輸入檔案路徑 (原版 / Steam版)");
+					Console.Write("Path to (Content.ggpk / _.index.bin): ");
+					args[0] = Console.ReadLine()!.Trim('\'', '"', ' ', '\r', '\n', '\t');
 					Console.WriteLine();
 				}
 				if (!File.Exists(args[0])) {
-					Console.WriteLine("File not found: " + args[0]);
+					Console.WriteLine("檔案不存在 (File not found): " + args[0]);
 					Console.WriteLine();
 					Console.WriteLine("Enter to exit . . .");
 					Console.ReadLine();
@@ -37,6 +42,7 @@ namespace PoeChinese3 {
 						Modify(ggpk.index);
 						ggpk.Dispose();
 						Console.WriteLine("Done!");
+						Console.WriteLine("中文化完成！ 再次使用以還原");
 						break;
 					case ".bin":
 						Console.WriteLine("Index path: " + args[0]);
@@ -46,13 +52,17 @@ namespace PoeChinese3 {
 						Modify(index);
 						index.Dispose();
 						Console.WriteLine("Done!");
+						Console.WriteLine("中文化完成！ 再次使用以還原");
 						break;
 					default:
 						Console.WriteLine("Unknown file extension: " + Path.GetFileName(args[0]));
 						break;
 				}
 			} catch (Exception e) {
+				var color = Console.ForegroundColor;
+				Console.ForegroundColor = ConsoleColor.Red;
 				Console.Error.WriteLine(e);
+				Console.ForegroundColor = color;
 			}
 			Console.WriteLine();
 			Console.WriteLine("Enter to exit . . .");

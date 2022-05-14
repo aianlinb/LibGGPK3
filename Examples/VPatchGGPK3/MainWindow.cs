@@ -64,7 +64,7 @@ namespace VPatchGGPK3 {
 				try {
 					File.WriteAllText("VPatchGGPK3.txt", ggpkPath.Text);
 				} catch (Exception ex) {
-					output!.Append("Warning: " + ex.Message);
+					output!.Append("Exception: " + ex.Message);
 				}
 				if (!File.Exists(ggpkPath.Text)) {
 					MessageBox.Show(this, "找不到檔案: " + ggpkPath.Text, "Error", MessageBoxType.Error);
@@ -128,9 +128,17 @@ namespace VPatchGGPK3 {
 		}
 
 		private void OnLoadComplete(object? sender, EventArgs e) {
-			Environment.CurrentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location ?? Assembly.GetCallingAssembly().Location ?? Environment.ProcessPath) ?? Environment.CurrentDirectory;
-			if (File.Exists("VPatchGGPK3.txt"))
-				ggpkPath.Text = File.ReadAllText("VPatchGGPK3.txt");
+			var path = AppContext.BaseDirectory;
+			if (string.IsNullOrEmpty(path))
+				path = Path.GetDirectoryName(Assembly.GetExecutingAssembly()?.Location ?? Assembly.GetEntryAssembly()?.Location ?? Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName);
+			if (!string.IsNullOrEmpty(path))
+				Environment.CurrentDirectory = path;
+			try {
+				if (File.Exists("VPatchGGPK3.txt"))
+					ggpkPath.Text = File.ReadAllText("VPatchGGPK3.txt");
+			} catch (Exception ex) {
+				output!.Append("Exception: " + ex.Message);
+			}
 		}
 	}
 }
