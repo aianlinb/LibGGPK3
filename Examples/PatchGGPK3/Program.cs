@@ -67,6 +67,7 @@ namespace PatchGGPK3 {
 				++successed;
 				Console.WriteLine("Done");
 			}
+			ggpk.Dispose();
 			Console.WriteLine();
 			Console.WriteLine("All finished!");
 			Console.WriteLine($"Replaced {successed} files, {failed} files failed");

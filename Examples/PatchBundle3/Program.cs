@@ -46,6 +46,7 @@ namespace PatchBundle3 {
 				var zip = ZipFile.OpenRead(args[1]);
 
 				index.Replace(zip.Entries);
+				index.Dispose();
 				Console.WriteLine("Done!");
 			} catch (Exception e) {
 				Console.Error.WriteLine(e);

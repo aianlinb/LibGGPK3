@@ -47,6 +47,7 @@ namespace PatchBundledGGPK3 {
 				var zip = ZipFile.OpenRead(args[1]);
 
 				ggpk.index.Replace(zip.Entries);
+				ggpk.Dispose();
 				Console.WriteLine("Done!");
 			} catch (Exception e) {
 				Console.Error.WriteLine(e);

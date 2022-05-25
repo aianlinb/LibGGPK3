@@ -60,48 +60,7 @@ namespace VPatchGGPK3 {
 				VerticalAlignment = VerticalAlignment.Center
 			}, pin = new TextBox() { Width = 50 } });
 			layout.EndCentered();
-			layout.Add(new Button(async (_, _) => {
-				try {
-					File.WriteAllText("VPatchGGPK3.txt", ggpkPath.Text);
-				} catch (Exception ex) {
-					output!.Append("Exception: " + ex.Message);
-				}
-				if (!File.Exists(ggpkPath.Text)) {
-					MessageBox.Show(this, "找不到檔案: " + ggpkPath.Text, "Error", MessageBoxType.Error);
-					return;
-				}
-
-				var json = (await JsonDocument.ParseAsync(await http.GetStreamAsync(tw.Checked ? "https://poedb.tw/fg/pin_tw.json" : "https://poedb.tw/fg/pin_cn.json"))).RootElement;
-				var url = await Extensions.GetPatchServer();
-				var officialVersion = url[(url.LastIndexOf('/', url.Length - 2) + 1)..^1];
-				if (json.GetProperty("version").GetString()! != officialVersion) {
-					MessageBox.Show(this, "Server Version not match Patch Version\r\n編年史中文化更新中，請稍待", "Error", MessageBoxType.Error);
-					return;
-				}
-				if (json.GetProperty("pin").GetString()! != pin.Text) {
-					MessageBox.Show(this, "無效的PIN碼\r\n請詳閱: https://poedb.tw/chinese", "Error", MessageBoxType.Error);
-					return;
-				}
-				var md5 = json.GetProperty("md5").GetString()!;
-
-				var ggpk = new GGPK(ggpkPath.Text);
-				var zip = new ZipArchive(await http.GetStreamAsync("https://poedb.tw/fg/" + md5 + ".zip"));
-				foreach (var e in zip.Entries) {
-					if (e.FullName.EndsWith('/'))
-						continue;
-					if (ggpk.FindNode(e.FullName) is not FileRecord fr) {
-						output!.Append("Unable to find in ggpk: " + e.FullName + "\r\n", true);
-						continue;
-					}
-					var f = e.Open();
-					var b = new byte[e.Length];
-					f.Read(b, 0, b.Length);
-					f.Close();
-					fr.ReplaceContent(b);
-					output!.Append("Replaced: " + e.FullName + "\r\n", true);
-				}
-				output!.Append("\r\nDone!\r\n", true);
-			}) { Text = "套用中文化", Height = 35 });
+			layout.Add(new Button(OnButtonClick) { Text = "套用中文化", Height = 35 });
 			layout.AddSpace();
 			var link = new LinkButton() {
 				Text = "poedb.tw",
@@ -127,7 +86,7 @@ namespace VPatchGGPK3 {
 			Content = layout;
 		}
 
-		private void OnLoadComplete(object? sender, EventArgs e) {
+		private void OnLoadComplete(object? sender, EventArgs _) {
 			var path = AppContext.BaseDirectory;
 			if (string.IsNullOrEmpty(path))
 				path = Path.GetDirectoryName(Assembly.GetExecutingAssembly()?.Location ?? Assembly.GetEntryAssembly()?.Location ?? Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName);
@@ -137,8 +96,52 @@ namespace VPatchGGPK3 {
 				if (File.Exists("VPatchGGPK3.txt"))
 					ggpkPath.Text = File.ReadAllText("VPatchGGPK3.txt");
 			} catch (Exception ex) {
-				output!.Append("Exception: " + ex.Message);
+				output.Append("Exception: " + ex.Message);
 			}
+		}
+
+		private async void OnButtonClick(object? sender, EventArgs _) {
+			try {
+				File.WriteAllText("VPatchGGPK3.txt", ggpkPath.Text);
+			} catch (Exception ex) {
+				output.Append("Exception: " + ex.Message);
+			}
+			if (!File.Exists(ggpkPath.Text)) {
+				MessageBox.Show(this, "找不到檔案: " + ggpkPath.Text, "Error", MessageBoxType.Error);
+				return;
+			}
+
+			var json = (await JsonDocument.ParseAsync(await http.GetStreamAsync(tw.Checked ? "https://poedb.tw/fg/pin_tw.json" : "https://poedb.tw/fg/pin_cn.json"))).RootElement;
+			var url = await Extensions.GetPatchServer();
+			var officialVersion = url[(url.LastIndexOf('/', url.Length - 2) + 1)..^1];
+			if (json.GetProperty("version").GetString()! != officialVersion) {
+				MessageBox.Show(this, "Server Version not match Patch Version\r\n編年史中文化更新中，請稍待", "Error", MessageBoxType.Error);
+				return;
+			}
+			if (json.GetProperty("pin").GetString()! != pin.Text) {
+				MessageBox.Show(this, "無效的PIN碼\r\n請詳閱: https://poedb.tw/chinese", "Error", MessageBoxType.Error);
+				return;
+			}
+			var md5 = json.GetProperty("md5").GetString()!;
+
+			var ggpk = new GGPK(ggpkPath.Text);
+			var zip = new ZipArchive(await http.GetStreamAsync("https://poedb.tw/fg/" + md5 + ".zip"));
+			foreach (var e in zip.Entries) {
+				if (e.FullName.EndsWith('/'))
+					continue;
+				if (ggpk.FindNode(e.FullName) is not FileRecord fr) {
+					output.Append("Unable to find in ggpk: " + e.FullName + "\r\n", true);
+					continue;
+				}
+				var f = e.Open();
+				var b = new byte[e.Length];
+				f.Read(b, 0, b.Length);
+				f.Close();
+				fr.ReplaceContent(b);
+				output!.Append("Replaced: " + e.FullName + "\r\n", true);
+			}
+			ggpk.Dispose();
+			output.Append("\r\nDone!\r\n", true);
 		}
 	}
 }

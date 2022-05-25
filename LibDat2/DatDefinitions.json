@@ -307,7 +307,8 @@
 		"Flag2": "bool",
 		"Mainhand_AnimationKey": "string",
 		"Offhand_AnimationKey": "string",
-		"Flag3": "bool"
+		"Flag3": "bool",
+		"Key0": "foreignrow"
 	},
 	"ApplyDamageFunctions": {
 		"Id": "string",
@@ -337,20 +338,20 @@
 	},
 	"ArchnemesisMods": {
 		"Mod": "foreignrow",
-		"Unknown0": "array|foreignrow",
+		//"Unknown0": "array|foreignrow",
+		"Unknown0": "i32",
 		"Unknown1": "i32",
 		"Unknown2": "i32",
 		"Unknown3": "i32",
-		"Unknown4": "i32",
 		"Name": "string",
-		"Icon": "string",
-		"Unknown5": "bool",
-		"Unknown6": "bool",
+		//"Icon": "string",
+		//"Unknown5": "bool",
+		//"Unknown6": "bool",
 		"Visual": "foreignrow",
-		"Unknown7": "array|foreignrow",
-		"Description": "string",
-		"DefeatAchievement": "foreignrow",
-		"Unknown8": "i32"
+		"Unknown8": "i32",
+		"Unknown9": "array|string"
+		//"Description": "string",
+		//"DefeatAchievement": "foreignrow"
 	},
 	"ArchnemesisModVisuals": {
 		"Id": "string",
@@ -398,7 +399,8 @@
 		"AOFiles": "array|string",
 		"Unknown1": "i32",
 		"Unknown2": "i8",
-		"Unknown3": "string"
+		"Unknown3": "string",
+		"Unknown4": "foreignrow"
 	},
 	"AreaTransitionAnimations": {
 		"Id": "string",
@@ -443,7 +445,7 @@
 	"Ascendancy": {
 		"Id": "string",
 		"ClassNo": "i32",
-		"CharactersKey": "foreignrow",
+		"Characters": "array|foreignrow",
 		"CoordinateRect": "string",
 		"RGBFlavourTextColour": "string",
 		"Name": "string",
@@ -451,7 +453,8 @@
 		"OGGFile": "string",
 		"PassiveTreeImage": "string",
 		"Unknown0": "i32",
-		"Unknown1": "i32"
+		"Unknown1": "i32",
+		"BackgroundImage": "string"
 	},
 	"AtlasAwakeningStats": {
 		"AwakeningLevel": "i32",
@@ -673,7 +676,7 @@
 		//"MagicPurchase_Costs": "array|i32", removed 3.16
 		"TagsKeys": "array|foreignrow",
 		"ModDomainsKey": "i32",
-		"IsDropDisabled": "bool",
+		"SiteVisibility": "i32", //"IsDropDisabled": "bool",
 		"ItemVisualIdentityKey": "foreignrow",
 		"HASH": "u32",
 		"VendorRecipe_AchievementItemsKeys": "array|foreignrow",
