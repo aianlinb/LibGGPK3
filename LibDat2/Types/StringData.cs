@@ -1,10 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Text;
-using static LibDat2.Types.IFieldData;
 
 namespace LibDat2.Types {
-	[FieldType(FieldType.String)]
 	public class StringData : ReferenceDataBase<string> {
 		public StringData(DatContainer dat) : base(dat) { }
 
@@ -23,10 +21,11 @@ namespace LibDat2.Types {
 			return sd;
 		}
 
-		public override void Read(BinaryReader reader) {
+		public override StringData Read(BinaryReader reader) {
 			if (Value != default)
 				Dat.ReferenceDataOffsets.Remove(ToString());
 			base.Read(reader);
+			return this;
 		}
 
 		/// <inheritdoc/>
@@ -63,7 +62,7 @@ namespace LibDat2.Types {
 		/// Read the <see cref="Value"/> from its string representation
 		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="FromString(string, DatContainer)"/> instead.
 		/// </summary>
-		public override void FromString(string value) {
+		public override StringData FromString(string value) {
 			if (Value != default)
 				Dat.ReferenceDataOffsets.Remove(ToString());
 
@@ -75,6 +74,7 @@ namespace LibDat2.Types {
 				Dat.ReferenceDatas[Offset] = this;
 			}
 			Dat.ReferenceDataOffsets[value] = Offset;
+			return this;
 		}
 
 		/// <inheritdoc/>

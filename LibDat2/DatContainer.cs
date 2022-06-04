@@ -87,7 +87,7 @@ namespace LibDat2 {
 		public readonly DatDataReadException? Exception;
 
 		/// <summary>
-		/// Used to dispose the FileStream created when calling <see cref="DatContainer(string)"/>
+		/// Used to dispose the FileStream created when calling <see cref="DatContainer(string,bool)"/>
 		/// </summary>
 		private static FileStream? tmp;
 		/// <summary>
@@ -186,10 +186,7 @@ namespace LibDat2 {
 				var index = 0;
 				foreach (var type in FieldDefinitions.Select(t => t.Value)) {
 					try {
-						if (type.StartsWith("array|"))
-							row[index++] = IArrayData.Read(reader, IFieldData.TypeFromString[type[6..]], this);
-						else
-							row[index++] = IFieldData.Read(reader, IFieldData.TypeFromString[type], this);
+						row[index++] = IFieldData.Read(reader, type, this);
 						lastPos = reader.BaseStream.Position;
 					} catch (Exception e) {
 						ex = new(Name, i, index - 1, FieldDefinitions[index - 1].Key, reader.BaseStream.Position, lastPos, e);
@@ -229,7 +226,7 @@ namespace LibDat2 {
 				"ulong" => "u64",
 				"float" => "f32",
 				"double" => "f64",
-				"string" => "valueString",
+				"string" => "valuestring",
 				_ => throw new InvalidCastException("Unknown type: " + type);
 			};
 		}
@@ -429,11 +426,7 @@ namespace LibDat2 {
 							sr.Read();
 							quotes = true;
 						}
-						var type = FieldDefinitions[i].Value;
-						if (type.StartsWith("array|"))
-							row[i++] = IArrayData.FromString(s.ToString(), IFieldData.TypeFromString[type[6..]], this);
-						else
-							row[i++] = IFieldData.FromString(s.ToString(), IFieldData.TypeFromString[type], this);
+						row[i] = IFieldData.FromString(s.ToString(), FieldDefinitions[i++].Value, this);
 						s.Length = 0;
 						break;
 					case '\r':
@@ -444,11 +437,7 @@ namespace LibDat2 {
 							sr.Read();
 							quotes = true;
 						}
-						var type2 = FieldDefinitions[i].Value;
-						if (type2.StartsWith("array|"))
-							row[i] = IArrayData.FromString(s.ToString(), IFieldData.TypeFromString[type2[6..]], this);
-						else
-							row[i] = IFieldData.FromString(s.ToString(), IFieldData.TypeFromString[type2], this);
+						row[i] = IFieldData.FromString(s.ToString(), FieldDefinitions[i].Value, this);
 						i = 0;
 						s.Length = 0;
 						list.Add(row);
@@ -517,7 +506,7 @@ namespace LibDat2 {
 			using var json = JsonDocument.Parse(File.ReadAllBytes(filePath), new() { CommentHandling = JsonCommentHandling.Skip });
 			DatDefinitions = new();
 			foreach (var dat in json.RootElement.EnumerateObject())
-				DatDefinitions.Add(dat.Name, dat.Value.EnumerateObject().Select(p => new KeyValuePair<string, string>(p.Name, p.Value.GetString()!)).ToArray());
+				DatDefinitions.Add(dat.Name, dat.Value.EnumerateObject().Select(p => new KeyValuePair<string, string>(p.Name, p.Value.GetString()!.ToLower())).ToArray());
 		}
 	}
 }

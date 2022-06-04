@@ -25,7 +25,7 @@ namespace LibDat2.Types {
 		/// Read the pointer and call <see cref="ReadInDataSection"/>.
 		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="StringData.Read(BinaryReader, DatContainer)"/> or <see cref="ArrayData{TypeOfValueInArray}.Read(BinaryReader, DatContainer, FieldType)"/> instead.
 		/// </summary>
-		public new void Read(BinaryReader reader);
+		public new IReferenceData Read(BinaryReader reader);
 
 		/// <summary>
 		/// Write the pointer and call WriteInDataSection(BinaryWriter)
@@ -36,7 +36,7 @@ namespace LibDat2.Types {
 		/// Read the <see cref="Value"/> from its string representation
 		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="StringData.FromString(string, DatContainer)"/> or <see cref="ArrayData{TypeOfValueInArray}.FromString(string, DatContainer, FieldType)"/> instead.
 		/// </summary>
-		public new void FromString(string value);
+		public new IReferenceData FromString(string value);
 
 		/// <summary>
 		/// Calculate the length of data in DataSection with current <see cref="IFieldData.Value"/>

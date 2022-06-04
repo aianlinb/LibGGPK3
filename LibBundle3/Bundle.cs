@@ -146,15 +146,16 @@ namespace LibBundle3 {
 			fixed (byte* cp = compressed, p = newData) {
 				var ptr = p;
 				var count = header.chunk_count - 1;
+				int l;
 				for (var i = 0; i < count; ++i) {
-					var l = (int)Oodle.OodleLZ_Compress(header.compressor, ptr, header.chunk_size, cp, compressionLevel);
+					l = (int)Oodle.OodleLZ_Compress(header.compressor, ptr, header.chunk_size, cp, compressionLevel);
 					ptr += header.chunk_size;
 					header.compressed_size += chunkSizes[i] = l;
 					baseStream.Write(compressed, 0, l);
 				}
-				var l2 = (int)Oodle.OodleLZ_Compress(header.compressor, ptr, header.GetLastChunkSize(), cp, compressionLevel);
-				header.compressed_size += chunkSizes[^1] = l2;
-				baseStream.Write(compressed, 0, l2);
+				l = (int)Oodle.OodleLZ_Compress(header.compressor, ptr, header.GetLastChunkSize(), cp, compressionLevel);
+				header.compressed_size += chunkSizes[^1] = l;
+				baseStream.Write(compressed, 0, l);
 			}
 			header.size_compressed = header.compressed_size;
 

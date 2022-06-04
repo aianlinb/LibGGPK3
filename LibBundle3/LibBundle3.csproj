@@ -1,14 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	<TargetFramework>net6.0</TargetFramework>
-	<Nullable>enable</Nullable>
-	<Authors>aianlinb</Authors>
-	<Copyright>Copyright © 2022 aianlinb</Copyright>
-	<Version>1.0.0</Version>
-	<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-	<NoWin32Manifest>true</NoWin32Manifest>
-	<DebugType>embedded</DebugType>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <Authors>aianlinb</Authors>
+    <Copyright>Copyright © 2022 aianlinb</Copyright>
+    <Version>1.0.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWin32Manifest>true</NoWin32Manifest>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
 </Project>

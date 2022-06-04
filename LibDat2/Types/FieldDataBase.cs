@@ -2,7 +2,7 @@
 using System.IO;
 
 namespace LibDat2.Types {
-	public abstract class FieldDataBase<TypeOfValue> : IFieldData {
+	public abstract class FieldDataBase<TypeOfValue> : IFieldData where TypeOfValue : notnull {
 		/// <summary>
 		/// <see cref="DatContainer"/> which created this instance
 		/// </summary>
@@ -46,7 +46,11 @@ namespace LibDat2.Types {
 		/// <summary>
 		/// Read the <see cref="Value"/> from a dat file
 		/// </summary>
-		public abstract void Read(BinaryReader reader);
+		public abstract FieldDataBase<TypeOfValue> Read(BinaryReader reader);
+
+		IFieldData IFieldData.Read(BinaryReader reader) {
+			return Read(reader);
+		}
 
 		/// <summary>
 		/// Write the <see cref="Value"/> to a dat file
@@ -56,13 +60,17 @@ namespace LibDat2.Types {
 		/// <summary>
 		/// Read the <see cref="Value"/> from its string representation
 		/// </summary>
-		public abstract void FromString(string value);
+		public abstract FieldDataBase<TypeOfValue> FromString(string value);
+
+		IFieldData IFieldData.FromString(string value) {
+			return FromString(value);
+		}
 
 		/// <summary>
 		/// Get the string representation of the <see cref="Value"/>
 		/// </summary>
 		public override string ToString() {
-			return Value?.ToString() ?? "{null}";
+			return Value?.ToString() ?? "{null}"; // "{null}" is an error
 		}
 	}
 }

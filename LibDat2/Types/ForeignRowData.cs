@@ -1,10 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Text.RegularExpressions;
-using static LibDat2.Types.IFieldData;
 
 namespace LibDat2.Types {
-	[FieldType(FieldType.ForeignRow)]
 	public class ForeignRowData : FieldDataBase<ForeignRowData> {
 		public const uint Nullx32Key = 0xFEFEFEFE;
 		public const ulong Nullx64Key = 0xFEFEFEFEFEFEFEFE;
@@ -17,7 +15,7 @@ namespace LibDat2.Types {
 		}
 
 		/// <inheritdoc/>
-		public override void Read(BinaryReader reader) {
+		public override ForeignRowData Read(BinaryReader reader) {
 			if (Dat.x64) {
 				Key1 = reader.ReadUInt64();
 				if (Key1 == Nullx64Key)
@@ -33,6 +31,7 @@ namespace LibDat2.Types {
 				if (Key2 == Nullx32Key)
 					Key2 = null;
 			}
+			return Value;
 		}
 
 		/// <inheritdoc/>
@@ -47,7 +46,7 @@ namespace LibDat2.Types {
 		}
 
 		/// <inheritdoc/>
-		public override void FromString(string value) {
+		public override ForeignRowData FromString(string value) {
 			var m = ForeignRowRegex.Match(value);
 			if (m.Success) {
 				if (m.Groups[1].Value.ToLower() == "null")
@@ -70,6 +69,7 @@ namespace LibDat2.Types {
 					throw new InvalidCastException("Unable to convert " + value + " to ForeignRowData");
 			} else
 				throw new InvalidCastException("Unable to convert " + value + " to ForeignRowData");
+			return Value;
 		}
 		public static readonly Regex ForeignRowRegex = new(@"^\s*<\s*(.+?)\s*,\s*(.+?)\s*>\s*$");
 

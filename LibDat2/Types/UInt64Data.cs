@@ -1,14 +1,13 @@
 ﻿using System.IO;
-using static LibDat2.Types.IFieldData;
 
 namespace LibDat2.Types {
-	[FieldType(FieldType.UInt64)]
 	public class UInt64Data : FieldDataBase<ulong> {
 		public UInt64Data(DatContainer dat) : base(dat) { }
 
 		/// <inheritdoc/>
-		public override void Read(BinaryReader reader) {
+		public override UInt64Data Read(BinaryReader reader) {
 			Value = reader.ReadUInt64();
+			return this;
 		}
 
 		/// <inheritdoc/>
@@ -17,8 +16,9 @@ namespace LibDat2.Types {
 		}
 
 		/// <inheritdoc/>
-		public override void FromString(string value) {
+		public override UInt64Data FromString(string value) {
 			Value = ulong.Parse(value.TrimEnd('U', 'L'));
+			return this;
 		}
 
 		/// <inheritdoc/>

@@ -1,14 +1,13 @@
 ﻿using System.IO;
-using static LibDat2.Types.IFieldData;
 
 namespace LibDat2.Types {
-	[FieldType(FieldType.Int32)]
 	public class Int32Data : FieldDataBase<int> {
 		public Int32Data(DatContainer dat) : base(dat) { }
 
 		/// <inheritdoc/>
-		public override void Read(BinaryReader reader) {
+		public override Int32Data Read(BinaryReader reader) {
 			Value = reader.ReadInt32();
+			return this;
 		}
 
 		/// <inheritdoc/>
@@ -17,8 +16,9 @@ namespace LibDat2.Types {
 		}
 
 		/// <inheritdoc/>
-		public override void FromString(string value) {
+		public override Int32Data FromString(string value) {
 			Value = int.Parse(value);
+			return this;
 		}
 	}
 }

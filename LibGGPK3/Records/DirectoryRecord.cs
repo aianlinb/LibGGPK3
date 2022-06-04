@@ -54,7 +54,7 @@ namespace LibGGPK3.Records {
 			} else {
 				Name = Extensions.FastAllocateString(nameLength);
 				fixed (char* p = Name)
-					s.Read(new(p, Name.Length * 2));
+					s.Read(new(p, nameLength * 2));
 				s.Seek(2, SeekOrigin.Current); // Null terminator
 			}
 			EntriesBegin = s.Position;
@@ -173,7 +173,7 @@ namespace LibGGPK3.Records {
 		}
 
 		public override int CaculateLength() {
-			return Entries.Length * 12 + (Name.Length + 1) * (Ggpk.GgpkRecord.GGPKVersion == 4 ? 4 : 2) + 48; // (4 + 4 + 4 + 4 + Entries.Length + Hash.Length + (Name + "\0").Length * 2) + Entries.Length * 12
+			return Entries.Length * 12 + (Name.Length + 1) * (Ggpk.GgpkRecord.GGPKVersion == 4 ? 4 : 2) + 48; // 4 + 4 + 4 + 4 + Hash.Length + (Name + "\0").Length * 2 + Entries.Length * 12
 		}
 
 		protected internal unsafe override void WriteRecordData() {

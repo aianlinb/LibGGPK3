@@ -307,8 +307,7 @@
 		"Flag2": "bool",
 		"Mainhand_AnimationKey": "string",
 		"Offhand_AnimationKey": "string",
-		"Flag3": "bool",
-		"StatsKey": "foreignrow"
+		"Flag3": "bool"
 	},
 	"ApplyDamageFunctions": {
 		"Id": "string",
@@ -322,6 +321,54 @@
 		"Unknown2": "foreignrow",
 		"BK2File": "string"
 	},
+	
+	// ----- 3.17 Begin -----
+	"ArchnemesisMetaRewards": {
+		"Id": "string",
+		"RewardText": "string",
+		"RewardGroup": "i32",
+		"ScriptArgument": "string",
+		"MinLevel": "i32",
+		"MaxLevel": "i32"
+	},
+	"ArchnemesisModComboAchievements": {
+		"Achievement": "foreignrow",
+		"Mods": "array|foreignrow"
+	},
+	"ArchnemesisMods": {
+		"Mod": "foreignrow",
+		"Unknown0": "array|foreignrow",
+		"Unknown1": "i32",
+		"Unknown2": "i32",
+		"Unknown3": "i32",
+		"Unknown4": "i32",
+		"Name": "string",
+		"Icon": "string",
+		"Unknown5": "bool",
+		"Unknown6": "bool",
+		"Visual": "foreignrow",
+		"Unknown7": "array|foreignrow",
+		"Description": "string",
+		"DefeatAchievement": "foreignrow",
+		"Unknown8": "i32"
+	},
+	"ArchnemesisModVisuals": {
+		"Id": "string",
+		"Unknown0": "foreignrow",
+		"Unknown1": "foreignrow",
+		"Unknown2": "foreignrow",
+		"Unknown3": "array|foreignrow",
+		"Unknown4": "array|foreignrow",
+		"Unknown5": "array|foreignrow",
+		"Unknown6": "array|foreignrow"
+	},
+	"ArchnemesisRecipes": {
+		"Result": "foreignrow",
+		"Recipe": "array|foreignrow",
+		"Unknown0": "i32"
+	},
+	// ----- 3.17 End -----
+	
 	"Archetypes": {
 		"Id": "string",
 		"CharactersKey": "foreignrow",
@@ -344,53 +391,14 @@
 		"Level": "i32",
 		"MoreLife": "i32"
 	},
-	"ArchnemesisMetaRewards": {
-		"Id": "string",
-		"RewardText": "string",
-		"RewardGroup": "i32",
-		"ScriptArgument": "string",
-		"MinLevel": "i32",
-		"MaxLevel": "i32"
-	},
-	"ArchnemesisModComboAchievements": {
-		"Achievement": "foreignrow",
-		"Mods": "array|foreignrow"
-	},
-	"ArchnemesisMods": {
-		"Mod": "foreignrow",
-		"Unknown0": "i32",
-		"Unknown1": "i32",
-		"Unknown2": "i32",
-		"Unknown3": "i32",
-		"Name": "string",
-		"Visual": "foreignrow",
-		"Unknown4": "i32",
-		"DisplayColors": "array|string"
-	},
-	"ArchnemesisModVisuals": {
-		"Id": "string",
-		"Unknown0": "foreignrow",
-		"Unknown1": "foreignrow",
-		"Unknown2": "foreignrow",
-		"Unknown3": "array|foreignrow",
-		"Unknown4": "array|foreignrow",
-		"Unknown5": "array|foreignrow",
-		"Unknown6": "array|foreignrow"
-	},
-	"ArchnemesisRecipes": {
-		"Result": "foreignrow",
-		"Recipe": "array|foreignrow",
-		"Unknown0": "i32"
-	},
 	"AreaInfluenceDoodads": {
-		"Influence_StatsKey": "foreignrow",
-		"Influence_StatsValue": "i32",
+		"StatsKey": "foreignrow",
+		"StatValue": "i32",
 		"Unknown0": "f32",
 		"AOFiles": "array|string",
 		"Unknown1": "i32",
 		"Unknown2": "i8",
-		"Unknown3": "string",
-		"Density_StatsKey": "foreignrow"
+		"Unknown3": "string"
 	},
 	"AreaTransitionAnimations": {
 		"Id": "string",
@@ -435,7 +443,7 @@
 	"Ascendancy": {
 		"Id": "string",
 		"ClassNo": "i32",
-		"Characters": "array|foreignrow",
+		"CharactersKey": "foreignrow",
 		"CoordinateRect": "string",
 		"RGBFlavourTextColour": "string",
 		"Name": "string",
@@ -443,29 +451,78 @@
 		"OGGFile": "string",
 		"PassiveTreeImage": "string",
 		"Unknown0": "i32",
-		"Unknown1": "i32",
-		"BackgroundImage": "string"
+		"Unknown1": "i32"
 	},
-	"AtlasEntities": {},
+	"AtlasAwakeningStats": {
+		"AwakeningLevel": "i32",
+		"Stats": "array|foreignrow",
+		"Values": "array|i32"
+	},
+	"AtlasBaseTypeDrops": {
+		"Id": "string",
+		"AtlasRegionsKey": "foreignrow",
+		"MinTier": "i32",
+		"MaxTier": "i32",
+		"SpawnWeight_TagsKeys": "array|foreignrow",
+		"SpawnWeight_Values": "array|i32"
+	},
 	"AtlasExileBossArenas": {
 		"AtlasExilesKey": "foreignrow",
+		"Unknown0": "i32",
 		"WorldAreasKey": "foreignrow"
 	},
 	"AtlasExileInfluence": {
 		"AtlasExilesKey": "foreignrow",
+		"Unknown0": "i32",
 		"AtlasExileInfluenceSetsKeys": "array|foreignrow"
+	},
+	"AtlasExileInfluenceData": {
+		"AtlasExileInfluenceOutcomeTypesKey": "foreignrow",
+		"Keys1": "array|foreignrow",
+		"Key2": "foreignrow",
+		"Keys3": "array|foreignrow",
+		"Unknown0": "i32",
+		"Unknown1": "array|i32",
+		"Unknown2": "array|i32"
+	},
+	"AtlasExileInfluenceOutcomes": {
+		"Id": "string",
+		"Unknown0": "i32",
+		"AtlasExileInfluenceOutcomeTypesKey": "i32"
+	},
+	"AtlasExileInfluenceOutcomeTypes": {},
+	"AtlasExileInfluenceSets": {
+		"Id": "string",
+		"AtlasExileInfluencePacksKey": "array|foreignrow"
+	},
+	"AtlasExileRegionQuestFlags": {
+		"AtlasExilesKey": "foreignrow",
+		"AtlasRegionsKey": "foreignrow",
+		"Unknown0": "i32",
+		"Unknown1": "foreignrow",
+		"QuestState": "i32"
 	},
 	"AtlasExiles": {
 		"Id": "string",
 		"MonsterVarietiesKey": "foreignrow",
-		"Unknown": "i32",
-		"OldArt": "string",
-		"Art": "string"
-	},
-	"AtlasFavouredMapSlots": {
-		"Index": "i32",
+		"Art": "string",
 		"Unknown0": "i32",
-		"Text": "string"
+		"Unknown1": "i32",
+		"Unknown2": "i32",
+		"Unknown3": "i32",
+		"Unknown4": "i32",
+		"Key0": "foreignrow",
+		"Unknown5": "i32",
+		"Unknown6": "i32",
+		"Unknown7": "i32",
+		"Unknown8": "i32",
+		"Unknown9": "i32",
+		"Unknown10": "i32",
+		"Unknown11": "i32",
+		"Unknown12": "i32",
+		"Unknown13": "i32",
+		"Unknown14": "foreignrow",
+		"Unknown15": "foreignrow"
 	},
 	"AtlasFog": {
 		"Unknown0": "i32",
@@ -473,27 +530,14 @@
 		"Unknown2": "i32",
 		"Unknown3": "i32"
 	},
-	"AtlasInfluenceData": {
-		"Unknown0": "foreignrow",
-		"Unknown1": "array|foreignrow",
-		"Unknown2": "foreignrow",
-		"Unknown3": "array|foreignrow",
-		"Unknown4": "i32",
-		"Unknown5": "array|i32",
-		"Unknown6": "array|i32",
-		"Unknown7": "i32",
-		"Unknown8": "i32",
-		"Unknown9": "foreignrow"
-	},
 	"AtlasInfluenceOutcomes": {
 		"Id": "string",
 		"Unknown0": "i32",
-		"Unknown1": "i32"
-	},
-	"AtlasInfluenceOutcomeTypes": {},
-	"AtlasInfluenceSets": {
-		"Id": "string",
-		"Unknown0": "array|foreignrow"
+		"Unknown1": "i32",
+		"MinTier": "i32",
+		"MaxTier": "i32",
+		"Unknown2": "foreignrow",
+		"ModsKeys": "array|foreignrow"
 	},
 	"AtlasMods": {
 		"ModsKey": "foreignrow",
@@ -506,20 +550,43 @@
 		"Unknown0": "bool",
 		"MapsKey": "foreignrow",
 		"FlavourTextKey": "foreignrow",
-		"ConnectedNodes_AtlasNodeKeys": "array|row",
+		"AtlasRegionsKey": "foreignrow",
+		"AtlasNodeKeys0": "array|row",
+		"AtlasNodeKeys1": "array|row",
+		"AtlasNodeKeys2": "array|row",
+		"AtlasNodeKeys3": "array|row",
+		"AtlasNodeKeys4": "array|row",
 		"Tier0": "i32",
 		"Tier1": "i32",
 		"Tier2": "i32",
 		"Tier3": "i32",
 		"Tier4": "i32",
+		"X0": "f32",
+		"X1": "f32",
+		"X2": "f32",
+		"X3": "f32",
+		"X4": "f32",
+		"Y0": "f32",
+		"Y1": "f32",
+		"Y2": "f32",
+		"Y3": "f32",
+		"Y4": "f32",
 		"Unknown1": "f32",
 		"Unknown2": "f32",
 		"Unknown3": "f32",
 		"Unknown4": "f32",
 		"Unknown5": "f32",
-		"DDSFile": "string",
-		"IsRoot": "bool",
-		"IsHidden": "bool"
+		"Unknown6": "i32",
+		"Unknown7": "i32",
+		"Unknown8": "i32",
+		"Unknown9": "i32",
+		"Unknown10": "i32",
+		"Unknown11": "i32",
+		"Unknown12": "i32",
+		"Unknown13": "i32",
+		"Unknown14": "i32",
+		"Unknown15": "i32",
+		"DDSFile": "string"
 	},
 	"AtlasNodeDefinition": {
 		"WorldAreasKey": "foreignrow",
@@ -527,11 +594,7 @@
 		"Unknown0": "bool",
 		"Tier": "i32",
 		"Unknown1": "i32",
-		"Unknown2": "i32",
-		"Flag0":  "bool"
-	},
-	"AtlasPassiveSkillTreeGroupType": {
-		"Unknown0": "string"
+		"Unknown2": "i32"
 	},
 	"AtlasPositions": {
 		"Unknown0": "i32",
@@ -539,66 +602,40 @@
 		"X": "f32",
 		"Y": "f32"
 	},
-	"AtlasPrimordialAltarChoices": {
-		"ModsKey": "foreignrow",
-		"AltarChoiceTypeKey": "foreignrow",
-		"IsNonMonsterUpside": "bool"
-	},
-	"AtlasPrimordialAltarChoiceTypes": {
+	"AtlasRegions": {
 		"Id": "string",
-		"TopTangledIcon": "string",
-		"BottomTangledIcon": "string",
-		"TopCleansingIcon": "string",
-		"BottomCleansingIcon": "string",
-		"Text": "string"
-	},
-	"AtlasPrimordialBosses": {
-		"Id": "string",
+		"Name": "string",
 		"Unknown0": "i32",
+		"Unknown1": "foreignrow",
+		"Unknown2": "f32",
+		"Unknown3": "f32",
+		"Unknown4": "foreignrow",
+		"Citadel": "string",
+		"Unknown5": "i32",
+		"bk2Path": "string",
+		"Unknown6": "i32",
+		"Unknown7": "foreignrow",
+		"Unknown8": "foreignrow",
+		"Unknown9": "foreignrow"
+	},
+	"AtlasRegionUpgradeRegions": {
+		"Unknown0": "foreignrow",
+		"Unknown1": "foreignrow"
+	},
+	"AtlasRegionUpgradesInventoryLayout": {
+		"Unknown0": "string",
 		"Unknown1": "i32",
 		"Unknown2": "i32",
-		"Unknown3": "i32",
-		"CompleteAnimatedKey": "foreignrow",
-		"Invitation1BaseType": "foreignrow",
-		"Invitation2BaseType": "foreignrow",
-		"Unknown4": "i32",
-		"Invitation1QuestKey": "foreignrow",
-		"Invitation2QuestKey": "foreignrow",
-		"AltarTagsKey": "foreignrow",
-		"AltarObjectKey": "foreignrow",
-		"AltarActivationAnimationKey": "foreignrow"
+		"Unknown3": "row",
+		"Unknown4": "row",
+		"Unknown5": "row",
+		"Unknown6": "row"
 	},
-	"AtlasPrimordialBossInfluence": {
-		"BossKey": "foreignrow",
-		"Unknown0": "i32",
-		"Unknown1": "i32",
-		"Unknown2": "i32",
-		"unknown3": "i32",
-		"QuestItemKey": "foreignrow",
-		"Unknown4": "f32",
-		"Unknown5": "i32"
-	},
-	"AtlasPrimordialBossOptions": {
-		"Index": "i32",
-		"Unknown0": "i32",
-		"DefaultMapDeviceIcon": "string",
-		"HoveredMapDeviceIcon": "string",
-		"FocusedMapDeviceIcon": "string",
-		"MissingMapDeviceIcon": "string",
-		"UseOptionClientString": "foreignrow",
-		"AcquireOptionClientString": "foreignrow",
-		"AtlasTrackerUnfilledProgressIcon": "string",
-		"AtlasTrackerFilledProgressIcon": "string",
-		"Name": "string"
-	},
-	"AtlasUpgradesInventoryLayout": {
+	"AtlasSkillGraphs": {
 		"Id": "string",
-		"Index": "i32",
-		"VoidstoneBaseitemTypeKey": "foreignrow",
-		"Unknown0": "i32",
-		"AcquireVoidstoneBy": "string",
-		"Unknown1": "i32",
-		"InsertVoidstoneSoundEffectKey": "foreignrow"
+		"PsgPath": "string",
+		"Text": "string",
+		"Keys": "array|foreignrow"
 	},
 	"Attributes": {},
 	"AwardDisplay": {
@@ -612,8 +649,7 @@
 		"Unknown4": "string",
 		"ForegroundImage": "string",
 		"OGGFile": "string",
-		"Unknown5": "i32",
-		"Unknown6": "i32"
+		"Unknown5": "i32"
 	},
 	"BackendErrors": {
 		"Id": "string",
@@ -631,43 +667,33 @@
 		"Implicit_ModsKeys": "array|foreignrow",
 		"SizeOnGround": "i32",
 		"SoundEffectsKey": "foreignrow",
+		//"NormalPurchase_BaseItemTypesKeys": "array|row", removed 3.16
+		//"NormalPurchase_Costs": "array|i32", removed 3.16
+		//"MagicPurchase_BaseItemTypesKeys": "array|row", removed 3.16
+		//"MagicPurchase_Costs": "array|i32", removed 3.16
 		"TagsKeys": "array|foreignrow",
 		"ModDomainsKey": "i32",
-		"SiteVisibility": "i32",
+		"IsDropDisabled": "bool",
 		"ItemVisualIdentityKey": "foreignrow",
 		"HASH": "u32",
 		"VendorRecipe_AchievementItemsKeys": "array|foreignrow",
+		//"RarePurchase_BaseItemTypesKeys": "array|row", removed 3.16
+		//"RarePurchase_Costs": "array|i32", removed 3.16
+		//"UniquePurchase_BaseItemTypesKeys": "array|row", removed 3.16
+		//"UniquePurchase_Costs": "array|i32", removed 3.16
 		"Inflection": "string",
 		"Equip_AchievementItemsKey": "foreignrow",
 		"IsCorrupted": "bool",
 		"Identify_AchievementItemsKeys": "array|foreignrow",
+		//"ItemThemesKey": "foreignrow", removed 3.17
 		"IdentifyMagic_AchievementItemsKeys": "array|foreignrow",
 		"FragmentBaseItemTypesKey": "row",
-		"IsMapDropOnly": "bool",
+		"Unknown0": "bool",
+		//"ItemShopType": "foreignrow", removed 3.17
 		"Unknown1": "foreignrow",
 		"Unknown2": "foreignrow",
 		"Unknown3": "bool",
-		"Unknown4": "foreignrow"
-	},
-	"BattlePasses": {
-		"Id": "string",
-		"Unknown0": "i32",
-		"WebVideo": "string",
-		"ShopVideo": "string",
-		"Unknown1": "i32"
-	},
-	"BattlePassRewards": {
-		"BattlePassKey": "foreignrow",
-		"GridPositionY": "i32",
-		"RequiredMapBonusObjectivesComplete": "i32",
-		"Flag0": "bool",
-		"Id": "string",
-		"ApplicableBaseItemTypes": "array|foreignrow",
-		"Unknown0": "i32",
-		"Unknown1": "string",
-		"Unknown2": "string",
-		"Unknown3": "i32",
-		"Unknown4": "i32"
+		"Unknown4": "foreignrow" // added 3.17
 	},
 	"BestiaryCapturableMonsters": {
 		"MonsterVarietiesKey": "foreignrow",
@@ -833,7 +859,7 @@
 		"BetrayalJobsKey": "foreignrow",
 		"Art": "string",
 		"Flag0": "i8",
-		"WeaponItemClassKey": "foreignrow",
+		"Key3": "foreignrow",
 		"FullName": "string",
 		"Safehouse_ARMFile": "string",
 		"ShortName": "string",
@@ -843,8 +869,7 @@
 		"Unknown1": "i32",
 		"Unknown2": "i32",
 		"Unknown3": "i32",
-		"Level4_AchievementItemsKey": "foreignrow",
-		"VeiledRareId": "string"
+		"Unknown4": "foreignrow"
 	},
 	"BetrayalTraitorRewards": {
 		"BetrayalJobsKey": "foreignrow",
@@ -976,16 +1001,16 @@
 	},
 	"BlightTopologyNodes": {
 		"Id": "string",
-		"Unknown0": "array|row",
+		"Keys0": "array|row",
 		"Size": "i32",
-		"Angle": "i32",
-		"Unknown1": "array|i32",
-		"Unknown2": "array|i32",
-		"Unknown3": "array|i32",
-		"Unknown4": "array|i32",
-		"Unknown5": "array|i32",
-		"Unknown6": "array|pair|i32",
-		"Unknown7": "i32"
+		"Type": "i32",
+		"Data3": "array|i32",
+		"Data4": "array|i32",
+		"Data5": "array|i32",
+		"Data6": "array|i32",
+		"Data7": "array|i32",
+		"Data8": "array|i32",
+		"Unknown0": "i32"
 	},
 	"BlightTowerAuras": {
 		"Id": "i32",
@@ -1016,23 +1041,41 @@
 		"Cost": "i32",
 		"Unknown1": "i32"
 	},
+	"Bloodlines": {
+		"Id": "string",
+		"ModsKeys": "array|foreignrow",
+		"MinZoneLevel": "i32",
+		"MaxZoneLevel": "i32",
+		"SpawnWeight_TagsKeys": "array|foreignrow",
+		"SpawnWeight_Values": "array|i32",
+		"Unknown0": "i32",
+		"BuffDefinitionsKey": "foreignrow",
+		"Unknown1": "array|i32",
+		"ItemWeight_TagsKeys": "array|foreignrow",
+		"ItemWeight_Values": "array|i32",
+		"MonsterVarietiesKey": "foreignrow",
+		"Unknown2": "i32",
+		"Unknown3": "bool",
+		"Unknown4": "array|foreignrow",
+		"Unknown5": "bool"
+	},
 	"BloodTypes": {
 		"Id": "string",
-		"ImpactSound0Key": "foreignrow",
-		"ImpactSound1Key": "foreignrow",
-		"AnimationKeys": "array|foreignrow",
-		"ImpactSound2Key": "foreignrow",
-		"Unknown0": "foreignrow",
-		"Unknown1": "foreignrow",
-		"DamageEffectVariation0Key": "foreignrow",
-		"DamageEffectVariation1Key": "foreignrow",
-		"DamageEffectVariation2Key": "foreignrow",
-		"DamageEffectVariation3Key": "foreignrow",
-		"DamageEffectVariation4Key": "foreignrow",
-		"DamageEffectVariation5Key": "foreignrow",
-		"DamageEffectVariation6Key": "foreignrow",
-		"DamageEffectVariation7Key": "foreignrow",
-		"DamageEffectVariation8Key": "foreignrow"
+		"PETFile1": "string",
+		"PETFile2": "string",
+		"PETFile3": "string",
+		"Key0": "foreignrow",
+		"PETFile4": "string",
+		"PETFile5": "string",
+		"PETFile6": "string",
+		"Key1": "foreignrow",
+		"Keys0": "array|foreignrow",
+		"Key2": "foreignrow",
+		"PETFile7": "string",
+		"PETFile8": "string",
+		"PETFile9": "string",
+		"Key3": "foreignrow",
+		"Key4": "foreignrow"
 	},
 	"BreachBossLifeScalingPerLevel": {
 		"MonsterLevel": "i32",
@@ -1097,27 +1140,23 @@
 		"Keys3": "array|foreignrow",
 		"Flag19": "bool",
 		"Unknown5": "i32",
-		"Key2": "foreignrow",
-		"Unknown6": "array|i32"
+		"Key2": "foreignrow"
 	},
 	"BuffGroups": {},
 	"BuffMergeModes": {},
 	"BuffStackUIModes": {},
 	"BuffTemplates": {
 		"Id": "string",
-		"BuffDefinitionsKey": "foreignrow",
-		"Data0": "array|i32",
+		"Unknown0": "foreignrow",
+		"Unknown1": "array|i32",
 		"Unknown2": "i32",
-		"Data1": "array|i32",
-		"Data2": "array|i32",
-		"BuffVisualsKey": "foreignrow",
-		"Unknown3": "f32",
-		"Flag0": "bool",
-		"StatsKeys": "array|foreignrow",
-		"Unknown4": "i32",
-		"Unknown5": "i32",
-		"Flag1": "bool",
-		"AdditionalStatKey": "foreignrow"
+		"Unknown3": "array|i32",
+		"Unknown4": "array|i32",
+		"Unknown5": "foreignrow",
+		"Unknown6": "i32",
+		"Unknown7": "i8",
+		"Unknown8": "array|foreignrow",
+		"Unknown9": "i32"
 	},
 	"BuffVisualOrbArt": {
 		"Id": "string",
@@ -1145,8 +1184,7 @@
 		"Unknown6": "foreignrow",
 		"Unknown7": "foreignrow",
 		"Unknown8": "i32",
-		"Unknown9": "bool",
-		"Unknown10": "f32"
+		"Unknown9": "bool"
 	},
 	"BuffVisuals": {
 		"Id": "string",
@@ -1212,14 +1250,12 @@
 		"StatsKeys3": "array|foreignrow",
 		"CharacterPanelTabsKey": "foreignrow",
 		"Flag0": "i8",
-		"StatDescriptionFunctionsKeys": "array|foreignrow",
-		"Unknown0": "i32"
+		"Keys": "array|foreignrow"
 	},
 	"CharacterPanelTabs": {
 		"Id": "string",
 		"Unknown0": "i32",
-		"Text": "string",
-		"Unknown1": "i32"
+		"Text": "string"
 	},
 	"Characters": {
 		"Id": "string",
@@ -1354,12 +1390,6 @@
 		"Flag7": "bool",
 		"Flag8": "bool"
 	},
-	"ClientLeagueAction": {
-		"Id": "string",
-		"GamepadButtonsKey": "foreignrow",
-		"VirtualKeyboardKey": "i32",
-		"Icon": "string"
-	},
 	"ClientStrings": {
 		"Id": "string",
 		"Text": "string",
@@ -1414,40 +1444,43 @@
 	},
 	"CraftingBenchCustomActions": {},
 	"CraftingBenchOptions": {
-		"NPCMastersKey": "foreignrow",
+		"HideoutNPCsKey": "foreignrow",
 		"Order": "i32",
-		"AddModsKey": "foreignrow",
+		"AddMod": "foreignrow", // ModsKey
 		"Cost_BaseItemTypesKeys": "array|foreignrow",
 		"Cost_Values": "array|u32",
 		"RequiredLevel": "i32",
 		"Name": "string",
-		"CraftingBenchCustomActionId": "i32",
+		"CraftingBenchCustomAction": "i32",
 		"ItemClassesKeys": "array|foreignrow",
-		"AddsLinks": "i32",
-		"AddsSocketColours": "string",
-		"AddsSockets": "i32",
-		"AddsItemQuantity": "i32",
+		"Links": "i32",
+		"SocketColours": "string",
+		"Sockets": "i32",
+		"ItemQuantity": "i32",
 		"Unknown0": "array|i32",
 		"Description": "string",
 		"IsDisabled": "bool",
 		"IsAreaOption": "bool",
 		"RecipeIds": "array|i32",
 		"Tier": "i32",
+		//"ModFamily": "string",
 		"CraftingItemClassCategoriesKeys": "array|foreignrow",
 		"MaximumMapTier": "i32",
 		"CraftingBenchUnlockCategoriesKey": "foreignrow",
 		"UnveilsRequired": "i32",
 		"UnveilsRequired2": "i32",
-		"TagsKeys": "array|foreignrow",
-		"AchievementItemsKeys": "array|foreignrow",
+		//"AffixType": "string",
+		"Unknown1": "array|foreignrow",
+		"Unknown2": "array|foreignrow",
+		//"AchievementItemsKeys": "array|foreignrow", // removed 3.16
 		"Unknown3": "i32",
 		"Unknown4": "i32",
-		"AddUnveiledModsKey": "foreignrow",
-		"AddEnchantmentModsKey": "foreignrow",
-		"SortCategoryKey": "foreignrow",
-		"BaseModsKey": "foreignrow",
-		"Unknown10": "bool",
-		"Unknown11": "i32"
+		"Unknown5": "bool",
+		"Unknown6": "foreignrow",
+		"AddEnchantment": "foreignrow",
+		"SortCategory": "foreignrow",
+		"Unknown9": "foreignrow",
+		"Unknown10": "bool"
 	},
 	"CraftingBenchSortCategories": {
 		"Id": "string",
@@ -1480,19 +1513,16 @@
 		"Unknown0": "bool",
 		"CosmeticTypeName": "string",
 		"Possession_AchievementItemsKey": "foreignrow",
-		"VendorTradeCost_BaseItemTypesKeys": "array|foreignrow",
-		"VendorTradeCost_Values": "array|i32",
+		"Unknown1": "array|foreignrow",
+		"Unknown2": "array|i32",
 		"CurrencyTab_StackSize": "i32",
 		"XBoxDirections": "string",
 		"Unknown3": "i32",
 		"Unknown4": "foreignrow",
-		"MicrotransactionRarityDisplayKey": "foreignrow",
-		"Harvest_AchievementItemsKeys": "array|foreignrow",
-		"Heist_AchievementItemsKeys": "array|foreignrow",
-		"Ritual_AchievmentItemsKeys": "array|foreignrow",
-		"Unknown8": "i32",
-		"Unknown9": "array|i32",
-		"ShopTagKey": "foreignrow"
+		"Unknown5": "foreignrow",
+		"AchievementItemsKeys": "array|foreignrow",
+		"Unknown6": "array|foreignrow",
+		"Unknown7": "foreignrow"
 	},
 	"CurrencyStashTabLayout": {
 		"Id": "string",
@@ -1517,22 +1547,18 @@
 		"Unknown6": "bool",
 		"Unknown7": "bool"
 	},
-	"DamageEffectVariations": {
-		"Id": "string",
-		"AnimationKeys": "array|foreignrow",
-		"PETVariations": "array|string",
+	"DamageHitEffects": {
+		"RowID": "i32",
+		"Unknown0": "i32",
+		"Keys0": "array|foreignrow",
 		"Unknown1": "i32",
 		"Unknown2": "i32",
 		"Unknown3": "array|string",
 		"Unknown4": "array|string",
-		"MiscEffectsKey": "foreignrow"
-	},
-	"DamageHitEffects": {
-		"RowID": "i32",
-		"Unknown0": "i32",
-		"Unknown1":  "i32",
-		"Variation1": "foreignrow",
-		"Variation2": "foreignrow"
+		"Key0": "foreignrow",
+		"Key1": "i32",
+		"Key2": "row",
+		"Key3": "row"
 	},
 	"DamageHitTypes": {},
 	"DamageParticleEffects": {
@@ -1667,13 +1693,13 @@
 		"WorldAreasKey": "foreignrow",
 		"Image": "string",
 		"AchievementItemsKeys": "array|foreignrow",
-		"MinTier": "array|pair|i32",
+		"MinTier": "array|i32",
 		"MinDepth": "array|i32",
 		"Description": "string",
 		"Unknown0": "i32",
-		"Unknown1": "array|i32",
-		"Unknown2": "array|i32",
-		"Unknown3": "array|i32"
+		"Data1": "array|i32",
+		"Data2": "array|i32",
+		"Data3": "array|i32"
 	},
 	"DelveFlares": {
 		"Unknown0": "i32",
@@ -1821,33 +1847,11 @@
 	},
 	"DivinationCardStashTabLayout": {
 		"BaseItemTypesKey": "foreignrow",
-		"IsInGame": "bool",
 		"IsEnabled": "bool"
 	},
 	"Doors": {
 		"Id": "string",
 		"Unknown0": "i8"
-	},
-	"DroneBaseTypes": {
-		"BaseItemTypesKey": "foreignrow",
-		"DroneTypesKey": "foreignrow",
-		"Charges": "i32",
-		"Duration": "i32",
-		"Empowers": "i32",
-		"BuffVisualsKey": "foreignrow",
-		"Empowerment": "i32",
-		"Use_AchievementItemsKey": "foreignrow",
-		"IsDropRestricted": "bool"
-	},
-	"DroneTypes": {
-		"Id": "string",
-		"Unknown0": "i32",
-		"MonsterVarietyKey": "foreignrow",
-		"InteractActionMessage": "string",
-		"Name": "string",
-		"Unlocked_StatsKey": "foreignrow",
-		"ControllerHoverMessageConnected": "string",
-		"ControllerHoverMessageDisconnected":  "string"
 	},
 	"DropEffects": {
 		"Id": "string",
@@ -1921,10 +1925,6 @@
 		"WorldAreasKey": "foreignrow",
 		"Unknown0": "i32",
 		"AchievementItemsKeys": "array|foreignrow"
-	},
-	"ElderGuardians": {
-		"Id": "string",
-		"Image": "string"
 	},
 	"ElderMapBossOverride": {
 		"WorldAreasKey": "foreignrow",
@@ -2041,7 +2041,7 @@
 	"EvergreenAchievementTypes": {},
 	"ExecuteGEAL": {
 		"Unknown0": "i32",
-		"MiscAnimatedKeys": "array|foreignrow",
+		"Keys0": "array|foreignrow",
 		"Unknown1": "i32",
 		"Unknown2": "i32",
 		"Unknown3": "i32",
@@ -2053,13 +2053,13 @@
 		"Unknown8": "i32",
 		"Flag1": "bool",
 		"Flag2": "bool",
-		"Unknown9": "array|i32",
+		"Unknown9": "array|foreignrow",
 		"Unknown10": "i32",
 		"Unknown11": "i32",
 		"Unknown12": "i32",
 		"Unknown13": "i32",
-		"Unknown14": "i32",
 		"Flag3": "bool",
+		"Unknown14": "i32",
 		"Unknown15": "string",
 		"Flag4": "bool",
 		"Unknown16": "i32",
@@ -2079,9 +2079,7 @@
 		"Flag8": "bool",
 		"Unknown25": "row",
 		"Unknown26": "string",
-		"Unknown27": "i32",
-		"Flag9": "i8",
-		"Unknown28": "i32"
+		"Unknown27": "i32"
 	},
 	"ExpandingPulse": {
 		"Unknown0": "i32",
@@ -2262,10 +2260,6 @@
 		"Unknown2": "i32",
 		"Unknown3": "i32"
 	},
-	"FlaskStashBaseTypeOrdering": {
-		"FlasksKey": "foreignrow",
-		"Id": "i32"
-	},
 	"Flasks": {
 		"BaseItemTypesKey": "foreignrow",
 		"Name": "string",
@@ -2288,10 +2282,7 @@
 	"Footprints": {
 		"Id": "string",
 		"Active_AOFiles": "array|string",
-		"Idle_AOFiles": "array|string",
-		"ActiveVariation_AOFiles": "array|string",
-		"IdleVariation_AOFiles": "array|string",
-		"Index": "i32"
+		"Idle_AOFiles": "array|string"
 	},
 	"FootstepAudio": {
 		"Id": "string",
@@ -2299,6 +2290,7 @@
 	},
 	"FragmentStashTabLayout": {
 		"Id": "string",
+		"BaseItemTypesKey": "foreignrow",
 		"PosX": "i32",
 		"PosY": "i32",
 		"Order": "i32",
@@ -2307,35 +2299,18 @@
 		"Unknown0": "bool",
 		"Unknown1": "i32",
 		"Unknown2": "i32",
-		"Unknown3": "bool",
-		"Unknown4": "i32",
-		"Storeable_BaseItemTypesKeys": "array|foreignrow"
+		"Unknown3": "bool"
 	},
 	"GameConstants": {
 		"Id": "string",
 		"Value": "i32",
 		"Unknown0": "i32"
 	},
-	"GameObjectTasks": {
-		"Id": "string",
-		"Unknown0": "i32"
-	},
 	"GamepadButton": {
 		"Unknown0": "string",
 		"Unknown1": "string",
 		"Unknown2": "string",
-		"Unknown3": "string",
-		"Unknown4": "string"
-	},
-	"GamepadButtonCombination": {
-		"Id": "string",
-		"First_GamepadButtonKey": "foreignrow",
-		"Second_GamepadButtonKey": "foreignrow",
-		"Unknown0": "i32"
-	},
-	"GamepadThumbstick": {
-		"Unknown0": "string",
-		"Unknown1": "string"
+		"Unknown3": "string"
 	},
 	"GamepadType": {
 		"Id": "string",
@@ -2358,26 +2333,10 @@
 	"GenericBuffAuras": {
 		"Id": "string"
 	},
-	"GenericLeagueRewardTypes": {
-		"Id": "string",
-		"DropMinLevel": "i32",
-		"DropMaxLevel": "i32"
-	},
-	"GenericLeagueRewardTypeVisuals": {
-		"GenericLeagueRewardTypesKey": "foreignrow",
-		"MinimapIconsKey": "foreignrow",
-		"MiscAnimatedKey": "foreignrow",
-		"X": "i8",
-		"Y": "i8",
-		"W": "i8",
-		"H": "i8",
-		"ArtFile": "string",
-		"Name": "string"
-	},
 	"GeometryAttack": {
 		"Unknown0": "i32",
-		"MiscAnimatedKeys0": "array|foreignrow",
-		"MiscAnimatedKeys1": "array|foreignrow",
+		"Keys0": "array|foreignrow",
+		"Keys1": "array|foreignrow",
 		"Unknown1": "i32",
 		"Unknown2": "i32",
 		"Unknown3": "i32",
@@ -2403,8 +2362,8 @@
 		"Flag6": "bool",
 		"Unknown18": "i32",
 		"Flag7": "bool",
-		"BuffDefinitionsKey": "foreignrow",
-		"BuffDefinitionsValues": "array|i32",
+		"Key1": "foreignrow",
+		"Unknown19": "array|i32",
 		"Unknown20": "i32",
 		"Flag8": "bool",
 		"Flag9": "bool",
@@ -2413,20 +2372,14 @@
 		"Unknown21": "array|i32",
 		"Flag15": "bool",
 		"Flag16": "bool",
-		"GeometryChannelKey": "foreignrow",
+		"Key3": "foreignrow",
 		"Flag17": "bool",
-		"Flag18": "bool",
 		"Unknown22": "foreignrow",
+		"Flag18": "bool",
 		"Flag19": "bool",
 		"Flag20": "bool",
 		"Flag21": "bool",
-		"Flag22": "bool",
-		"Flag23": "bool",
-		"Flag24": "bool",
-		"Flag25": "bool",
-		"Flag26": "bool",
-		"Flag27": "bool",
-		"Flag28": "bool"
+		"Flag22": "bool"
 	},
 	"GeometryChannel": {
 		"Id": "string",
@@ -2470,8 +2423,8 @@
 	},
 	"GeometryTrigger": {
 		"Unknown0": "i32",
-		"GrantedEffectsKey": "foreignrow",
-		"MiscAnimatedKey0": "foreignrow",
+		"Key0": "foreignrow",
+		"Key1": "foreignrow",
 		"Unknown1": "i32",
 		"Unknown2": "i32",
 		"Unknown3": "i32",
@@ -2490,11 +2443,12 @@
 		"Flag0": "i8",
 		"Unknown16": "i32",
 		"Flag1": "i8",
+		"Unknown17": "i32",
 		"Flag2": "i8",
-		"Unknown17": "f32",
 		"Unknown18": "i32",
 		"Unknown19": "i32",
-		"MisANimatedKeys": "array|foreignrow",
+		"Key2": "row",
+		"Key3": "row",
 		"Unknown20": "i32",
 		"Flag3": "i8",
 		"Unknown21": "i32",
@@ -2503,18 +2457,19 @@
 		"Unknown22": "i32",
 		"Flag6": "i8",
 		"Flag7": "i8",
-		"MiscAnimatedKey1": "foreignrow",
+		"Key4": "foreignrow",
 		"Flag8": "i8",
-		"Flag9": "i8",
-		"Flag10": "i8",
 		"Unknown23": "i32",
 		"Unknown24": "i32",
-		"StatsKeys": "array|foreignrow",
-		"StatsValues": "array|i32",
-		"Unknown25": "i32",
-		"Unknown26": "i32",
-		"Unknown27": "i32",
-		"Flag11": "bool"
+		"Flag9": "i8",
+		"Flag10": "i8",
+		"Unknown25": "row",
+		"Unknown26": "row",
+		"Unknown27": "row",
+		"Unknown28": "row",
+		"Unknown29": "i32",
+		"Unknown30": "i32",
+		"Unknown31": "i32"
 	},
 	"GiftWrapArtVariations": {
 		"Unknown0": "i32",
@@ -2574,11 +2529,7 @@
 		"Unknown9": "foreignrow",
 		"Unknown10": "bool",
 		"Unknown11": "array|foreignrow",
-		"GrantedEffectsKey": "row",
-		"Unknown12": "i32",
-		"Unknown13": "i32",
-		"Unknown14": "i32",
-		"Unknown15": "bool"
+		"GrantedEffectsKey": "row"
 	},
 	"GrantedEffectsPerLevel": {
 		"GrantedEffectsKey": "foreignrow",
@@ -2642,27 +2593,27 @@
 		"GroundEffectTypesKey": "foreignrow",
 		"Unknown0": "i32",
 		"Unknown1": "i32",
-		"BuffVisualsKey0": "foreignrow",
+		"Key0": "foreignrow",
 		"Flag0": "i8",
 		"Flag1": "i8",
-		"Unknown2": "i16",
+		"Flag2": "i8",
+		"Flag3": "i8",
 		"Data0": "array|i32",
-		"Flag2": "bool",
-		"AOFiles": "array|string",
-		"Unknown3": "array|string",
-		"Unknown4": "string",
-		"BuffDefinitionsKey": "foreignrow",
-		"MiscObjectKey0": "foreignrow",
-		"MiscObjectKey1": "foreignrow",
-		"Key0": "foreignrow",
-		"Key1": "foreignrow",
-		"Flag3": "bool",
 		"Flag4": "bool",
-		"Flag5": "bool",
-		"BuffVisualsKey1": "foreignrow",
+		"AOFiles": "array|string",
+		"Unknown2": "array|string",
+		"Unknown3": "string",
+		"Key1": "foreignrow",
 		"Key2": "foreignrow",
+		"Key3": "foreignrow",
+		"Key4": "foreignrow",
+		"Key5": "foreignrow",
+		"Flag5": "bool",
 		"Flag6": "bool",
-		"Flag7": "bool"
+		"Flag7": "bool",
+		"Key6": "foreignrow",
+		"Key7": "foreignrow",
+		"Flag8": "bool"
 	},
 	"GroundEffectTypes": {
 		"Id": "string",
@@ -3123,8 +3074,7 @@
 	"HellscapeMods": {
 		"ModKey": "foreignrow",
 		"Unknown0": "array|i32",
-		"TransformAchievement": "foreignrow",
-		"Unknown1": "array|string"
+		"TransformAchievement": "foreignrow" // AchievementItemsKey
 	},
 	"HellscapeMonsterPacks": {
 		"Id": "string",
@@ -3153,13 +3103,12 @@
 		"AllocationsRequired": "i32",
 		"HellscapePassivesKeys": "array|foreignrow"
 	},
-	"HideoutDoodadCategory": {
-		"Id": "string",
-		"Name": "string"
-	},
 	"HideoutDoodads": {
 		"BaseItemTypesKey": "foreignrow",
 		"Variation_AOFiles": "array|string",
+		//"FavourCost": "i32", // removed 3.16
+		//"MasterLevel": "i32", // removed 3.16
+		//"HideoutNPCsKey": "foreignrow", // removed 3.16
 		"IsNonMasterDoodad": "bool",
 		"Unknown0": "i32",
 		"Unknown1": "i32",
@@ -3167,17 +3116,14 @@
 		"InheritsFrom": "string",
 		"Unknown3": "bool",
 		"IsCraftingBench": "bool",
-		"HideoutDoodadTags": "array|foreignrow",
+		"Unknown4": "array|foreignrow",
 		"Unknown5": "bool",
-		"HideoutsKey": "foreignrow",
-		"CategoryKey": "foreignrow",
-		"Unknown6": "i32"
+		"Unknown6": "foreignrow"
 	},
 	"HideoutDoodadTags": {
 		"Id": "string",
 		"Unknown0": "array|i32",
-		"Unknown1": "array|i32",
-		"Name": "string"
+		"Unknown1": "array|i32"
 	},
 	"HideoutNPCs": {
 		"Hideout_NPCsKey": "foreignrow",
@@ -3189,8 +3135,7 @@
 		"Unknown2": "i32",
 		"Key0": "foreignrow",
 		"Unknown3": "i32",
-		"Flag0": "i8",
-		"RuleSetsKey": "foreignrow"
+		"Flag0": "i8"
 	},
 	"HideoutRarity": {
 		"Id": "string",
@@ -3371,21 +3316,17 @@
 		"CanHaveAspects": "bool",
 		"CanTransferSkin": "bool",
 		"ItemStance": "foreignrow",
-		"CanScourge": "bool",
-		"Unknown5": "bool",
-		"Unknown6": "bool",
-		"Unknown7": "bool",
-		"Data0": "array|i32",
-		"Data1": "array|i32"
+		"CanScourge": "bool", // Added 3.16
+		"Unknown5": "bool", // Added 3.16
+		"Unknown6": "bool" // Added 3.17
 	},
-	"ItemClassFlags": {},
 	"ItemCostPerLevel": {
 		"ContractBaseItemTypesKey": "foreignrow",
 		"Level": "i32",
 		"Cost": "foreignrow",
 		"Unknown0": "foreignrow"
 	},
-	"ItemCosts": {
+	"ItemCosts": { // Added 3.16
 		"Id": "string",
 		"Cost1Currencies": "array|foreignrow",
 		"Cost1Values": "array|i32",
@@ -3407,18 +3348,13 @@
 		"ItemVisualEffectKey": "foreignrow",
 		"ItemVisualIdentityKey1": "foreignrow",
 		"ItemVisualIdentityKey2": "foreignrow",
-		"StatsKeys": "array|foreignrow",
-		"ItemClassesKeys": "array|foreignrow",
-		"BaseItemTypesKeys": "array|foreignrow",
+		"Keys0": "array|foreignrow",
+		"Keys1": "array|foreignrow",
+		"Keys2": "array|foreignrow",
 		"Flag0": "bool",
 		"Data3": "array|i32",
 		"Data4": "array|i32",
-		"Flag1": "bool",
-		"Data5": "array|i32",
-		"Flag2": "bool",
-		"Data6": "array|i32",
-		"CharactersKeys": "array|foreignrow",
-		"ItemVisualIdentityKey3": "foreignrow"
+		"Flag1": "bool"
 	},
 	"ItemNoteCode": {
 		"BaseItemTypesKey": "foreignrow",
@@ -3427,8 +3363,16 @@
 		"Unknown1": "bool"
 	},
 	"ItemSetNames": {},
+	"ItemShopType": {
+		"Id": "string",
+		"Name": "string"
+	},
 	"ItemStances": {
 		"Id": "string"
+	},
+	"ItemThemes": {
+		"Id": "string",
+		"Name": "string"
 	},
 	"ItemVisualEffect": {
 		"Id": "string",
@@ -3448,21 +3392,21 @@
 		"ShieldEPKFile": "string"
 	},
 	"ItemVisualHeldBodyModel": {
-		"ItemVisualIdentityKey": "foreignrow",
-		"MarauderAOFile": "string",
-		"RangerAOFile": "string",
-		"WitchAOFile": "string",
-		"DuelistAOFile": "string",
-		"TemplarAOFile": "string",
-		"ShadowAOFile": "string",
-		"ScionAOFile": "string",
-		"MarauderAttachmentLocation": "string",
-		"RangerAttachmentLocation": "string",
-		"WitchAttachmentLocation": "string",
-		"DuelistAttachmentLocation": "string",
-		"TemplarAttachmentLocation": "string",
-		"ShadowAttachmentLocation": "string",
-		"ScionAttachmentLocation": "string"
+		"Key0": "foreignrow",
+		"Unknown0": "string",
+		"Unknown1": "string",
+		"Unknown2": "string",
+		"Key4": "row",
+		"Key5": "row",
+		"Key6": "row",
+		"Unknown3": "string",
+		"Unknown4": "string",
+		"Unknown5": "string",
+		"Unknown6": "string",
+		"Unknown7": "string",
+		"Unknown8": "string",
+		"Unknown9": "string",
+		"Unknown10": "string"
 	},
 	"ItemVisualIdentity": {
 		"Id": "string",
@@ -3513,12 +3457,8 @@
 		"Unknown16": "array|i32",
 		"Unknown17": "bool",
 		"Unknown18": "array|u64",
-		"Unknown19": "string",
-		"Unknown20": "i32",
-		"StatsKey0": "foreignrow",
-		"StatsKey1": "foreignrow",
-		"StatsKey2": "foreignrow",
-		"StatsKey3": "foreignrow"
+		"Unknown19": "string", // Added 3.16
+		"Unknown20": "i32"
 	},
 	"JobAssassinationSpawnerGroups": {
 		"Key0": "row",
@@ -3539,10 +3479,6 @@
 		"Kills": "i32",
 		"MonsterVarietiesKey": "foreignrow",
 		"AchievementItemsKey": "foreignrow"
-	},
-	"KiracLevels": {
-		"ItemLevel": "i32",
-		"MapBonusCompletedLevel": "i32"
 	},
 	"LabyrinthAreas": {
 		"Id": "string",
@@ -3674,8 +3610,7 @@
 		"Id": "string",
 		"Image": "string",
 		"Flag0": "bool",
-		"Flag1": "bool",
-		"LoginBannerImage": "string"
+		"Flag1": "bool"
 	},
 	"LeagueInfo": {
 		"Id": "string",
@@ -3685,29 +3620,14 @@
 		"Description": "string",
 		"League": "string",
 		"Flag0": "bool",
+		"ItemImages": "array|string",
+		"HoverImages": "array|string",
 		"TrailerVideoLink": "string",
 		"BackgroundImage": "string",
 		"Flag1": "bool",
-		"Flag2": "bool",
-		"InfoPanelImages": "array|string"
+		"Flag2": "bool"
 	},
 	"LeagueQuestFlags": {},
-	"LeagueStaticRewards": {
-		"I": "u32",
-		"a": "u32",
-		"b": "u32",
-		"c": "foreignrow",
-		"d": "foreignrow"
-	},
-	"LegacyAtlasInfluenceOutcomes": {
-		"Id": "string",
-		"Unknown0": "i32",
-		"Unknown1": "i32",
-		"MinTier": "i32",
-		"MaxTier": "i32",
-		"Unknown2": "foreignrow",
-		"ModsKeys": "array|foreignrow"
-	},
 	"LegionBalancePerLevel": {
 		"MinLevel": "i32",
 		"Unknown0": "i32",
@@ -3850,14 +3770,15 @@
 		"Id": "string",
 		"BaseItemTypesKeys": "array|foreignrow",
 		"WorldAreasKey": "foreignrow",
-		"PortalVariationKey": "foreignrow",
+		"Key0": "foreignrow",
 		"AreaLevel": "i32",
 		"Unknown0": "i32",
 		"Unknown1": "i32",
 		"IsLegionMap": "bool",
-		"IsGuardianSetBoss": "bool",
-		"IsInvitationEncounter": "bool",
-		"AchievementItemsKeys": "array|foreignrow"
+		"Flag2": "bool",
+		"Flag3": "bool",
+		"Flag4": "bool",
+		"Keys": "array|foreignrow"
 	},
 	"MapDevices": {
 		"Id": "string",
@@ -3871,7 +3792,8 @@
 		"Flag1": "i8",
 		"Flag2": "i8",
 		"Flag3": "i8",
-		"Flag4": "i8"
+		"Flag4": "i8",
+		"Flag5": "i8"
 	},
 	"MapFragmentFamilies": {},
 	"MapFragmentMods": {
@@ -3908,6 +3830,15 @@
 		"Tier": "i32",
 		"Cost": "foreignrow",
 		"Unknown1": "foreignrow"
+		// Removed 3.16
+		//"NormalPurchase_BaseItemTypesKeys": "array|foreignrow",
+		//"NormalPurchase_Costs": "array|i32",
+		//"MagicPurchase_BaseItemTypesKeys": "array|foreignrow",
+		//"MagicPurchase_Costs": "array|i32",
+		//"RarePurchase_BaseItemTypesKeys": "array|foreignrow",
+		//"RarePurchase_Costs": "array|i32",
+		//"UniquePurchase_BaseItemTypesKeys": "array|foreignrow",
+		//"UniquePurchase_Costs": "array|i32"
 	},
 	"Maps": {
 		"BaseItemTypesKey": "foreignrow",
@@ -3927,7 +3858,7 @@
 		"MapSeriesKey": "i32",
 		"Flag0": "bool",
 		"Flag1": "bool",
-		"Flag2": "bool"
+		"Flag2": "bool" // Added 3.16
 	},
 	"MapSeries": {
 		"Id": "string",
@@ -3937,8 +3868,8 @@
 		"Shaper_DDSFile": "string",
 		"Elder_DDSFile": "string",
 		"Drawn_DDSFile": "string",
-		"Delirious_DDSFile": "string",
-		"UberBlighted_DDSFile": "string"
+		"Delirious_DDSFile": "string", // Added 3.16
+		"UberBlighted_DDSFile": "string" // Added 3.16
 	},
 	"MapSeriesTiers": {
 		"MapsKey": "foreignrow",
@@ -3953,32 +3884,15 @@
 		"HeistTier": "i32",
 		"EchoesOfTheAtlasTier": "i32",
 		"ExpeditionTier": "i32",
-		"ScourgeTier": "i32",
-		"ArchnemesisTier": "i32",
-		"SentinelTier": "i32"
+		"ScourgeTier": "i32"
 	},
-	"MapStashSpecialTypeEntries": {
-		"Id": "string",
-		"SetIndex": "i32",
-		"FragmentBaseItemTypesKey": "foreignrow",
-		"Name": "string",
-		"SetSubIndex": "i32",
-		"Icon": "string",
-		"NewIcon": "string",
-		"IsShaper": "bool",
-		"IsElder": "bool"
-	},
-	"MapStashUniqueMapInfo": {
-		"Unknown0": "foreignrow",
-		"Unknown1": "foreignrow"
-	},
+	"MapStashTabLayout": {},
 	"MapStatConditions": {
 		"Id": "string",
 		"StatsKey": "foreignrow",
 		"Unknown0": "i8",
 		"StatMin": "i32",
-		"StatMax": "i32",
-		"Unknown1": "i8"
+		"StatMax": "i32"
 	},
 	"MapTierAchievements": {
 		"Id": "string",
@@ -3987,8 +3901,7 @@
 	},
 	"MapTiers": {
 		"Tier": "i32",
-		"Level": "i32",
-		"Unknown0": "i32"
+		"Level": "i32"
 	},
 	"MasterHideoutLevels": {
 		"NPCMasterKey": "foreignrow",
@@ -4002,29 +3915,25 @@
 		"TextAudioT3": "foreignrow",
 		"TextAudioT4": "foreignrow",
 		"TextAudioT5": "foreignrow",
-		"Unknown0": "bool",
-		"TextAudioT6": "foreignrow"
+		"Unknown0": "bool"
 	},
 	"MavenFights": {
 		"Id": "string",
-		"AreaLevel": "i32",
+		"Unknown0": "foreignrow",
 		"Unknown1": "i32",
+		"Level": "i32",
 		"Unknown2": "i32",
-		"BossesCount": "i32",
-		"BaseItemTypesKey": "foreignrow",
+		"Unknown3": "i32",
 		"Unknown4": "i32",
-		"MinimumMapTierToWitness": "i32",
-		"Unknown6": "i32",
+		"Unknown5": "foreignrow",
+		"Unknown6": "foreignrow",
 		"Unknown7": "i32",
-		"WorldAreasKeys": "array|foreignrow",
 		"Unknown8": "i32",
 		"Unknown9": "i32",
-		"IsEndgameInvitation": "bool",
+		"Unknown10": "i32",
 		"Unknown11": "array|foreignrow",
-		"AchievementItemsKeys": "array|foreignrow"
-	},
-	"MavenJewelRadiusKeystones": {
-		"Unknown0": "foreignrow"
+		"Unknown12": "i32",
+		"Unknown13": "i32"
 	},
 	"Melee": {
 		"Key0": "foreignrow",
@@ -4143,19 +4052,8 @@
 		"Unknown1": "foreignrow",
 		"Unknown2": "foreignrow"
 	},
-	"MicrotransactionCategory": {
-		"Id": "i32",
-		"Name": "string"
-	},
-	"MicrotransactionCategoryId": {},
 	"MicrotransactionCharacterPortraitVariations": {
 		"Unknown0": "foreignrow"
-	},
-	"MicrotransactionChargeVariations": {
-		"Unknown0": "foreignrow",
-		"Unknown1": "foreignrow",
-		"Unknown2": "foreignrow",
-		"Unknown4": "foreignrow"
 	},
 	"MicrotransactionCombineFormula": {
 		"Id": "string",
@@ -4180,27 +4078,10 @@
 		"Key0": "foreignrow",
 		"Id": "string"
 	},
-	"MicrotransactionJewelVariations": {
-		"BaseItemTypesKey": "foreignrow",
-		"Unknown0": "i32",
-		"ArtFile": "string",
-		"BackgroundFile": "string",
-		"Unknown1": "i32",
-		"BackgroundFile2": "string"
-	},
 	"MicrotransactionPeriodicCharacterEffectVariations": {
 		"Id": "string",
 		"AOFile": "string",
-		"MiscObjectsKey": "foreignrow",
-		"Index": "i32"
-	},
-	"MicrotransactionPlayerShieldVariations": {
-		"BaseItemTypesKey": "foreignrow",
-		"ArtFile": "string",
-		"BackgroundFile": "string",
-		"ConsoleArtFile": "string",
-		"ConsoleBackgroundFile": "string",
-		"Unknown0": "i32"
+		"Unknown0": "foreignrow"
 	},
 	"MicrotransactionPortalVariations": {
 		"BaseItemTypesKey": "foreignrow",
@@ -4213,8 +4094,11 @@
 		"Unknown1": "f32",
 		"Unknown2": "string",
 		"PortalEffectLarge_AOFile": "string",
-		"Unknown6": "i32",
-		"Unknown7": "i32"
+		"Unknown3": "string",
+		"Unknown4": "string",
+		"Unknown5": "string",
+		"Unknown6": "i32", // Added 3.16
+		"Unknown7": "i32" // Added 3.16
 	},
 	"MicrotransactionRarityDisplay": {
 		"Rarity": "string",
@@ -4229,11 +4113,6 @@
 		"Unknown0": "foreignrow",
 		"Unknown1": "i32",
 		"Unknown2": "i32"
-	},
-	"MicrotransactionSlot": {
-		"Id": "i32",
-		"ShopTagKey": "foreignrow",
-		"Name": "string"
 	},
 	"MicrotransactionSlotId": {},
 	"MicrotransactionSocialFrameVariations": {
@@ -4254,8 +4133,7 @@
 	"MiniQuestStates": {
 		"Unknown0": "i32",
 		"Unknown1": "array|i32",
-		"Unknown2": "array|i32",
-		"Unknown3": "i32"
+		"Unknown2": "array|i32"
 	},
 	"MiscAnimated": {
 		"Id": "string",
@@ -4264,7 +4142,7 @@
 		"Unknown0": "i32",
 		"Unknown1": "i32"
 	},
-	"MiscAnimatedArtVariations": {
+	"MiscAnimatedArtVariations": { // Added 3.16
 		"Id": "string",
 		"Unknown0": "array|foreignrow",
 		"Unknown1": "i32",
@@ -4278,7 +4156,7 @@
 		"PreloadGroupsKeys": "array|foreignrow",
 		"Unknown2": "i32"
 	},
-	"MiscBeamsArtVariations": {
+	"MiscBeamsArtVariations": { // Added 3.16
 		"Id": "string",
 		"Unknown0": "array|foreignrow",
 		"Unknown1": "i32",
@@ -4295,7 +4173,7 @@
 		"Unknown4": "i8",
 		"PlayerOnly_EPKFile": "string"
 	},
-	"MiscEffectPacksArtVariations": {
+	"MiscEffectPacksArtVariations": { // Added 3.16
 		"Id": "string",
 		"Unknown0": "array|foreignrow",
 		"Unknown1": "i32"
@@ -4307,12 +4185,16 @@
 		"Unknown0": "i32",
 		"Unknown1": "i32"
 	},
-	"MiscObjectsArtVariations": {
+	"MiscObjectsArtVariations": { // Added 3.16
 		"Id": "string",
 		"Unknown0": "array|foreignrow",
 		"Unknown1": "i32",
 		"Unknown2": "i32",
 		"Unknown3": "foreignrow"
+	},
+	"MissionFavourPerLevel": {
+		"Level": "i32",
+		"Favour": "i32"
 	},
 	"MissionTileMap": {},
 	"MissionTimerTypes": {
@@ -4421,10 +4303,9 @@
 		"Unknown18": "i32",
 		"Unknown19": "i32",
 		"Unknown20": "i32",
-		"BuffTemplateKey0": "row",
+		"BuffTemplate": "row",
 		"ArchnemesisMinionMod": "foreignrow",
-		"HASH32": "u32",
-		"BuffTemplateKey1": "array|foreignrow"
+		"HASH32": "u32"
 	},
 	"ModSellPriceTypes": {
 		"Id": "string"
@@ -4432,8 +4313,7 @@
 	"ModSetNames": {},
 	"ModType": {
 		"Name": "string",
-		"ModSellPriceTypesKeys": "array|foreignrow",
-		"Flag0": "bool"
+		"ModSellPriceTypesKeys": "array|foreignrow"
 	},
 	"MonsterArmours": {
 		"Id": "string",
@@ -4511,9 +4391,7 @@
 		"Keys2": "array|foreignrow",
 		"Unknown3": "i32",
 		"Key2": "foreignrow",
-		"Key3": "foreignrow",
-		"Unknown4": "i32",
-		"Unknown5": "i32"
+		"Key3": "foreignrow"
 	},
 	"MonsterFleeConditions": {},
 	"MonsterGroupEntries": {
@@ -4525,13 +4403,11 @@
 	"MonsterHeightBrackets": {
 		"Id": "string",
 		"Unknown0": "i32",
-		"BuffVisualKey": "foreignrow",
-		"EndBuffVisualKey": "foreignrow",
+		"Key0": "foreignrow",
+		"Key1": "foreignrow",
 		"Unknown1": "i32",
-		"Unknown2": "f32",
-		"Unknown3": "f32",
-		"TagsKey": "foreignrow",
-		"Unknown4": "i32"
+		"Unknown2": "i32",
+		"Unknown3": "i32"
 	},
 	"MonsterHeights": {
 		"Key0": "foreignrow",
@@ -4566,9 +4442,9 @@
 	},
 	"MonsterMortar": {
 		"IntId": "i32",
-		"ProjectilesKey": "foreignrow",
-		"AnimationKey": "foreignrow",
-		"ImpactAnimationKey": "foreignrow",
+		"Key0": "foreignrow",
+		"Key1": "foreignrow",
+		"Key2": "foreignrow",
 		"Unknown0": "i32",
 		"Flag0": "bool",
 		"Flag1": "bool",
@@ -4577,18 +4453,10 @@
 		"Unknown1": "i32",
 		"Unknown2": "i32",
 		"Unknown3": "i32",
-		"IsRemoved": "bool",
+		"Flag4": "bool",
 		"Unknown4": "i32",
 		"Flag5": "bool",
-		"Flag6": "bool",
-		"BounceAnimationKey": "foreignrow",
-		"Unknown5": "i32",
-		"Unknown6": "f32",
-		"Unknown7": "f32",
-		"Unknown8": "f32",
-		"IsEnabled": "bool",
-		"Unknown9": "foreignrow",
-		"Unknown10": "string"
+		"Flag6": "bool"
 	},
 	"MonsterPackCounts": {
 		"Unknown0": "foreignrow",
@@ -4614,18 +4482,15 @@
 		"BossMonster_MonsterVarietiesKeys": "array|foreignrow",
 		"Flag0": "bool",
 		"Unknown2": "i32",
-		"AreaIds": "array|string",
-		"TagsKeys0": "array|foreignrow",
+		"Data1": "array|string",
+		"TagsKeys": "array|foreignrow",
 		"MinLevel": "i32",
 		"MaxLevel": "i32",
-		"TagsKeys1": "array|foreignrow",
+		"Keys0": "array|foreignrow",
 		"Unknown3": "i32",
-		"PackFormationsKey": "foreignrow",
+		"Key0": "foreignrow",
 		"Unknown4": "i32",
-		"Flag1": "i8",
-		"Unknown5": "array|foreignrow",
-		"Flag2": "i8",
-		"Flag3": "i8"
+		"Flag1": "i8"
 	},
 	"MonsterProjectileAttack": {
 		"Id": "i32",
@@ -4843,9 +4708,7 @@
 		"Unknown23": "i32",
 		"Unknown24": "i8",
 		"Unknown25": "i8",
-		"Unknown26": "i32",
-		"Unknown27": "u32",
-		"Flag3": "i8"
+		"Unknown26": "i32"
 	},
 	"MTXSetBonus": {
 		"Id": "string",
@@ -4884,9 +4747,7 @@
 		"IsAvailableInHideout": "i8",
 		"Name": "string",
 		"Unknown1": "string",
-		"MusicCategoriesKeys": "array|foreignrow",
-		"Flag0": "i8",
-		"Unknown2": "i32"
+		"Keys0": "array|foreignrow"
 	},
 	"MusicCategories": {
 		"Id": "string",
@@ -4923,8 +4784,7 @@
 		"Unknown2": "string",
 		"Unknown3": "i32",
 		"Unknown4": "bool",
-		"Unknown5": "bool",
-		"Unknown6": "i32"
+		"Unknown5": "bool"
 	},
 	"NPCAudio": {
 		"Id": "string",
@@ -4982,8 +4842,7 @@
 		"Unknown9": "array|i32",
 		"Unknown10": "array|i32",
 		"Unknown11": "i32",
-		"Unknown12": "bool",
-		"Unknown13": "bool"
+		"Unknown12": "bool"
 	},
 	"NPCMaster": {
 		"Id": "string",
@@ -4995,13 +4854,15 @@
 		"SpawnWeight_Values": "array|i32",
 		"Data0": "array|i32",
 		"Data1": "array|i32",
+		//"Key1": "foreignrow", removed 3.16
+		//"HelpText": "string", removed 3.16
+		//"HelpTextForNextLevel": "string", removed 3.16
 		"Key0": "foreignrow",
 		"Unknown2": "i32",
 		"AreaDescription": "string",
 		"Key1": "foreignrow",
 		"Unknown3": "i32",
-		"Key2": "foreignrow",
-		"Unknown4": "i8"
+		"Key2": "foreignrow"
 	},
 	"NPCPortraits": {
 		"Id": "string",
@@ -5049,8 +4910,8 @@
 		"Data2": "array|u32",
 		"Script": "string",
 		"Unknown1": "i32",
-		"NPCTalkCategoryKey": "foreignrow",
-		"QuestRewardOffersKey": "foreignrow",
+		"Unknown2": "foreignrow",
+		"QuestKey": "foreignrow",
 		"Unknown3": "i32",
 		"NPCTextAudioKeys": "array|foreignrow",
 		"Script2": "string",
@@ -5062,12 +4923,13 @@
 		"Unknown5": "array|i32",
 		"Unknown6": "i32",
 		"Flag2": "bool",
-		"BaseItemTypesKey": "foreignrow",
+		"Keys0": "array|foreignrow",
+		"Key0": "foreignrow",
 		"Flag3": "bool",
 		"Flag4": "bool",
 		"DialogueOption2": "string",
-		"NPCTalkConsoleQuickActionsKey": "foreignrow",
-		"WorldAreasKey": "foreignrow",
+		"Key1": "foreignrow",
+		"Key2": "foreignrow",
 		"Unknown7": "i32",
 		"Unknown8": "array|i32",
 		"Unknown9": "i32"
@@ -5097,6 +4959,7 @@
 		"Key4": "foreignrow"
 	},
 	"NPCTextAudioInterruptRules": {},
+	"OldMapStashTabLayout": {},
 	"OnKillAchievements": {
 		"MonsterVarietiesKey": "foreignrow",
 		"Unknown0": "foreignrow"
@@ -5215,9 +5078,8 @@
 		"IsExpansion": "bool",
 		"IsProxyPassive": "bool",
 		"SkillType": "i32", // enum { PASSIVE_TREE, ATLAS_TREE }
-		"PassiveSkillMasteryGroupsKey": "foreignrow",
-		"AtlasPassiveSkillTreeGroupTypeKey": "foreignrow",
-		"SoundEffectsKey": "foreignrow"
+		"MasteryGroup": "foreignrow",
+		"Unknown1": "foreignrow"
 	},
 	"PassiveSkillStatCategories": {
 		"Id": "string",
@@ -5268,26 +5130,6 @@
 		"Unknown2": "foreignrow",
 		"Unknown3": "foreignrow"
 	},
-	"PassiveSkillTreeUIArt": {
-		"Id": "string",
-		"SmallBackgroundImage": "string",
-		"MediumBackgroundImage": "string",
-		"LargeBackgroundImage": "string",
-		"Flag0": "bool",
-		"NormalBasicImage": "string",
-		"NormalNotableImage": "string",
-		"NormalKeystoneImage": "string",
-		"ActiveBasicImage": "string",
-		"ActiveNotableImage": "string",
-		"ActiveKeystoneImage": "string",
-		"CanAllocateNotableImage": "string",
-		"CanAllocateKeystoneImage": "string",
-		"CanAllocateOrnamentImage": "string",
-		"OrnamentImage": "string",
-		"SmallBlankBackgroundImage": "string",
-		"MediumBlankBackgroundImage": "string",
-		"LargeBlankBackgroundImage": "string"
-	},
 	"PassiveSkillTypes": {},
 	"PassiveTreeExpansionJewels": {
 		"BaseItemTypesKey": "foreignrow",
@@ -5318,6 +5160,40 @@
 		"BaseItemTypesKey": "foreignrow",
 		"Unknown0": "i32"
 	},
+	"PerandusBosses": {
+		"MonsterVarietiesKey": "foreignrow",
+		"MinLevel": "i32",
+		"MaxLevel": "i32",
+		"SpawnWeight": "i32"
+	},
+	"PerandusChests": {
+		"ChestsKey": "foreignrow",
+		"Unknown0": "i32",
+		"Unknown1": "i32",
+		"MinLevel": "i32",
+		"MaxLevel": "i32",
+		"Key2": "foreignrow"
+	},
+	"PerandusDaemons": {
+		"MonsterVarietiesKey": "foreignrow",
+		"Unknown0": "i32",
+		"Unknown1": "i32",
+		"Unknown2": "i32",
+		"Unknown3": "i32",
+		"Unknown4": "array|foreignrow",
+		"Flag0": "bool",
+		"Unknown5": "array|foreignrow"
+	},
+	"PerandusGuards": {
+		"Id": "string",
+		"Unknown0": "i32",
+		"MinLevel": "i32",
+		"MaxLevel": "i32",
+		"MonsterPacksKeys": "array|foreignrow",
+		"Unknown1": "i32",
+		"Unknown2": "array|u32",
+		"Unknown3": "i32"
+	},
 	"PerLevelValues": {},
 	"Pet": {
 		"Id": "string",
@@ -5346,10 +5222,6 @@
 		"Id": "string"
 	},
 	"PreloadPriorities": {},
-	"PrimordialBossLifeScalingPerLevel": {
-		"AreaLevel": "i32",
-		"Scaling": "i32"
-	},
 	"ProjectileCollisionTypes": {},
 	"Projectiles": {
 		"Id": "string",
@@ -5363,7 +5235,7 @@
 		"Unknown3": "bool",
 		"InheritsFrom": "string",
 		"Unknown4": "i32",
-		"MiscAnimatedKey0": "foreignrow",
+		"Unknown5": "foreignrow",
 		"Unknown6": "i32",
 		"Unknown7": "bool",
 		"Unknown8": "bool",
@@ -5373,24 +5245,50 @@
 		"Unknown10": "i32",
 		"Unknown11": "i32",
 		"Unknown12": "i32",
-		"MiscAnimatedKey1": "foreignrow",
-		"MiscAnimatedKey2": "foreignrow",
+		"Unknown13": "foreignrow",
+		"Unknown14": "foreignrow",
 		"Unknown15": "i32",
 		"Unknown16": "i32",
 		"Unknown17": "i32",
 		"Unknown18": "i32",
 		"Unknown19": "i32",
-		"Unknown20": "array|string",
-		"Unknown21": "bool",
-		"Unknown22": "array|i32",
-		"Unknown23": "string"
+		"Unknown20": "array|foreignrow",
+		"Unknown21": "foreignrow",
+		"Unknown22": "bool"
 	},
-	"ProjectilesArtVariations": {
+	"ProjectilesArtVariations": { // Added 3.16
 		"Projectile": "string",
 		"Variant": "i32",
 		"Unknown0": "array|foreignrow",
 		"Unknown1": "i32",
 		"Unknown2": "foreignrow"
+	},
+	"Prophecies": {
+		"Id": "string",
+		"PredictionText": "string",
+		"Unknown0": "i32",
+		"Name": "string",
+		"FlavourText": "string",
+		"QuestTracker_ClientStringsKeys": "array|foreignrow",
+		"OGGFile": "string",
+		"ProphecyChainKey": "foreignrow",
+		"ProphecyChainPosition": "i32",
+		"IsEnabled": "bool",
+		"SealCost": "i32",
+		"PredictionText2": "string"
+	},
+	"ProphecyChain": {
+		"Id": "string",
+		"Unknown0": "i32",
+		"Unknown1": "array|i32",
+		"Unknown2": "array|i32",
+		"Unknown3": "i32",
+		"Unknown4": "i32"
+	},
+	"ProphecySetNames": {},
+	"ProphecyType": {
+		"Id": "string",
+		"Unknown0": "i32"
 	},
 	"PVPTypes": {
 		"Id": "string",
@@ -5413,8 +5311,7 @@
 		"QuestStates": "array|i32",
 		"Unknown0": "array|i32",
 		"AchievementItemsKeys": "array|foreignrow",
-		"Keys0": "array|foreignrow",
-		"Flag0": "bool"
+		"Keys0": "array|foreignrow"
 	},
 	"QuestFlags": {},
 	"QuestItems": {
@@ -5426,20 +5323,15 @@
 		"Unknown4": "array|foreignrow",
 		"Unknown5": "bool",
 		"Unknown6": "bool",
-		"ClientStringsKey0": "foreignrow",
-		"Unknown8": "i32",
-		"ClientStringsKey1": "foreignrow",
-		"Unknown10": "string"
+		"Unknown7": "foreignrow",
+		"Unknown8": "i32"
 	},
 	"QuestRewardOffers": {
 		"Id": "string",
 		"QuestKey": "foreignrow",
+		"QuestState": "i32",
 		"Unknown0": "i32",
-		"Unknown1": "i32",
-		"ClientStringsKey0": "foreignrow",
-		"Flag0": "bool",
-		"Flag1": "bool",
-		"ClientStringsKey1": "foreignrow"
+		"Unknown1": "i32"
 	},
 	"QuestRewards": {
 		"RewardOffer": "foreignrow",
@@ -5462,6 +5354,7 @@
 		"Unknown12": "foreignrow",
 		"Unknown13": "i32"
 	},
+	"QuestRewardType": {},
 	"QuestStateCalculation": {},
 	"QuestStates": {
 		"QuestKey": "foreignrow",
@@ -5505,13 +5398,15 @@
 	"Races": {
 		"Id": "string",
 		"Unknown0": "array|foreignrow",
+		"Unknown1": "array|foreignrow",
 		"Unknown2": "string",
 		"Url": "string",
 		"Unknown3": "i32",
 		"Unknown4": "i32",
 		"Unknown5": "array|foreignrow",
 		"Flag0": "bool",
-		"Unknown7": "i32"			
+		"Unknown6": "i32",
+		"Unknown7": "i32"
 	},
 	"RaceTimes": {
 		"RacesKey": "foreignrow",
@@ -5658,112 +5553,39 @@
 		"BaseItemTypesKey": "foreignrow"
 	},
 	"ScarabTypes": {},
-	"ScoutingReports": {
-		"A1": "string",
-		"A2": "foreignrow",
-		"A4": "u32"
-	},
-	"SentinelCraftingCurrency": {
-		"BaseItemTypesKey": "foreignrow",
-		"CurrencyTypeIndex": "i32"
-	},
-	"SentinelDroneInventoryLayout": {
-		"DroneTypeKey": "foreignrow",
-		"X": "i32",
-		"Y": "i32",
-		"W": "i32",
-		"H": "i32"
-	},
-	"SentinelPassives": {
-		"Id": "string",
-		"Unknown0": "i32",
-		"Unknown1": "string",
-		"SentinelPassiveStatsKeys": "array|foreignrow",
-		"SentinelPassiveStatsValues": "array|i32",
-		"SubCategoryIndex": "i32",
-		"CategoryIndex": "i32",
-		"SentinelPassiveTypesKey": "foreignrow",
-		"Unknown2": "i32",
-		"Unknown3": "i32",
-		"Unknown4": "i32"
-	},
-	"SentinelPassiveStats": {
-		"StatsKey0": "foreignrow",
-		"StatsKey1": "foreignrow",
-		"Unknown0": "i32"
-	},
-	"SentinelPassiveTypes": {
-		"Id": "string",
-		"EmptyImage": "string",
-		"FilledImage": "string",
-		"SentinelDroneInventoryLayoutKey": "foreignrow",
-		"Unknown0": "i32"
-	},
-	"SentinelPowerExpLevels": {
-		"Level": "i32",
-		"ExperienceRequired": "i32"
-	},
-	"SentinelStorageLayout": {
-		"Id": "string",
-		"BaseItemTypesKey": "foreignrow",
-		"DroneTypesKey": "foreignrow",
-		"IsDroneInfo": "bool",
-		"TabImage": "string",
-		"Unknown0": "i32",
-		"Unknown1": "i32",
-		"Unknown2": "i32",
-		"Unknown3": "i32",
-		"Unknown4": "i32",
-		"Unknown5": "i32",
-		"Unknown6": "i32",
-		"ItemClassesKey": "foreignrow"
-	},
-	"SentinelTaggedMonsterStats": {
-		"Unknown0": "foreignrow",
-		"Unknown1": "foreignrow",
-		"Unknown2": "foreignrow",
-		"Unknown3": "foreignrow",
-		"Unknown4": "foreignrow"
-	},
 	"SessionQuestFlags": {
 		"QuestFlag": "i32"
-	},
-	"ShaperGuardians": {
-		"Id": "string",
-		"Unknown0": "foreignrow"
 	},
 	"ShieldTypes": {
 		"BaseItemTypesKey": "foreignrow",
 		"Block": "i32"
 	},
-	"ShopTag": {
+	"ShrineBuffs": {
 		"Id": "string",
-		"Name": "string",
-		"Flag0": "bool",
-		"ShopTagKey": "row",
-		"BaseItemTypesKeys": "array|foreignrow"
+		"BuffStatValues": "array|i32",
+		"BuffDefinitionsKey": "foreignrow",
+		"Unknown0": "foreignrow"
 	},
 	"Shrines": {
 		"Id": "string",
 		"TimeoutInSeconds": "i32",
+		"Name": "string",
 		"ChargesShared": "bool",
-		"PlayerShrine_BuffTemplatesKey": "foreignrow",
+		"Player_ShrineBuffsKey": "foreignrow",
 		"Unknown0": "i32",
 		"Unknown1": "i32",
-		"MonsterShrine_BuffTemplatesKey": "foreignrow",
+		"Description": "string",
+		"Monster_ShrineBuffsKey": "foreignrow",
 		"SummonMonster_MonsterVarietiesKey": "foreignrow",
 		"SummonPlayer_MonsterVarietiesKey": "foreignrow",
 		"Unknown2": "i32",
 		"Unknown3": "i32",
 		"ShrineSoundsKey": "foreignrow",
-		"IsPVPShrine": "bool",
+		"Unknown4": "bool",
 		"AchievementItemsKeys": "array|foreignrow",
-		"IsCTFShrine": "bool",
+		"IsPVPOnly": "bool",
 		"Unknown5": "bool",
-		"IsLesserShrine": "bool",
-		"Description_ClientStringsKey": "foreignrow",
-		"ShrineName_ClientStringsKey": "foreignrow",
-		"IsRoyaleShrine": "bool"
+		"IsLesserShrine": "bool"
 	},
 	"ShrineSounds": {
 		"Id": "string",
@@ -5780,20 +5602,16 @@
 		"Frame_ArtFile": "string"
 	},
 	"SingleGroundLaser": {
-        "Index": "i32",
+		"Id": "i32",
+		"Unknown0": "foreignrow",
 		"Unknown1": "foreignrow",
-		"Unknown2": "foreignrow",
-		"Unknown3": "i32",
-		"Unknown4": "string",
-        "Flag0": "bool",
+		"Unknown2": "i32",
+		"Unknown3": "string",
+		"Unknown4": "bool",
 		"Unknown5": "i32",
-		"Flag1": "bool",
-		"Unknown6": "i32",
+		"Unknown6": "bool",
 		"Unknown7": "i32",
-		"Unknown8": "foreignrow",
-		"Unknown9": "foreignrow",
-		"Unknown10": "i32",
-		"Flag2": "bool"
+		"Unknown8": "i32"
 	},
 	"SkillArtVariations": {
 		"Id": "string",
@@ -5848,11 +5666,11 @@
 		"Unknown1": "array|foreignrow",
 		"DDSFiles": "array|string",
 		"Unknown2": "i32",
-		"OverlayImages": "array|string",
-		"Unknown3": "i32",
-		"Unknown4": "array|f32",
-		"Unknown5": "bool",
-		"Unknown6": "bool"
+		"Unknown3": "array|i32",
+		"Unknown4": "i32",
+		"Unknown5": "array|f32",
+		"Unknown6": "bool",
+		"Unknown7": "bool"
 	},
 	"SkillMorphDisplayOverlayCondition": {},
 	"SkillMorphDisplayOverlayStyle": {},
@@ -5919,7 +5737,8 @@
 		"Unknown8": "string",
 		"Unknown9": "i32",
 		"Flag1": "bool",
-		"Unknown10": "i32"
+		"Unknown10": "i32",
+		"Unknown11": "i32"
 	},
 	"SpecialRooms": {
 		"Id": "string",
@@ -5979,13 +5798,52 @@
 		"ContextFlags": "array|foreignrow"
 	},
 	"StatSemantics": {},
+	"StrDexIntMissionExtraRequirement": {
+		"Id": "string",
+		"SpawnWeight": "i32",
+		"MinLevel": "i32",
+		"MaxLevel": "i32",
+		"TimeLimit": "i32",
+		"HasTimeBonusPerKill": "bool",
+		"HasTimeBonusPerObjectTagged": "bool",
+		"HasLimitedPortals": "bool",
+		"NPCTalkKey": "foreignrow",
+		"TimeLimitBonusFromObjective": "i32",
+		"ObjectCount": "i32",
+		"Unknown0": "array|i32",
+		"Unknown1": "bool",
+		"Unknown2": "array|foreignrow"
+	},
+	"StrDexIntMissions": {
+		"Id": "string",
+		"Unknown0": "i32",
+		"Unknown1": "i32",
+		"SpawnWeight": "i32",
+		"Key1": "foreignrow",
+		"Key2": "foreignrow",
+		"Extra_ModsKeys": "array|foreignrow",
+		"Flag0": "i8",
+		"Flag1": "i8",
+		"Flag2": "i8",
+		"Key3": "foreignrow",
+		"Unknown2": "i32",
+		"Unknown3": "i32",
+		"Unknown4": "i32",
+		"Unknown5": "i32",
+		"Key4": "foreignrow",
+		"Key5": "foreignrow",
+		"Key6": "foreignrow",
+		"Flag3": "i8",
+		"Key7": "foreignrow",
+		"Flag4": "bool",
+		"Key8": "foreignrow"
+	},
 	"Strongboxes": {
 		"ChestsKey": "foreignrow",
 		"SpawnWeight": "i32",
 		"Unknown0": "i32",
 		"IsCartographerBox": "bool",
-		"Unknown1": "bool",
-		"ApplicableAtlasPassive_StatsKey": "foreignrow"
+		"Unknown1": "bool"
 	},
 	"SuicideExplosion": {
 		"Id": "i32",
@@ -6003,8 +5861,7 @@
 		"ChestsKey": "foreignrow",
 		"Key0": "foreignrow",
 		"Key1": "foreignrow",
-		"Key2": "foreignrow",
-		"Unknown0a": "string"
+		"Key2": "foreignrow"
 	},
 	"SummonedSpecificMonsters": {
 		"Id": "i32",
@@ -6023,8 +5880,7 @@
 		"Unknown4": "i32",
 		"Unknown5": "string",
 		"Flag4": "bool",
-		"Flag5": "bool",
-		"Unknown6": "i32"
+		"Flag5": "bool"
 	},
 	"SummonedSpecificMonstersOnDeath": {
 		"Id": "string",
@@ -6112,36 +5968,6 @@
 		"ArtFile": "string",
 		"AchievementItemsKey": "foreignrow"
 	},
-	"TableCharge": {
-		"Index": "i32",
-		"Flag0": "bool",
-		"Unknown0": "i32",
-		"Unknown1": "i32",
-		"Key0": "foreignrow",
-		"Flag1": "bool",
-		"Data0": "array|i32",
-		"Key1": "foreignrow",
-		"Unknown2": "i32",
-		"Unknown3": "i32",
-		"Unknown4": "i32",
-		"Unknown5": "i32",
-		"Flag2": "bool",
-		"Flag3": "bool",
-		"Key2": "foreignrow",
-		"Key3": "foreignrow",
-		"Flag4": "bool",
-		"Unknown6": "i32",
-		"Unknown7": "i32",
-		"Unknown8": "i32",
-		"Unknown9": "i32",
-		"Unknown10": "i32",
-		"Unknown11": "i32",
-		"Unknown12": "i32",
-		"Unknown13": "i32",
-		"Flag5": "bool",
-		"Flag6": "bool",
-		"Unknown14": "i32"
-	},
 	"TableMonsterSpawners": {
 		"Metadata": "string",
 		"Unknown0": "i32",
@@ -6154,28 +5980,23 @@
 		"Unknown7": "i32",
 		"Unknown8": "i32",
 		"Unknown9": "i32",
-		"Flag0": "bool",
-		"Flag1": "bool",
-		"Flag2": "bool",
-		"Flag3": "bool",
-		"Flag4": "bool",
-		"Flag5": "bool",
+		"Flag0": "i8",
 		"Unknown10": "i32",
 		"Unknown11": "i32",
+		"Flag1": "i8",
 		"Unknown12": "i32",
 		"Unknown13": "i32",
-		"Key0": "foreignrow",
-		"Flag6": "bool",
-		"Flag7": "bool",
-		"Script0": "string",
-		"Flag8": "bool",
-		"Flag9": "bool",
-		"Script1": "string",
-		"Data0": "array|i32", 
 		"Unknown14": "i32",
 		"Unknown15": "i32",
-		"Unknown16": "i32",
+		"Unknown16": "foreignrow",
+		"Flag3": "i8",
+		"Flag4": "i8",
 		"Unknown17": "i32",
+		"Script1": "string",
+		"Flag5": "i8",
+		"Flag6": "i8",
+		"Script2": "string",
+		"Data0": "array|i32",
 		"Unknown18": "i32",
 		"Unknown19": "i32",
 		"Unknown20": "i32",
@@ -6270,24 +6091,6 @@
 		"ModsKeys0": "array|foreignrow",
 		"ModsKeys1": "array|foreignrow"
 	},
-	"TradeMarketCategory": {
-		"Id": "string",
-		"Name": "string",
-		"Unknown0": "i32",
-		"TradeMarketCategoryGroupKey": "foreignrow",
-		"Unknown1": "array|i32",
-		"IsHidden": "bool",
-		"IsRemoved": "bool"
-	},
-	"TradeMarketCategoryGroups": {
-		"Id": "string",
-		"Name": "string"
-	},
-	"TradeMarketCategoryListAllClass": {
-		"TradeMarketCategoryKey": "foreignrow",
-		"ItemClassesKey": "foreignrow"
-	},
-	"TradeMarketCategoryStyleFlag": {},
 	"TreasureHunterMissions": {
 		"Unknown0": "string",
 		"Unknown1": "foreignrow",
@@ -6453,7 +6256,7 @@
 		"HasGuildCharacter": "bool",
 		"GuildCharacter": "string",
 		"Name": "string",
-		"IsDropDisabled": "bool"
+		"IsDropDisabled": "bool" // Added 3.16
 	},
 	"UniqueSetNames": {},
 	"UniqueStashLayout": {
@@ -6480,10 +6283,8 @@
 		"Name": "string",
 		"Unknown2": "i32",
 		"Image": "string",
-		"Unknown3": "i32",
-		"IsWatchstone": "bool"
+		"Unknown3": "i32"
 	},
-	"UserInterfaceModeCondition": {},
 	"VirtualStatContextFlags": {
 		"Id": "string",
 		"Unknown0": "i32"
@@ -6584,7 +6385,7 @@
 		"Inflection": "string"
 	},
 	"WorldAreaLeagueChances": {
-		"Id": "string",
+		"Key0": "foreignrow",
 		"Unknown0": "i32",
 		"Unknown1": "i32",
 		"Unknown2": "i32",
@@ -6625,7 +6426,9 @@
 		"Unknown37": "i32",
 		"HeistChance": "i32",
 		"Unknown39": "i32",
-		"ExpeditionOrUltimatumChance1": "i32"
+		"ExpeditionOrUltimatumChance1": "i32",
+		"Unknown41": "i32",
+		"Unknown42": "i32"
 	},
 	"WorldAreas": {
 		"Id": "string",
@@ -6653,7 +6456,7 @@
 		"SpawnWeight_Values": "array|u32",
 		"IsMapArea": "bool",
 		"FullClear_AchievementItemsKeys": "array|foreignrow",
-		"PVPTypesKey": "foreignrow",
+		"Unknown9": "foreignrow",
 		"AchievementItemsKey": "foreignrow",
 		"ModsKeys": "array|foreignrow",
 		"Unknown10": "i32",
@@ -6696,9 +6499,7 @@
 		"Unknown52": "i32",
 		"Unknown53": "i32",
 		"Unknown54": "i32",
-		"Unknown55": "array|foreignrow",
-		"Unknown56": "foreignrow",
-		"Unknown57": "i32"
+		"Unknown55": "array|foreignrow"
 	},
 	"WorldPopupIconTypes": {
 		"Id": "string",

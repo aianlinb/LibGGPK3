@@ -1,10 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Text.RegularExpressions;
-using static LibDat2.Types.IFieldData;
 
 namespace LibDat2.Types {
-	[FieldType(FieldType.Row)]
 	public class RowData : FieldDataBase<RowData> {
 		public const uint Nullx32Key = 0xFEFEFEFE;
 		public const ulong Nullx64Key = 0xFEFEFEFEFEFEFEFE;
@@ -16,7 +14,7 @@ namespace LibDat2.Types {
 		}
 
 		/// <inheritdoc/>
-		public override void Read(BinaryReader reader) {
+		public override RowData Read(BinaryReader reader) {
 			if (Dat.x64) {
 				Key = reader.ReadUInt64();
 				if (Key == Nullx64Key)
@@ -26,6 +24,7 @@ namespace LibDat2.Types {
 				if (Key == Nullx32Key)
 					Key = null;
 			}
+			return this;
 		}
 
 		/// <inheritdoc/>
@@ -37,7 +36,7 @@ namespace LibDat2.Types {
 		}
 
 		/// <inheritdoc/>
-		public override void FromString(string value) {
+		public override RowData FromString(string value) {
 			var m = RowRegex.Match(value);
 			if (m.Success) {
 				if (m.Groups[1].Value.ToLower() == "null")
@@ -51,6 +50,7 @@ namespace LibDat2.Types {
 					throw new InvalidCastException("Unable to convert " + value + " to RowData");
 			} else
 				throw new InvalidCastException("Unable to convert " + value + " to RowData");
+			return Value;
 		}
 		public static readonly Regex RowRegex = new(@"^\s*<\s*(.+?)\s*>\s*$");
 

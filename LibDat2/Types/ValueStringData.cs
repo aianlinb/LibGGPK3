@@ -1,18 +1,16 @@
 ﻿using System;
 using System.IO;
 using System.Text;
-using static LibDat2.Types.IFieldData;
 
 namespace LibDat2.Types {
-	[FieldType(FieldType.ValueString)]
 	public class ValueStringData : FieldDataBase<string> {
 		public ValueStringData(DatContainer dat) : base(dat) { }
 
 		/// <inheritdoc/>
-		public override unsafe void Read(BinaryReader reader) {
+		public override unsafe ValueStringData Read(BinaryReader reader) {
 			if (reader.BaseStream.Position == reader.BaseStream.Length) {
 				Value = null!;
-				return;
+				return this;
 			}
 
 			var sb = new StringBuilder();
@@ -28,6 +26,7 @@ namespace LibDat2.Types {
 					throw new("Not found \\0 at the end of the string");
 			}
 			Value = sb.ToString();
+			return this;
 		}
 
 		/// <inheritdoc/>
@@ -45,8 +44,9 @@ namespace LibDat2.Types {
 		}
 
 		/// <inheritdoc/>
-		public override void FromString(string value) {
+		public override ValueStringData FromString(string value) {
 			Value = value;
+			return this;
 		}
 	}
 }

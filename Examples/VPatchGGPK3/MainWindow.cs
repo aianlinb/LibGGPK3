@@ -133,12 +133,13 @@ namespace VPatchGGPK3 {
 					output.Append("Unable to find in ggpk: " + e.FullName + "\r\n", true);
 					continue;
 				}
-				var f = e.Open();
+				var fs = e.Open();
 				var b = new byte[e.Length];
-				f.Read(b, 0, b.Length);
-				f.Close();
+				for (var l = 0; l < b.Length;)
+					l += fs.Read(b, l, b.Length - l);
+				fs.Close();
 				fr.ReplaceContent(b);
-				output!.Append("Replaced: " + e.FullName + "\r\n", true);
+				output.Append("Replaced: " + e.FullName + "\r\n", true);
 			}
 			ggpk.Dispose();
 			output.Append("\r\nDone!\r\n", true);

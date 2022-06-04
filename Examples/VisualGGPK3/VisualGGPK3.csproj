@@ -2,50 +2,20 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-	<TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
-	<Authors>aianlinb</Authors>
-	<Copyright>Copyright © 2022 aianlinb</Copyright>
-	<Configurations>Debug;Windows;Linux;MacOS</Configurations>
-	<NoWin32Manifest>true</NoWin32Manifest>
-	<DebugType>embedded</DebugType>
+    <Authors>aianlinb</Authors>
+    <Copyright>Copyright © 2022 aianlinb</Copyright>
+    <NoWin32Manifest>true</NoWin32Manifest>
+    <DebugType>embedded</DebugType>
     <Optimize Condition="'$(Configuration)' != 'Debug'">True</Optimize>
   </PropertyGroup>
-  
-  <ItemGroup>
-    <PackageReference Include="Eto.Forms" Version="2.6.1" />
-  </ItemGroup>
   
   <ItemGroup>
     <ProjectReference Include="..\..\LibBundledGGPK3\LibBundledGGPK3.csproj" />
     <ProjectReference Include="..\..\LibDat2\LibDat2.csproj" />
   </ItemGroup>
   
-  <Choose>
-    <When Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'Windows'">
-	  <PropertyGroup>
-	    <TargetFramework>net6.0-windows</TargetFramework>
-      </PropertyGroup>
-      <ItemGroup>
-        <PackageReference Include="Eto.Platform.Windows" Version="2.6.1" />
-      </ItemGroup>
-	</When>
-	
-    <When Condition="'$(Configuration)' == 'MacOS'">
-      <PropertyGroup>
-	    <RuntimeIdentifiers>osx-x64</RuntimeIdentifiers>
-	    <MacBundleDotNet>true</MacBundleDotNet>
-      </PropertyGroup>
-      <ItemGroup>
-        <PackageReference Include="Eto.Platform.Mac64" Version="2.6.1" />
-      </ItemGroup>
-	</When>
-	
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Eto.Platform.Gtk" Version="2.6.1" />
-      </ItemGroup>
-	</Otherwise>
-  </Choose>
+  <Import Project="../EtoForms.targets" />
 
 </Project>

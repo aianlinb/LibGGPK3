@@ -1,9 +1,8 @@
 ﻿using System.IO;
-using static LibDat2.Types.IFieldData;
 
 namespace LibDat2.Types {
 #pragma warning disable CS8612
-	public abstract class ReferenceDataBase<TypeOfValue> : FieldDataBase<TypeOfValue>, IReferenceData {
+	public abstract class ReferenceDataBase<TypeOfValue> : FieldDataBase<TypeOfValue>, IReferenceData where TypeOfValue : notnull {
 		public ReferenceDataBase(DatContainer dat) : base(dat) { }
 
 		/// <inheritdoc/>
@@ -35,11 +34,13 @@ namespace LibDat2.Types {
 		/// <inheritdoc/>
 		public virtual long EndOffset => Offset + Length;
 
+		IReferenceData IReferenceData.Read(BinaryReader reader) => Read(reader);
+
 		/// <summary>
 		/// Read the pointer and call <see cref="ReadInDataSection(BinaryReader)"/>.
 		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="StringData.Read(BinaryReader, DatContainer)"/> or <see cref="ArrayData{TypeOfValueInArray}.Read(BinaryReader, DatContainer, FieldType)"/> instead.
 		/// </summary>
-		public override void Read(BinaryReader reader) {
+		public override ReferenceDataBase<TypeOfValue> Read(BinaryReader reader) {
 			Offset = Dat.x64 ? reader.ReadInt64() : reader.ReadInt32();
 			Dat.ReferenceDatas[Offset] = this;
 
@@ -50,6 +51,7 @@ namespace LibDat2.Types {
 			reader.BaseStream.Seek(previousPos, SeekOrigin.Begin);
 
 			Dat.ReferenceDataOffsets[ToString()] = Offset;
+			return this;
 		}
 
 		/// <summary>
@@ -105,5 +107,7 @@ namespace LibDat2.Types {
 		/// Calculate the length of data in DataSection with current <see cref="FieldDataBase{TypeOfValue}.Value"/>
 		/// </summary>
 		public abstract int CalculateLength();
+
+		IReferenceData IReferenceData.FromString(string value) => (IReferenceData)FromString(value);
 	}
 }
