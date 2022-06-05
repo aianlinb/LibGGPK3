@@ -30,7 +30,7 @@ namespace LibGGPK3 {
 		}
 
 		/// <param name="filePath">Path to Content.ggpk</param>
-		public GGPK(string filePath) : this(File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read)) {
+		public GGPK(string filePath) : this(File.Open(Extensions.ExpandPath(filePath)!, FileMode.Open, FileAccess.ReadWrite, FileShare.Read)) {
 		}
 
 		/// <param name="stream">Stream of Content.ggpk</param>
@@ -327,7 +327,7 @@ namespace LibGGPK3 {
 		public virtual void Dispose() {
 			GC.SuppressFinalize(this);
 			if (!LeaveOpen)
-				GGPKStream.Close();
+				GGPKStream?.Close();
 		}
 
 		~GGPK() {

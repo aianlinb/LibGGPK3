@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace LibGGPK3 {
 	public static class Extensions {
@@ -14,6 +15,44 @@ namespace LibGGPK3 {
 #else
 		public static readonly Func<int, string> FastAllocateString = typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic)!.CreateDelegate<Func<int, string>>();
 #endif
+		public static string? ExpandPath(string path) {
+			if (path.StartsWith('~')) {
+				var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None);
+				if (userProfile != "") {
+					if (path.Length == 1)
+						return Environment.ExpandEnvironmentVariables(userProfile);
+					if (path[1] is '/' or '\\')
+						return Environment.ExpandEnvironmentVariables(userProfile + path[1..]);
+				}
+				try {
+					if (!OperatingSystem.IsWindows()) {
+						string bash;
+						if (File.Exists("/bin/zsh"))
+							bash = "/bin/zsh";
+						else if (File.Exists("/bin/var/bash"))
+							bash = "/bin/var/bash";
+						else if (File.Exists("/bin/bash"))
+							bash = "/bin/bash";
+						else
+							return Environment.ExpandEnvironmentVariables(path);
+						var p = Process.Start(new ProcessStartInfo(bash) {
+							CreateNoWindow = true,
+							ErrorDialog = true,
+							RedirectStandardInput = true,
+							RedirectStandardOutput = true,
+							WindowStyle = ProcessWindowStyle.Hidden
+						});
+						p!.StandardInput.WriteLine("echo " + path);
+						var tmp = p.StandardOutput.ReadLine();
+						p.Dispose();
+						if (!string.IsNullOrEmpty(tmp))
+							return tmp;
+					}
+				} catch { }
+			}
+			return Environment.ExpandEnvironmentVariables(path);
+		}
+
 		public static async Task<string> GetPatchServer(bool garena = false) {
 			var tcp = new Socket(SocketType.Stream, ProtocolType.Tcp);
 			if (garena)

@@ -2,6 +2,7 @@
 using LibBundle3.Records;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -50,17 +51,53 @@ namespace LibBundle3 {
 		/// </summary>
 		public Func<BundleRecord, Bundle> FuncReadBundle = static (br) => new((br.Index.baseDirectory ?? "") + br.Path + ".bundle.bin");
 
+		internal static string? ExpandPath(string path) {
+			if (path.StartsWith('~')) {
+				var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None);
+				if (userProfile != "") {
+					if (path.Length == 1)
+						return Environment.ExpandEnvironmentVariables(userProfile);
+					if (path[1] is '/' or '\\')
+						return Environment.ExpandEnvironmentVariables(userProfile + path[1..]);
+				}
+				try {
+					if (!OperatingSystem.IsWindows()) {
+						string bash;
+						if (File.Exists("/bin/zsh"))
+							bash = "/bin/zsh";
+						else if (File.Exists("/bin/var/bash"))
+							bash = "/bin/var/bash";
+						else if (File.Exists("/bin/bash"))
+							bash = "/bin/bash";
+						else
+							return Environment.ExpandEnvironmentVariables(path);
+						var p = Process.Start(new ProcessStartInfo(bash) {
+							CreateNoWindow = true,
+							ErrorDialog = true,
+							RedirectStandardInput = true,
+							RedirectStandardOutput = true,
+							WindowStyle = ProcessWindowStyle.Hidden
+						});
+						p!.StandardInput.WriteLine("echo " + path);
+						var tmp = p.StandardOutput.ReadLine();
+						p.Dispose();
+						if (!string.IsNullOrEmpty(tmp))
+							return tmp;
+					}
+				} catch { }
+			}
+			return Environment.ExpandEnvironmentVariables(path);
+		}
+
 		/// <param name="filePath">Path to _.index.bin</param>
-		/// <param name="parsePaths">Whether to parse the file paths in index. "<see langword="false"/>" to speed up reading but all <see cref="FileRecord.Path"/> and <see cref="FileRecord.DirectoryRecord"/> in each of <see cref="Files"/> will be <see langword="null"/></param>
-		public Index(string filePath, bool parsePaths = true) : this(File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false, parsePaths) {
-			baseDirectory = Path.GetDirectoryName(Path.GetFullPath(filePath));
-			if (baseDirectory != null)
-				baseDirectory += "/";
+		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> and <see cref="FileRecord.DirectoryRecord"/> in each of <see cref="Files"/> will be <see langword="null"/></param>
+		public Index(string filePath, bool parsePaths = true) : this(File.Open(filePath = ExpandPath(filePath)!, FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false, parsePaths) {
+			baseDirectory = Path.GetDirectoryName(Path.GetFullPath(filePath)) + "/";
 		}
 
 		/// <param name="stream">Stream of _.index.bin</param>
 		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> after this instance has been disposed</param>
-		/// <param name="parsePaths">Whether to parse the file paths in index. "<see langword="false"/>" to speed up reading but all <see cref="FileRecord.Path"/> and <see cref="FileRecord.DirectoryRecord"/> in each of <see cref="Files"/> will be <see langword="null"/></param>
+		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> and <see cref="FileRecord.DirectoryRecord"/> in each of <see cref="Files"/> will be <see langword="null"/></param>
 		public unsafe Index(Stream stream, bool leaveOpen = true, bool parsePaths = true) {
 			bundle = new(stream, leaveOpen);
 			var data = bundle.ReadData();

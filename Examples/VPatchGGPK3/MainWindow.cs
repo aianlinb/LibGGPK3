@@ -12,10 +12,10 @@ using System.Text.Json;
 
 namespace VPatchGGPK3 {
 	public class MainWindow : Form {
-		private readonly HttpClient http = new HttpClient(new HttpClientHandler() {
+		private readonly HttpClient http = new(new HttpClientHandler() {
 			UseCookies = false,
 			CheckCertificateRevocationList = false,
-			ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+			ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
 		});
 
 		private readonly RadioButton tw;
@@ -84,6 +84,14 @@ namespace VPatchGGPK3 {
 			layout.EndVertical();
 			LoadComplete += OnLoadComplete;
 			Content = layout;
+#if MAC
+			Closed += OnClosed;
+			Application.Instance.Terminating += (s, e) => Closed -= OnClosed;
+#endif
+		}
+
+		private void OnClosed(object? sender, EventArgs e) {
+			Application.Instance.Quit();
 		}
 
 		private void OnLoadComplete(object? sender, EventArgs _) {
@@ -93,56 +101,60 @@ namespace VPatchGGPK3 {
 			if (!string.IsNullOrEmpty(path))
 				Environment.CurrentDirectory = path;
 			try {
-				if (File.Exists("VPatchGGPK3.txt"))
+				var args = Environment.GetCommandLineArgs();
+				if (args.Length > 1 && File.Exists(Path.GetFullPath(args[1])))
+					ggpkPath.Text = args[1];
+				else if (File.Exists("VPatchGGPK3.txt"))
 					ggpkPath.Text = File.ReadAllText("VPatchGGPK3.txt");
-			} catch (Exception ex) {
-				output.Append("Exception: " + ex.Message);
+				else if (OperatingSystem.IsMacOS())
+					ggpkPath.Text = "~/Library/Application Support/Path of Exile/Content.ggpk";
+			} catch {
+				if (OperatingSystem.IsMacOS())
+					ggpkPath.Text = "~/Library/Application Support/Path of Exile/Content.ggpk";
 			}
 		}
 
 		private async void OnButtonClick(object? sender, EventArgs _) {
 			try {
 				File.WriteAllText("VPatchGGPK3.txt", ggpkPath.Text);
-			} catch (Exception ex) {
-				output.Append("Exception: " + ex.Message);
-			}
-			if (!File.Exists(ggpkPath.Text)) {
-				MessageBox.Show(this, "找不到檔案: " + ggpkPath.Text, "Error", MessageBoxType.Error);
-				return;
-			}
+			} catch { }
 
-			var json = (await JsonDocument.ParseAsync(await http.GetStreamAsync(tw.Checked ? "https://poedb.tw/fg/pin_tw.json" : "https://poedb.tw/fg/pin_cn.json"))).RootElement;
-			var url = await Extensions.GetPatchServer();
-			var officialVersion = url[(url.LastIndexOf('/', url.Length - 2) + 1)..^1];
-			if (json.GetProperty("version").GetString()! != officialVersion) {
-				MessageBox.Show(this, "Server Version not match Patch Version\r\n編年史中文化更新中，請稍待", "Error", MessageBoxType.Error);
-				return;
-			}
-			if (json.GetProperty("pin").GetString()! != pin.Text) {
-				MessageBox.Show(this, "無效的PIN碼\r\n請詳閱: https://poedb.tw/chinese", "Error", MessageBoxType.Error);
-				return;
-			}
-			var md5 = json.GetProperty("md5").GetString()!;
-
-			var ggpk = new GGPK(ggpkPath.Text);
-			var zip = new ZipArchive(await http.GetStreamAsync("https://poedb.tw/fg/" + md5 + ".zip"));
-			foreach (var e in zip.Entries) {
-				if (e.FullName.EndsWith('/'))
-					continue;
-				if (ggpk.FindNode(e.FullName) is not FileRecord fr) {
-					output.Append("Unable to find in ggpk: " + e.FullName + "\r\n", true);
-					continue;
+			try {
+				var json = (await JsonDocument.ParseAsync(await http.GetStreamAsync(tw.Checked ? "https://poedb.tw/fg/pin_tw.json" : "https://poedb.tw/fg/pin_cn.json"))).RootElement;
+				var url = await Extensions.GetPatchServer();
+				var officialVersion = url[(url.LastIndexOf('/', url.Length - 2) + 1)..^1];
+				if (json.GetProperty("version").GetString()! != officialVersion) {
+					MessageBox.Show(this, "Server Version not match Patch Version\r\n編年史中文化更新中，請稍待", "Error", MessageBoxType.Error);
+					return;
 				}
-				var fs = e.Open();
-				var b = new byte[e.Length];
-				for (var l = 0; l < b.Length;)
-					l += fs.Read(b, l, b.Length - l);
-				fs.Close();
-				fr.ReplaceContent(b);
-				output.Append("Replaced: " + e.FullName + "\r\n", true);
+				if (json.GetProperty("pin").GetString()! != pin.Text) {
+					MessageBox.Show(this, "無效的PIN碼\r\n請詳閱: https://poedb.tw/chinese", "Error", MessageBoxType.Error);
+					return;
+				}
+				var md5 = json.GetProperty("md5").GetString()!;
+
+				var ggpk = new GGPK(ggpkPath.Text);
+				var zip = new ZipArchive(await http.GetStreamAsync("https://poedb.tw/fg/" + md5 + ".zip"));
+				foreach (var e in zip.Entries) {
+					if (e.FullName.EndsWith('/'))
+						continue;
+					if (ggpk.FindNode(e.FullName) is not FileRecord fr) {
+						output.Append("Unable to find in ggpk: " + e.FullName + "\r\n", true);
+						continue;
+					}
+					var fs = e.Open();
+					var b = new byte[e.Length];
+					for (var l = 0; l < b.Length;)
+						l += fs.Read(b, l, b.Length - l);
+					fs.Close();
+					fr.ReplaceContent(b);
+					output.Append("Replaced: " + e.FullName + "\r\n", true);
+				}
+				ggpk.Dispose();
+				output.Append("\r\nDone!\r\n", true);
+			} catch (Exception ex) {
+				MessageBox.Show(this, ex.ToString(), "Error", MessageBoxType.Error);
 			}
-			ggpk.Dispose();
-			output.Append("\r\nDone!\r\n", true);
 		}
 	}
 }

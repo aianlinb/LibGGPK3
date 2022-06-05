@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <Authors>aianlinb</Authors>
     <Copyright>Copyright © 2022 aianlinb</Copyright>
+    <Version>1.1.0</Version>
     <NoWin32Manifest>true</NoWin32Manifest>
     <DebugType>embedded</DebugType>
     <Optimize Condition="'$(Configuration)' != 'Debug'">True</Optimize>

@@ -1,4 +1,11 @@
 <Project>
+  <PropertyGroup>
+    <DefineConstants Condition="'$(RuntimeIdentifier.StartsWith(`osx`))' == 'true'">$(DefineConstants);MAC</DefineConstants>
+  </PropertyGroup>
+  
+  <Target Name="OSVerification" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(RuntimeIdentifier)' != '' And '$(RuntimeIdentifier.StartsWith(`win`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`osx`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`linux`))' != 'true'" Text="Unsupported RuntimeIdentifier: '$(RuntimeIdentifier)'" />
+  </Target>
   
   <ItemGroup>
     <PackageReference Include="Eto.Forms" Version="*" />
@@ -30,9 +37,5 @@
       </ItemGroup>
     </When>
   </Choose>
-  
-  <Target Name="OSVerification" BeforeTargets="BeforeBuild">
-    <Error Condition="'$(RuntimeIdentifier)' != '' And '$(RuntimeIdentifier.StartsWith(`win`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`osx`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`linux`))' != 'true'" Text="Unsupported RuntimeIdentifier: '$(RuntimeIdentifier)'" />
-  </Target>
   
 </Project>

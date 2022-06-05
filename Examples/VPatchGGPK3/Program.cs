@@ -8,10 +8,12 @@ namespace VPatchGGPK3 {
 		/// </summary>
 		[STAThread]
 		public static void Main() {
+#if MAC
+			Eto.Style.Add<Eto.Mac.Forms.ApplicationHandler>(null, handler => handler.AllowClosingMainForm = true);
+#endif
 			var app = new Application();
-			var form = new MainWindow();
-			app.UnhandledException += (o, e) => MessageBox.Show(form, e.ExceptionObject.ToString(), "Error", MessageBoxType.Error);
-			app.Run(form);
+			app.UnhandledException += (o, e) => MessageBox.Show(app.MainForm, e.ExceptionObject.ToString(), "Error", MessageBoxType.Error);
+			app.Run(app.MainForm = new MainWindow());
 		}
 	}
 }
