@@ -3,6 +3,7 @@ using LibBundle3.Records;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -510,7 +511,7 @@ namespace LibBundle3 {
 		/// The separator of the <paramref name="path"/> must be forward slash '/'
 		/// </summary>
 		/// <returns>Null when not found</returns>
-		public virtual bool TryGetFile(string path, out FileRecord? file) {
+		public virtual bool TryGetFile(string path, [NotNullWhen(true)] out FileRecord? file) {
 			return Files.TryGetValue(FNV1a64Hash(path), out file);
 		}
 

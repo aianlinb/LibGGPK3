@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -14,6 +15,7 @@ using System.Threading;
 
 namespace LibDat2 {
 	public class DatContainer {
+#pragma warning disable CS8618
 		/// <summary>
 		/// Structure definition of dat files
 		/// </summary>
@@ -32,10 +34,6 @@ namespace LibDat2 {
 		/// <summary>
 		/// Call <see cref="ReloadDefinitions"/>
 		/// </summary>
-#pragma warning disable CS8618
-		static DatContainer() {
-			ReloadDefinitions();
-		}
 
 		public static void DownloadSchemaMin() {
 			var http = new HttpClient() { Timeout = Timeout.InfiniteTimeSpan };
@@ -79,7 +77,7 @@ namespace LibDat2 {
 		/// <summary>
 		/// List of record content of the dat file
 		/// </summary>
-		public List<IFieldData?[]?> FieldDatas;
+		public List<IFieldData[]> FieldDatas;
 
 		/// <summary>
 		/// Store the first error that occurred during reading
@@ -91,7 +89,8 @@ namespace LibDat2 {
 		/// </summary>
 		private static FileStream? tmp;
 		/// <summary>
-		/// Parses the dat file contents from a file
+		/// Parses the dat file contents from a file.
+		/// Check for <see cref="Exception"/> to see if the read fails.
 		/// </summary>
 		/// <param name="filePath">Path of a dat file</param>
 		/// <param name="SchemaMin">Whether to use schema.min.json</param>
@@ -101,7 +100,8 @@ namespace LibDat2 {
 		}
 
 		/// <summary>
-		/// Parses the dat file contents from a binary data
+		/// Parses the dat file contents from a binary data.
+		/// Check for <see cref="Exception"/> to see if the read fails.
 		/// </summary>
 		/// <param name="fileData">Binary data of a dat file</param>
 		/// <param name="fileName">Name of the dat file with extension</param>
@@ -109,12 +109,15 @@ namespace LibDat2 {
 		public DatContainer(byte[] fileData, string fileName, bool SchemaMin = false) : this(new MemoryStream(fileData), fileName, SchemaMin) { }
 
 		/// <summary>
-		/// Parses the dat file contents from a stream
+		/// Parses the dat file contents from a stream.
+		/// Check for <see cref="Exception"/> to see if the read fails.
 		/// </summary>
 		/// <param name="stream">Contents of a dat file</param>
 		/// <param name="fileName">Name of the dat file</param>
 		/// <param name="SchemaMin">Whether to use schema.min.json</param>
 		public DatContainer(Stream stream, string fileName, bool SchemaMin = false) {
+			if (DatDefinitions == null)
+				ReloadDefinitions();
 			this.SchemaMin = SchemaMin;
 			switch (Path.GetExtension(fileName)) {
 				case ".dat":
@@ -179,7 +182,7 @@ namespace LibDat2 {
 			var lastPos = reader.BaseStream.Position;
 			for (var i = 0; i < entryCount; ++i) {
 				if (ex != null) {
-					FieldDatas.Add(null);
+					FieldDatas.Add(null!);
 					continue;
 				}
 				var row = new IFieldData[FieldDefinitions.Count];
@@ -261,12 +264,14 @@ namespace LibDat2 {
 		#endregion
 
 		/// <summary>
-		/// Create a DatContainer with Datas
+		/// Create a DatContainer instance with existing data
 		/// </summary>
 		/// <param name="fieldDatas">Contents of a dat file</param>
 		/// <param name="fileName">Name of the dat file</param>
 		/// <param name="SchemaMin">Whether to use schema.min.json</param>
-		public DatContainer(string fileName, List<IFieldData?[]?>? fieldDatas, bool SchemaMin = false) {
+		public DatContainer(string fileName, List<IFieldData[]> fieldDatas, bool SchemaMin = false) {
+			if (DatDefinitions == null)
+				ReloadDefinitions();
 			this.SchemaMin = SchemaMin;
 			switch (Path.GetExtension(fileName)) {
 				case ".dat":
@@ -401,7 +406,7 @@ namespace LibDat2 {
 			var row = new IFieldData[FieldDefinitions.Count];
 			var i = 0;
 			var s = new StringBuilder();
-			var list = new List<IFieldData?[]?>(FieldDatas.Count);
+			var list = new List<IFieldData[]>(FieldDatas.Count);
 
 			if (sr.Peek() == '"') {
 				sr.Read();
@@ -479,9 +484,10 @@ namespace LibDat2 {
 		}
 
 		/// <summary>
-		/// Reload DatDefinitions from DatDefinitions.json
-		/// This won't affect the existing instances of <see cref="DatContainer"/>
+		/// Reload DatDefinitions from DatDefinitions.json.
+		/// This won't affect the existing instances of <see cref="DatContainer"/>.
 		/// </summary>
+		[MemberNotNull(nameof(DatDefinitions))]
 		public static void ReloadDefinitions() {
 			if (File.Exists("DatDefinitions.json"))
 				ReloadDefinitions("DatDefinitions.json");
@@ -499,11 +505,33 @@ namespace LibDat2 {
 		}
 
 		/// <summary>
-		/// Reload DatDefinitions from a file
-		/// This won't affect the existing instances of <see cref="DatContainer"/>
+		/// Reload DatDefinitions from a file.
+		/// This won't affect the existing instances of <see cref="DatContainer"/>.
 		/// </summary>
+		[MemberNotNull(nameof(DatDefinitions))]
 		public static void ReloadDefinitions(string filePath) {
-			using var json = JsonDocument.Parse(File.ReadAllBytes(filePath), new() { CommentHandling = JsonCommentHandling.Skip });
+			ReloadDefinitions(File.ReadAllBytes(filePath));
+		}
+
+		/// <summary>
+		/// Reload DatDefinitions from binaries.
+		/// This won't affect the existing instances of <see cref="DatContainer"/>.
+		/// </summary>
+		[MemberNotNull(nameof(DatDefinitions))]
+		public static void ReloadDefinitions(ReadOnlyMemory<byte> content) {
+			using var json = JsonDocument.Parse(content, new() { CommentHandling = JsonCommentHandling.Skip });
+			DatDefinitions = new();
+			foreach (var dat in json.RootElement.EnumerateObject())
+				DatDefinitions.Add(dat.Name, dat.Value.EnumerateObject().Select(p => new KeyValuePair<string, string>(p.Name, p.Value.GetString()!.ToLower())).ToArray());
+		}
+
+		/// <summary>
+		/// Reload DatDefinitions from stream.
+		/// This won't affect the existing instances of <see cref="DatContainer"/>.
+		/// </summary>
+		[MemberNotNull(nameof(DatDefinitions))]
+		public static void ReloadDefinitions(Stream stream) {
+			using var json = JsonDocument.Parse(stream, new() { CommentHandling = JsonCommentHandling.Skip });
 			DatDefinitions = new();
 			foreach (var dat in json.RootElement.EnumerateObject())
 				DatDefinitions.Add(dat.Name, dat.Value.EnumerateObject().Select(p => new KeyValuePair<string, string>(p.Name, p.Value.GetString()!.ToLower())).ToArray());
