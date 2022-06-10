@@ -28,12 +28,16 @@ namespace LibBundle3.Records {
 			Size = size;
 		}
 
+
+		/// <summary>
+		/// Read the content of the file
+		/// </summary>
 		public virtual Memory<byte> Read() {
 			return BundleRecord.Bundle.ReadData(Offset, Size);
 		}
 
 		/// <summary>
-		/// Replace the content of the file and save the Index
+		/// Replace the content of the file and save the <see cref="Index"/>
 		/// </summary>
 		/// <param name="newContent"></param>
 		public virtual void Write(ReadOnlySpan<byte> newContent) {
@@ -48,6 +52,9 @@ namespace LibBundle3.Records {
 			BundleRecord.Index.Save();
 		}
 
+		/// <summary>
+		/// Redirect the <see cref="FileRecord"/> to another section in specified bundle
+		/// </summary>
 		public virtual void Redirect(BundleRecord bundle, int offset, int size) {
 			BundleRecord = bundle;
 			BundleIndex = bundle.BundleIndex;

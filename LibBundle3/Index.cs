@@ -532,10 +532,11 @@ namespace LibBundle3 {
 		/// <summary>
 		/// Get a available bundle with smallest uncompressed_size
 		/// </summary>
-		public virtual BundleRecord GetSmallestBundle() {
-			if (Bundles == null || Bundles.Length == 0)
+		public virtual BundleRecord GetSmallestBundle(BundleRecord[]? toSearch = null) {
+			toSearch ??= Bundles;
+			if (toSearch == null || toSearch.Length == 0)
 				throw new("Unable to find an available bundle");
-			var bundles = (BundleRecord[])Bundles.Clone();
+			var bundles = (BundleRecord[])toSearch.Clone();
 			Array.Sort(bundles, (x, y) => x.UncompressedSize - y.UncompressedSize);
 			for (var i = 0; i < bundles.Length; ++i)
 				try {

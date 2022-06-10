@@ -6,13 +6,15 @@
     <Nullable>enable</Nullable>
     <Authors>aianlinb</Authors>
     <Copyright>Copyright © 2022 aianlinb</Copyright>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\LibBundledGGPK3\LibBundledGGPK3.csproj" />
     <ProjectReference Include="..\..\LibDat2\LibDat2.csproj" />
+    <EmbeddedResource Include="DatDefinitions.json" />
   </ItemGroup>
 
 </Project>

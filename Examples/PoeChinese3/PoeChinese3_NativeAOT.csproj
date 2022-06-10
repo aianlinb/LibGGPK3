@@ -6,7 +6,8 @@
     <Nullable>enable</Nullable>
     <Authors>aianlinb</Authors>
     <Copyright>Copyright © 2022 aianlinb</Copyright>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>PoeChinese3</AssemblyName>
     <RootNamespace>PoeChinese3</RootNamespace>
   </PropertyGroup>
