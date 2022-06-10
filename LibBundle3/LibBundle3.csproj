@@ -9,6 +9,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <NoWin32Manifest>true</NoWin32Manifest>
     <DebugType>embedded</DebugType>
+    <Configurations>Debug;Release;AOT</Configurations>
+    <Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
   </PropertyGroup>
 
 </Project>

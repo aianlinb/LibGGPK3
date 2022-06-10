@@ -8,6 +8,8 @@
     <Version>1.1.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DebugType>embedded</DebugType>
+    <Configurations>Debug;Release;AOT</Configurations>
+    <Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
   </PropertyGroup>
 
 </Project>

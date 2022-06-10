@@ -1,9 +1,12 @@
-<Project>
+<Project InitialTargets="AOTVerification">
+  
+  <Target Name="AOTVerification">
+    <Error Condition="'$(Configuration)' != 'AOT'" Text="Expected Configuration to be: AOT, but got: '$(Configuration)'" />
+  </Target>
   
   <PropertyGroup>
     <IlcInvariantGlobalization>true</IlcInvariantGlobalization>
     <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
-    <DefineConstants>$(DefineConstants)AOT</DefineConstants>
   </PropertyGroup>
   
   <ItemGroup>

@@ -8,7 +8,8 @@
     <Version>0.14.1</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DebugType>embedded</DebugType>
-    <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
+    <Configurations>Debug;Release;AOT</Configurations>
+    <Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
   </PropertyGroup>
 
   <ItemGroup>

@@ -46,7 +46,7 @@ namespace PoeChinese3 {
 						Modify(ggpk.index);
 						ggpk.Dispose();
 						Console.WriteLine("Done!");
-						Console.WriteLine("中文化完成！ 再次使用以還原");
+						Console.WriteLine("中文化完成！ 再次執行以還原");
 						break;
 					case ".bin":
 						Console.WriteLine("Index path: " + args[0]);
@@ -56,7 +56,7 @@ namespace PoeChinese3 {
 						Modify(index);
 						index.Dispose();
 						Console.WriteLine("Done!");
-						Console.WriteLine("中文化完成！ 再次使用以還原");
+						Console.WriteLine("中文化完成！ 再次執行以還原");
 						break;
 					default:
 						Console.WriteLine("Unknown file extension: " + Path.GetFileName(args[0]));

@@ -9,6 +9,8 @@
     <NoWin32Manifest>true</NoWin32Manifest>
     <DebugType>embedded</DebugType>
     <Optimize Condition="'$(Configuration)' != 'Debug'">True</Optimize>
+    <Configurations>Debug;Release;AOT</Configurations>
+    <Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
   </PropertyGroup>
   
   <ItemGroup>
