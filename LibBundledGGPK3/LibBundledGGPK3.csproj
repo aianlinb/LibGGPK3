@@ -1,20 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <Authors>aianlinb</Authors>
-    <Copyright>Copyright © 2022 aianlinb</Copyright>
-    <Version>1.1.0</Version>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DebugType>embedded</DebugType>
-    <Configurations>Debug;Release;AOT</Configurations>
-    <Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\LibBundle3\LibBundle3.csproj" />
-    <ProjectReference Include="..\LibGGPK3\LibGGPK3.csproj" />
-  </ItemGroup>
-
+	<PropertyGroup>
+		<Description>Library for Content.ggpk of game PathOfExile
+Contains LibGGPK3 and LibBundle3</Description>
+	</PropertyGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\LibBundle3\LibBundle3.csproj" />
+		<ProjectReference Include="..\LibGGPK3\LibGGPK3.csproj" />
+	</ItemGroup>
+	<Target Name="NugetPackDependencies" BeforeTargets="Build">
+		<ItemGroup>
+			<None Include="$(OutDir)LibGGPK3.dll">
+				<Pack>True</Pack>
+				<PackagePath>lib/$(TargetFramework)/</PackagePath>
+			</None>
+			<None Include="$(OutDir)LibBundle3.dll">
+				<Pack>True</Pack>
+				<PackagePath>lib/$(TargetFramework)/</PackagePath>
+			</None>
+		</ItemGroup>
+	</Target>
 </Project>

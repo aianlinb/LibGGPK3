@@ -14,7 +14,7 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Offset of next FreeRecord
 		/// </summary>
-		protected internal long NextFreeOffset;
+		public long NextFreeOffset { get; protected internal set; }
 
 		protected internal FreeRecord(int length, GGPK ggpk) : base(length, ggpk) {
 			Offset = ggpk.GGPKStream.Position - 8;

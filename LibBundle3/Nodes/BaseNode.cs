@@ -1,17 +1,16 @@
 ﻿namespace LibBundle3.Nodes {
 	public abstract class BaseNode {
-		public BaseNode? Parent;
-		public string Name;
+		public readonly BaseNode? Parent;
+		public readonly string Name;
 
-		public BaseNode(string name) {
+		protected internal BaseNode(string name, DirectoryNode? parent) {
 			Name = name;
+			Parent = parent;
 		}
 
 		/// <summary>
 		/// Get the absolute path in the tree
 		/// </summary>
-		public virtual string GetPath() {
-			return Parent == null ? Name : Parent.GetPath() + Name;
-		}
+		public abstract string GetPath();
 	}
 }

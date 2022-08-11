@@ -7,7 +7,7 @@ namespace LibGGPK3 {
 	/// Stream to access a file in <see cref="GGPK"/>, use <see cref="FileRecord.ReadFileContent"/> and <see cref="FileRecord.ReplaceContent"/> for better performance
 	/// </summary>
 	public class GGFileStream : Stream {
-		public readonly FileRecord Record;
+		public FileRecord Record { get; }
 
 		protected MemoryStream? _Buffer;
 		protected virtual MemoryStream Buffer {
@@ -94,8 +94,10 @@ namespace LibGGPK3 {
 		public override long Position { get => Buffer.Position; set => Buffer.Position = value; }
 
 		protected override void Dispose(bool disposing) {
-			Flush();
-			_Buffer?.Close();
+			if (disposing) {
+				Flush();
+				_Buffer?.Close();
+			}
 		}
 
 		~GGFileStream() {

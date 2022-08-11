@@ -1,3 +1,4 @@
+[![NuGet](https://img.shields.io/nuget/v/LibGGPK3.LibGGPK3.svg)](https://www.nuget.org/packages?q=Tags:"LibGGPK3")
 # Notice
 All projects in this repository are not thread-safe,
 do not use these libraries with more than one thread!

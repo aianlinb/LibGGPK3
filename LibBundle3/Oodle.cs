@@ -2,12 +2,13 @@
 using System.Runtime.InteropServices;
 
 namespace LibBundle3 {
-	public static unsafe class Oodle {
-		[DllImport("oo2core", CallingConvention = CallingConvention.Winapi)]
-		public static extern nint OodleLZ_Decompress(byte* buffer, nint bufferSize, byte* output, nint decompressedSize, int fuzzSafe = 1, int checkCRC = 0, int verbose = 0, byte* v_decBufBase = null, nint decBufSize = 0, void* fpCallback = null, void* callbackUserData = null, void* decoderMemory = null, nint decoderMemorySize = 0, int threadPhase = 3);
+	public static class Oodle {
+#pragma warning disable CA1401
+		[DllImport("oo2core")]
+		public static unsafe extern nint OodleLZ_Decompress(byte* buffer, nint bufferSize, byte* output, nint decompressedSize, int fuzzSafe = 1, int checkCRC = 0, int verbose = 0, byte* v_decBufBase = null, nint decBufSize = 0, void* fpCallback = null, void* callbackUserData = null, void* decoderMemory = null, nint decoderMemorySize = 0, int threadPhase = 3);
 
-		[DllImport("oo2core", CallingConvention = CallingConvention.Winapi)]
-		public static extern nint OodleLZ_Compress(Compressor compressor, byte* buffer, nint bufferSize, byte* outputBuffer, CompressionLevel level, void* pOptions = null, void* dictionaryBase = null, void* longRangeMatcher = null, void* scratchMem = null, nint scratchSize = 0);
+		[DllImport("oo2core")]
+		public static unsafe extern nint OodleLZ_Compress(Compressor compressor, byte* buffer, nint bufferSize, byte* outputBuffer, CompressionLevel level, void* pOptions = null, void* dictionaryBase = null, void* longRangeMatcher = null, void* scratchMem = null, nint scratchSize = 0);
 
 		public enum Compressor {
 			Invalid = -1,

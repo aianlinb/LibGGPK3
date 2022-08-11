@@ -9,47 +9,48 @@ using System.Threading.Tasks;
 
 namespace LibGGPK3 {
 	public class GGPK : IDisposable {
-		public Stream GGPKStream;
-		public bool LeaveOpen;
-		public readonly GGPKRecord GgpkRecord;
-		public readonly DirectoryRecord Root;
+		protected internal Stream GGPKStream;
+		protected bool LeaveOpen;
+		public GGPKRecord GgpkRecord { get; }
+		public DirectoryRecord Root { get; }
 		protected LinkedList<FreeRecord>? _FreeRecords;
-		public LinkedList<FreeRecord> FreeRecords => _FreeRecords ??= BuildFreeRecordList();
-		protected LinkedList<FreeRecord> BuildFreeRecordList() {
-			var list = new LinkedList<FreeRecord>();
-			var offsets = new HashSet<long>();
-			var NextFreeOffset = GgpkRecord.FirstFreeRecordOffset;
-			while (NextFreeOffset > 0) {
-				if (!offsets.Add(NextFreeOffset))
-					throw new("FreeRecordList causes an infinite loops, your GGPK is broken!");
-				var current = (FreeRecord)ReadRecord(NextFreeOffset);
-				list.AddLast(current);
-				NextFreeOffset = current.NextFreeOffset;
+		public LinkedList<FreeRecord> FreeRecords {
+			get {
+				if (_FreeRecords == null) {
+					var list = new LinkedList<FreeRecord>();
+					var offsets = new HashSet<long>();
+					var NextFreeOffset = GgpkRecord.FirstFreeRecordOffset;
+					while (NextFreeOffset > 0) {
+						if (!offsets.Add(NextFreeOffset))
+							throw new("FreeRecordList causes an infinite loops, your GGPK file is broken!");
+						var current = (FreeRecord)ReadRecord(NextFreeOffset);
+						list.AddLast(current);
+						NextFreeOffset = current.NextFreeOffset;
+					}
+					_FreeRecords = list;
+				}
+				return _FreeRecords;
 			}
-			return list;
 		}
 
 		/// <param name="filePath">Path to Content.ggpk</param>
-		public GGPK(string filePath) : this(File.Open(Extensions.ExpandPath(filePath)!, FileMode.Open, FileAccess.ReadWrite, FileShare.Read)) {
+		public GGPK(string filePath) : this(File.Open(Extensions.ExpandPath(filePath), FileMode.Open, FileAccess.ReadWrite, FileShare.Read)) {
 		}
 
 		/// <param name="stream">Stream of Content.ggpk</param>
 		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> after this instance has been disposed</param>
-		public GGPK(Stream stream, bool leaveOpen = true) {
+		public GGPK(Stream stream, bool leaveOpen = false) {
 			LeaveOpen = leaveOpen;
 			GGPKStream = stream;
-			GgpkRecord = (GGPKRecord)ReadRecord();
+			GgpkRecord = (GGPKRecord)ReadRecord(0);
 			Root = (DirectoryRecord)ReadRecord(GgpkRecord.RootDirectoryOffset);
 		}
 
 		/// <summary>
-		/// Read a record from GGPK at <paramref name="offset"/>
+		/// Read a record from GGPK at current stream position
 		/// </summary>
-		/// <param name="offset">Record offset, null for current stream position</param>
 		[SkipLocalsInit]
-		public unsafe virtual BaseRecord ReadRecord(long? offset = null) {
-			if (offset.HasValue)
-				GGPKStream.Seek(offset.Value, SeekOrigin.Begin);
+		public unsafe virtual BaseRecord ReadRecord() {
 			var buffer = stackalloc byte[8];
 			GGPKStream.Read(new(buffer, 8));
 			var length = *(int*)buffer;
@@ -63,33 +64,45 @@ namespace LibGGPK3 {
 		}
 
 		/// <summary>
+		/// Read a record from GGPK with <paramref name="offset"/> in bytes
+		/// </summary>
+		/// <param name="offset">Record offset, null for current stream position</param>
+		public virtual BaseRecord ReadRecord(long offset) {
+			GGPKStream.Seek(offset, SeekOrigin.Begin);
+			return ReadRecord();
+		}
+
+		/// <summary>
 		/// Find the record with a <paramref name="path"/>
 		/// </summary>
-		/// <param name="path">Path in GGPK under <paramref name="parent"/></param>
-		/// <param name="parent">Where to start searching, null for ROOT directory in GGPK</param>
+		/// <param name="path">Relative path in GGPK under <paramref name="root"/></param>
+		/// <param name="root">Where to start searching, null for ROOT directory in GGPK</param>
 		/// <returns>null if not found</returns>
-		public virtual TreeNode? FindNode(string path, DirectoryRecord? parent = null) {
-			parent ??= Root;
+		public virtual TreeNode? FindNode(string path, DirectoryRecord? root = null) {
+			root ??= Root;
 			var SplittedPath = path.Split('/', '\\');
 			foreach (var name in SplittedPath) {
 				if (name == "")
 					continue;
-				var next = parent[TreeNode.GetNameHash(name)];
+				var next = root[TreeNode.GetNameHash(name)];
 				if (next is not DirectoryRecord dr)
 					return next;
-				parent = dr;
+				root = dr;
 			}
-			return parent;
+			return root;
 		}
 
-		public virtual LinkedListNode<FreeRecord>? FindBestFreeRecord(int length, out int remainingSpace) {
+		/// <summary>
+		/// Find the best FreeRecord from <see cref="GGPK.FreeRecords"/> to write a Record with length of <paramref name="length"/>
+		/// </summary>
+		protected internal virtual LinkedListNode<FreeRecord>? FindBestFreeRecord(int length) {
 			LinkedListNode<FreeRecord>? bestNode = null; // Find the FreeRecord with most suitable size
 			var currentNode = FreeRecords.First!;
-			remainingSpace = int.MaxValue;
+			var remainingSpace = int.MaxValue;
 			do {
 				if (currentNode.Value.Length == length) {
 					bestNode = currentNode;
-					remainingSpace = 0;
+					//remainingSpace = 0;
 					break;
 				}
 				var tmpSpace = currentNode.Value.Length - length;
@@ -249,6 +262,40 @@ namespace LibGGPK3 {
 			});
 		}
 
+		/// <summary>
+		/// Try to fix the broken FreeRecord Linked List
+		/// </summary>
+		public virtual void FixFreeRecordList() {
+			var s = GGPKStream;
+			s.Seek(0, SeekOrigin.Begin);
+			GgpkRecord.FirstFreeRecordOffset = 0;
+			var list = new LinkedList<FreeRecord>();
+			FreeRecord? last = null;
+			while (s.Position < s.Length) {
+				var record = ReadRecord();
+				if (record is FreeRecord fr) {
+					if (last != null)
+						last.NextFreeOffset = fr.Offset;
+					else
+						GgpkRecord.FirstFreeRecordOffset = fr.Offset;
+					last = fr;
+					list.AddLast(last);
+				}
+			}
+			if (last != null)
+				last.NextFreeOffset = 0;
+			s.Seek(GgpkRecord.Offset + 20, SeekOrigin.Begin);
+			s.Write(GgpkRecord.FirstFreeRecordOffset);
+			foreach (var fr in list) {
+				s.Seek(fr.Offset + 8, SeekOrigin.Begin);
+				s.Write(fr.NextFreeOffset);
+			}
+			s.Flush();
+		}
+
+		/// <summary>
+		/// Merge all adjacent FreeRecords
+		/// </summary>
 		protected virtual void FreeRecordConcat() {
 			if (FreeRecords.Count == 0)
 				return;
@@ -276,6 +323,11 @@ namespace LibGGPK3 {
 			}
 		}
 
+		/// <summary>
+		/// Recursive all nodes under <paramref name="node"/>
+		/// </summary>
+		/// <param name="node"></param>
+		/// <returns></returns>
 		public virtual IEnumerable<TreeNode> RecursiveTree(TreeNode node) {
 			yield return node;
 			if (node is DirectoryRecord dr)

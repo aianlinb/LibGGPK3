@@ -1,22 +1,28 @@
 ﻿using LibBundle3.Nodes;
 using LibBundle3.Records;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace LibBundle3 {
 	public class Index : IDisposable {
-		public BundleRecord[] Bundles;
-		public Dictionary<ulong, FileRecord> Files;
-		public DirectoryRecord[] Directories;
+		protected BundleRecord[] _Bundles;
+		protected Dictionary<ulong, FileRecord> _Files;
+		internal DirectoryRecord[] _Directories;
+		public virtual ReadOnlySpan<BundleRecord> Bundles => _Bundles;
+		public virtual ReadOnlyDictionary<ulong, FileRecord> Files => new(_Files);
 
-		protected readonly string? baseDirectory;
 		protected readonly Bundle bundle;
+		protected readonly string? baseDirectory;
 		protected readonly byte[] directoryBundleData;
 		protected int UncompressedSize; // For memory alloc when saving
 
@@ -27,20 +33,19 @@ namespace LibBundle3 {
 		public virtual DirectoryNode Root {
 			get {
 				if (_Root == null) {
-					_Root = new("");
-					foreach (var f in Files.Values) {
+					_Root = new("", null);
+					var files = _Files.Values.OrderBy(f => f.Path, PathComparer.Instance);
+					foreach (var f in files) {
 						var paths = f.Path.Split('/');
-						var parent = Root;
+						var parent = _Root;
 						var lastDirectory = paths.Length - 1;
 						for (var i = 0; i < lastDirectory; ++i) {
-							if (parent.Children.FirstOrDefault(n => n.Name == paths[i]) is not DirectoryNode next) {
-								next = new DirectoryNode(paths[i]);
-								parent.Children.Add(next);
-								next.Parent = parent;
-							}
-							parent = next;
+							var next = parent._Children.Count > 0 ? parent._Children[^1] : null;
+							if (next is not DirectoryNode dr || dr.Name != paths[i])
+								parent._Children.Add(dr = new(paths[i], parent));
+							parent = dr;
 						}
-						parent.Children.Add(new FileNode(f));
+						parent._Children.Add(new FileNode(f, parent));
 					}
 				}
 				return _Root;
@@ -50,18 +55,20 @@ namespace LibBundle3 {
 		/// <summary>
 		/// Function to get <see cref="Bundle"/> instance with a <see cref="BundleRecord"/>
 		/// </summary>
-		public Func<BundleRecord, Bundle> FuncReadBundle = static (br) => new((br.Index.baseDirectory ?? "") + br.Path + ".bundle.bin");
+		public Func<BundleRecord, Bundle> FuncReadBundle = static (br) => new((br.Index.baseDirectory ?? "") + br.Path, br);
 
-		internal static string? ExpandPath(string path) {
+		protected internal static string ExpandPath(string path) {
 			if (path.StartsWith('~')) {
-				var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None);
-				if (userProfile != "") {
-					if (path.Length == 1)
+				if (path.Length == 1) { // ~
+					var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None);
+					if (userProfile != "")
 						return Environment.ExpandEnvironmentVariables(userProfile);
-					if (path[1] is '/' or '\\')
+				} else if (path[1] is '/' or '\\') { // ~/...
+					var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None);
+					if (userProfile != "")
 						return Environment.ExpandEnvironmentVariables(userProfile + path[1..]);
 				}
-				try {
+				try { // ~username/...
 					if (!OperatingSystem.IsWindows()) {
 						string bash;
 						if (File.Exists("/bin/zsh"))
@@ -81,6 +88,7 @@ namespace LibBundle3 {
 						});
 						p!.StandardInput.WriteLine("echo " + path);
 						var tmp = p.StandardOutput.ReadLine();
+						p.Kill();
 						p.Dispose();
 						if (!string.IsNullOrEmpty(tmp))
 							return tmp;
@@ -91,64 +99,70 @@ namespace LibBundle3 {
 		}
 
 		/// <param name="filePath">Path to _.index.bin</param>
-		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> and <see cref="FileRecord.DirectoryRecord"/> in each of <see cref="Files"/> will be <see langword="null"/></param>
-		public Index(string filePath, bool parsePaths = true) : this(File.Open(filePath = ExpandPath(filePath)!, FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false, parsePaths) {
+		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> and <see cref="FileRecord.DirectoryRecord"/> in each of <see cref="_Files"/> will be <see langword="null"/></param>
+		public Index(string filePath, bool parsePaths = true) : this(File.Open(filePath = ExpandPath(filePath), FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false, parsePaths) {
 			baseDirectory = Path.GetDirectoryName(Path.GetFullPath(filePath)) + "/";
 		}
 
 		/// <param name="stream">Stream of _.index.bin</param>
 		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> after this instance has been disposed</param>
-		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> and <see cref="FileRecord.DirectoryRecord"/> in each of <see cref="Files"/> will be <see langword="null"/></param>
+		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> and <see cref="FileRecord.DirectoryRecord"/> in each of <see cref="_Files"/> will be <see langword="null"/></param>
 		public unsafe Index(Stream stream, bool leaveOpen = true, bool parsePaths = true) {
 			bundle = new(stream, leaveOpen);
 			var data = bundle.ReadData();
 			UncompressedSize = data.Length;
-			var UTF8 = Encoding.UTF8;
 			fixed (byte* p = data) {
 				var ptr = (int*)p;
 
 				var bundleCount = *ptr++;
-				Bundles = new BundleRecord[bundleCount];
+				_Bundles = new BundleRecord[bundleCount];
 				for (var i = 0; i < bundleCount; i++) {
 					var pathLength = *ptr++;
-					var path = UTF8.GetString((byte*)ptr, pathLength);
+					var path = new string((sbyte*)ptr, 0, pathLength);
 					ptr = (int*)((byte*)ptr + pathLength);
 					var uncompressedSize = *ptr++;
-					Bundles[i] = new BundleRecord(path, uncompressedSize, this) { BundleIndex = i };
+					_Bundles[i] = new BundleRecord(path, uncompressedSize, this, i);
 				}
 
 				var fileCount = *ptr++;
-				Files = new(fileCount);
+				_Files = new(fileCount);
 				for (var i = 0; i < fileCount; i++) {
 					var nameHash = *(ulong*)ptr;
 					ptr += 2;
-					var f = new FileRecord(nameHash, *ptr++, *ptr++, *ptr++);
-					Files[nameHash] = f;
-					var b = Bundles[f.BundleIndex];
-					f.BundleRecord = b;
-					b.Files.Add(f);
+					var bundle = _Bundles[*ptr++];
+					var f = new FileRecord(nameHash, bundle, *ptr++, *ptr++);
+					_Files[nameHash] = f;
+					bundle._Files.Add(f);
 				}
 
 				var directoryCount = *ptr++;
-				Directories = new DirectoryRecord[directoryCount];
+				_Directories = new DirectoryRecord[directoryCount];
+				fixed (DirectoryRecord* drp = _Directories)
+					Unsafe.CopyBlockUnaligned(drp, ptr, (uint)directoryCount * 20);
+				ptr += directoryCount * 5;
+				/*
 				for (var i = 0; i < directoryCount; i++) {
 					var nameHash = *(ulong*)ptr;
 					ptr += 2;
-					Directories[i] = new DirectoryRecord(nameHash, *ptr++, *ptr++, *ptr++);
+					_Directories[i] = new DirectoryRecord(nameHash, *ptr++, *ptr++, *ptr++);
 				}
+				*/
 
 				directoryBundleData = data[(int)((byte*)ptr - p)..];
 			}
 
-			if (!parsePaths)
-				return;
+			if (parsePaths)
+				ParsePaths();
+			return;
+		}
 
+		public virtual unsafe void ParsePaths() {
 			var directoryBundle = new Bundle(new MemoryStream(directoryBundleData), false);
 			var directory = directoryBundle.ReadData();
 			directoryBundle.Dispose();
 			fixed (byte* p = directory) {
 				var ptr = p;
-				foreach (var d in Directories) {
+				foreach (var d in _Directories) {
 					var temp = new List<string>();
 					var Base = false;
 					var offset = ptr = p + d.Offset;
@@ -161,21 +175,29 @@ namespace LibBundle3 {
 								temp.Clear();
 						} else {
 							index -= 1;
+							/*
 							var sb = new StringBuilder();
 							byte c;
 							while ((c = *ptr++) != 0)
 								sb.Append((char)c);
 							var str = sb.ToString();
-							if (index < temp.Count)
+							*/  // See String.Ctor(sbyte* value)
+							var strlen = new ReadOnlySpan<byte>(ptr, d.Size).IndexOf((byte)0);
+							var str = new string((sbyte*)ptr, 0, strlen);
+							
+							if (index < temp.Count) {
 								str = temp[index] + str;
-							if (Base)
-								temp.Add(str);
-							else {
-								var f = Files[FNV1a64Hash(str)];
-								f._Path = str;
-								d.Children.Add(f);
-								f.DirectoryRecord = d;
+								if (Base)
+									temp.Add(str);
+								else
+									_Files[FNV1a64Hash(str)].Path = str;
+							} else {
+								if (Base)
+									temp.Add(str);
+								else
+									_Files[FNV1a64Hash(new ReadOnlySpan<byte>(ptr, strlen))].Path = str;
 							}
+							ptr += strlen + 1; // '\0'
 						}
 					}
 				}
@@ -185,38 +207,35 @@ namespace LibBundle3 {
 		/// <summary>
 		/// Save the _.index.bin. Call this after any file changed
 		/// </summary>
-		public virtual void Save() {
+		public virtual unsafe void Save() {
 			var ms = new MemoryStream(UncompressedSize);
 			var bw = new BinaryWriter(ms);
-			var UTF8 = Encoding.UTF8;
 
-			bw.Write(Bundles.Length);
-			foreach (var b in Bundles) {
-				var path = UTF8.GetBytes(b.Path);
-				bw.Write(path.Length);
-				bw.Write(path, 0, path.Length);
-				bw.Write(b.UncompressedSize);
-			}
+			bw.Write(_Bundles.Length);
+			foreach (var b in _Bundles)
+				b.Save(bw);
 
-			bw.Write(Files.Count);
-			foreach (var f in Files.Values) {
-				bw.Write(f.PathHash);
-				bw.Write(f.BundleIndex);
-				bw.Write(f.Offset);
-				bw.Write(f.Size);
-			}
+			bw.Write(_Files.Count);
+			foreach (var f in _Files.Values)
+				f.Save(bw);
 
-			bw.Write(Directories.Length);
-			foreach (var d in Directories) {
+			bw.Write(_Directories.Length);
+			/*
+			foreach (var d in _Directories) {
 				bw.Write(d.PathHash);
 				bw.Write(d.Offset);
 				bw.Write(d.Size);
 				bw.Write(d.RecursiveSize);
 			}
+			*/
+			fixed (DirectoryRecord* drp = _Directories)
+				bw.Write(new ReadOnlySpan<byte>(drp, _Directories.Length * 20));
 
 			bw.Write(directoryBundleData);
 
 			bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
+			UncompressedSize = (int)ms.Length;
+			ms.Close();
 			bw.Close();
 		}
 
@@ -246,7 +265,8 @@ namespace LibBundle3 {
 
 			list.Sort(BundleComparer.Instance);
 			pathToSave += "/";
-			var trim = node.GetPath().Length;
+			var pp = node.GetPath();
+			var trim = pp.Length;
 
 			var first = list[0];
 			if (list.Count == 1) {
@@ -267,7 +287,7 @@ namespace LibBundle3 {
 			foreach (var fr in list) {
 				if (br != fr.BundleRecord) {
 					if (!err)
-						br.Bundle.CachedData = null;
+						br.Bundle.Dispose();
 					br = fr.BundleRecord;
 					try {
 						br.Bundle.ReadDataAndCache();
@@ -278,22 +298,22 @@ namespace LibBundle3 {
 				}
 				if (err)
 					continue;
-				var f = File.Create(pathToSave + first.Path[trim..]);
+				var f = File.Create(pathToSave + fr.Path[trim..]);
 				f.Write(fr.Read().Span);
 				f.Flush();
 				f.Close();
 			}
 			if (!err)
-				br.Bundle.CachedData = null;
+				br.Bundle.Dispose();
 		}
 
 		/// <summary>
 		/// Extract files with their path, throw when a file couldn't be found
 		/// </summary>
-		/// <param name="filePaths">Path of files to extract, <see langword="null"/> for all files in <see cref="Files"/></param>
+		/// <param name="filePaths">Path of files to extract, <see langword="null"/> for all files in <see cref="_Files"/></param>
 		/// <returns>KeyValuePairs of path and data of each file</returns>
 		public virtual IEnumerable<KeyValuePair<string, Memory<byte>>> Extract(IEnumerable<string>? filePaths) {
-			var list = filePaths == null ? new List<FileRecord>(Files.Values) : filePaths.Select(s => Files[FNV1a64Hash(s.Replace('\\', '/'))]).ToList();
+			var list = filePaths == null ? new List<FileRecord>(_Files.Values) : filePaths.Select(s => _Files[FNV1a64Hash(s.Replace('\\', '/').TrimEnd('/'))]).ToList();
 			if (list.Count == 0)
 				yield break;
 			list.Sort(BundleComparer.Instance);
@@ -308,13 +328,13 @@ namespace LibBundle3 {
 			br.Bundle.ReadDataAndCache();
 			foreach (var fr in list) {
 				if (br != fr.BundleRecord) {
-					br.Bundle.CachedData = null;
+					br.Bundle.Dispose();
 					br = fr.BundleRecord;
 					br.Bundle.ReadDataAndCache();
 				}
 				yield return new(fr.Path, fr.Read());
 			}
-			br.Bundle.CachedData = null;
+			br.Bundle.Dispose();
 		}
 
 		/// <summary>
@@ -357,21 +377,18 @@ namespace LibBundle3 {
 					if (br != fr.BundleRecord) {
 						br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 						ms.Close();
-						br.UncompressedSize = br.Bundle.UncompressedSize;
 						br = fr.BundleRecord;
 						ms = new(br.Bundle.UncompressedSize);
 						ms.Write(br.Bundle.ReadData());
 					}
 					var b = File.ReadAllBytes(pathToLoad + fr.Path[trim..]);
 					ms.Write(b);
-					fr.Offset = (int)ms.Length;
-					fr.Size = b.Length;
+					fr.Redirect(br, (int)ms.Length, b.Length);
 				}
 				br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 				ms.Close();
-				br.UncompressedSize = br.Bundle.UncompressedSize;
 			} else {
-				var maxSize = 200000000; //200MB
+				var maxSize = 209715200; //200MB
 				var br = GetSmallestBundle();
 				while (br.Bundle.UncompressedSize >= maxSize)
 					maxSize *= 2;
@@ -381,7 +398,6 @@ namespace LibBundle3 {
 					if (ms.Length >= maxSize) {
 						br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 						ms.Close();
-						br.UncompressedSize = br.Bundle.UncompressedSize;
 						br = GetSmallestBundle();
 						while (br.Bundle.UncompressedSize >= maxSize)
 							maxSize *= 2;
@@ -394,7 +410,6 @@ namespace LibBundle3 {
 				}
 				br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 				ms.Close();
-				br.UncompressedSize = br.Bundle.UncompressedSize;
 			}
 			Save();
 		}
@@ -403,11 +418,11 @@ namespace LibBundle3 {
 		/// <summary>
 		/// Replace files with their path, throw when a file couldn't be found
 		/// </summary>
-		/// <param name="filePaths">Path of files to replace, <see langword="null"/> for all files in <see cref="Files"/></param>
+		/// <param name="filePaths">Path of files to replace, <see langword="null"/> for all files in <see cref="_Files"/></param>
 		/// <param name="funcGetDataFromFilePath">For getting new data with the path of the file</param>
 		/// <param name="dontChangeBundle">Whether to force all files to be written to their respective original bundle</param>
 		public virtual void Replace(IEnumerable<string>? filePaths, FuncGetData funcGetDataFromFilePath, bool dontChangeBundle = false) {
-			var list = filePaths == null ? new List<FileRecord>(Files.Values) : filePaths.Select(s => Files[FNV1a64Hash(s.Replace('\\', '/'))]).ToList();
+			var list = filePaths == null ? new List<FileRecord>(_Files.Values) : filePaths.Select(s => _Files[FNV1a64Hash(s.Replace('\\', '/').TrimEnd('/'))]).ToList();
 			if (list.Count == 0)
 				return;
 
@@ -428,21 +443,18 @@ namespace LibBundle3 {
 					if (br != fr.BundleRecord) {
 						br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 						ms.Close();
-						br.UncompressedSize = br.Bundle.UncompressedSize;
 						br = fr.BundleRecord;
 						ms = new(br.Bundle.UncompressedSize);
 						ms.Write(br.Bundle.ReadData());
 					}
 					var b = funcGetDataFromFilePath(fr.Path);
 					ms.Write(b);
-					fr.Offset = (int)ms.Length;
-					fr.Size = b.Length;
+					fr.Redirect(br, (int)ms.Length, b.Length);
 				}
 				br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 				ms.Close();
-				br.UncompressedSize = br.Bundle.UncompressedSize;
 			} else {
-				var maxSize = 200000000; //200MB
+				var maxSize = 209715200; //200MB
 				var br = GetSmallestBundle();
 				while (br.Bundle.UncompressedSize >= maxSize)
 					maxSize *= 2;
@@ -452,7 +464,6 @@ namespace LibBundle3 {
 					if (ms.Length >= maxSize) {
 						br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 						ms.Close();
-						br.UncompressedSize = br.Bundle.UncompressedSize;
 						br = GetSmallestBundle();
 						while (br.Bundle.UncompressedSize >= maxSize)
 							maxSize *= 2;
@@ -465,7 +476,6 @@ namespace LibBundle3 {
 				}
 				br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 				ms.Close();
-				br.UncompressedSize = br.Bundle.UncompressedSize;
 			}
 			Save();
 		}
@@ -474,7 +484,7 @@ namespace LibBundle3 {
 		/// Patch with a zip file and ignore its files that couldn't be found
 		/// </summary>
 		public virtual void Replace(IEnumerable<ZipArchiveEntry> zipEntries) {
-			var maxSize = 200000000; //200MB
+			var maxSize = 209715200; //200MB
 			var br = GetSmallestBundle();
 			while (br.Bundle.UncompressedSize >= maxSize)
 				maxSize *= 2;
@@ -483,12 +493,11 @@ namespace LibBundle3 {
 			foreach (var zip in zipEntries) {
 				if (zip.FullName.EndsWith('/'))
 					continue;
-				if (!Files.TryGetValue(FNV1a64Hash(zip.FullName), out var f))
+				if (!_Files.TryGetValue(FNV1a64Hash(zip.FullName), out var f))
 					continue;
 				if (ms.Length >= maxSize) {
 					br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 					ms.Close();
-					br.UncompressedSize = br.Bundle.UncompressedSize;
 					br = GetSmallestBundle();
 					while (br.Bundle.UncompressedSize >= maxSize)
 						maxSize *= 2;
@@ -501,7 +510,6 @@ namespace LibBundle3 {
 			}
 			br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 			ms.Close();
-			br.UncompressedSize = br.Bundle.UncompressedSize;
 
 			Save();
 		}
@@ -512,31 +520,32 @@ namespace LibBundle3 {
 		/// </summary>
 		/// <returns>Null when not found</returns>
 		public virtual bool TryGetFile(string path, [NotNullWhen(true)] out FileRecord? file) {
-			return Files.TryGetValue(FNV1a64Hash(path), out file);
+			return _Files.TryGetValue(FNV1a64Hash(path), out file);
 		}
 
-		/// <param name="path">Relative path below <paramref name="parent"/></param>
-		/// <param name="parent">Node to start searching</param>
-		public virtual BaseNode? FindNode(string path, DirectoryNode? parent = null) {
-			parent ??= Root;
+		/// <param name="path">Relative path below <paramref name="root"/></param>
+		/// <param name="root">Node to start searching</param>
+		public virtual BaseNode? FindNode(string path, DirectoryNode? root = null) {
+			root ??= Root;
 			var SplittedPath = path.Split('/', '\\');
 			foreach (var name in SplittedPath) {
-				var next = parent.Children.FirstOrDefault(n => n.Name == name);
+				if (name == "")
+					return root;
+				var next = root._Children.FirstOrDefault(n => n.Name == name);
 				if (next is not DirectoryNode dn)
 					return next;
-				parent = dn;
+				root = dn;
 			}
-			return parent;
+			return root;
 		}
 
 		/// <summary>
-		/// Get a available bundle with smallest uncompressed_size
+		/// Get an available bundle with smallest uncompressed_size
 		/// </summary>
-		public virtual BundleRecord GetSmallestBundle(BundleRecord[]? toSearch = null) {
-			toSearch ??= Bundles;
-			if (toSearch == null || toSearch.Length == 0)
+		public virtual BundleRecord GetSmallestBundle() {
+			if (_Bundles == null || _Bundles.Length == 0)
 				throw new("Unable to find an available bundle");
-			var bundles = (BundleRecord[])toSearch.Clone();
+			var bundles = (BundleRecord[])_Bundles.Clone();
 			Array.Sort(bundles, (x, y) => x.UncompressedSize - y.UncompressedSize);
 			for (var i = 0; i < bundles.Length; ++i)
 				try {
@@ -565,26 +574,55 @@ namespace LibBundle3 {
 			else if (node is DirectoryNode dn) {
 				if (createDirectory)
 					Directory.CreateDirectory(path);
-				foreach (var n in dn.Children)
+				foreach (var n in dn._Children)
 					RecursiveList(n, path + "/" + n.Name, list, createDirectory);
 			}
 		}
 
 		/// <summary>
-		/// Get the hash of a file path
+		/// Get the hash of a file path, only support ascii characters
 		/// </summary>
-		public static ulong FNV1a64Hash(string str) {
+		public static unsafe ulong FNV1a64Hash(ReadOnlySpan<char> str) {
+			/*
 			if (str.EndsWith('/'))
 				str = str.TrimEnd('/') + "++";
 			else
 				str = str.ToLower() + "++";
-
 			var bs = Encoding.UTF8.GetBytes(str);
+			return bs.Aggregate(0xCBF29CE484222325UL, (current, by) => (current ^ by) * 0x100000001B3UL);
+			*/
 			var hash = 0xCBF29CE484222325UL;
-			foreach (var by in bs)
-				hash = (hash ^ by) * 0x100000001B3UL;
-			// Equals to: bs.Aggregate(0xCBF29CE484222325UL, (current, by) => (current ^ by) * 0x100000001B3UL);
-			return hash;
+			if (str[^1] == '/') {
+				str = str[..^1]; // TrimEnd('/')
+				foreach (ulong by in str)
+					hash = (hash ^ by) * 0x100000001B3UL;
+			} else
+				foreach (ulong by in str) {
+					if (by < 91 && by >= 65)
+						hash = (hash ^ (by + 32)) * 0x100000001B3UL; // ToLower
+					else
+						hash = (hash ^ by) * 0x100000001B3UL;
+				}
+			return (((hash ^ 43) * 0x100000001B3UL) ^ 43) * 0x100000001B3UL; // "++" ('+'==43)
+		}
+
+		/// <summary>
+		/// Get the hash of a UTF-8 file path
+		/// </summary>
+		public static unsafe ulong FNV1a64Hash(ReadOnlySpan<byte> utf8Str) {
+			var hash = 0xCBF29CE484222325UL;
+			if (utf8Str[^1] == '/') {
+				utf8Str = utf8Str[..^1]; // TrimEnd('/')
+				foreach (ulong by in utf8Str)
+					hash = (hash ^ by) * 0x100000001B3UL;
+			} else
+				foreach (ulong by in utf8Str) {
+					if (by < 91 && by >= 65)
+						hash = (hash ^ (by + 32)) * 0x100000001B3UL; // ToLower
+					else
+						hash = (hash ^ by) * 0x100000001B3UL;
+				}
+			return (((hash ^ 43) * 0x100000001B3UL) ^ 43) * 0x100000001B3UL; // "++" ('+'==43)
 		}
 
 		/// <summary>
@@ -592,11 +630,26 @@ namespace LibBundle3 {
 		/// </summary>
 		public sealed class BundleComparer : IComparer<FileRecord> {
 			public static readonly BundleComparer Instance = new();
-			private BundleComparer() {
-			}
+			private BundleComparer() { }
 #pragma warning disable CS8767
 			public int Compare(FileRecord x, FileRecord y) {
 				return x.BundleRecord.BundleIndex - y.BundleRecord.BundleIndex;
+			}
+		}
+
+		/// <summary>
+		/// Use to sort nodes by their name
+		/// </summary>
+		public sealed class PathComparer : IComparer<string> {
+			public static readonly PathComparer Instance = new();
+			private PathComparer() { }
+
+			[DllImport("shlwapi", CallingConvention = CallingConvention.Winapi, CharSet = CharSet.Unicode)]
+			private static extern int StrCmpLogicalW(string x, string y);
+			private static readonly Func<string, string, int> FuncCompare = OperatingSystem.IsWindows() ? StrCmpLogicalW : string.Compare;
+#pragma warning disable CS8767
+			public int Compare(string x, string y) {
+				return FuncCompare(x, y);
 			}
 		}
 	}

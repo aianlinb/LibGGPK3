@@ -1,23 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <Authors>aianlinb</Authors>
-    <Copyright>Copyright © 2022 aianlinb</Copyright>
-    <Version>1.1.0</Version>
-    <NoWin32Manifest>true</NoWin32Manifest>
-    <DebugType>embedded</DebugType>
-    <Optimize Condition="'$(Configuration)' != 'Debug'">True</Optimize>
-    <Configurations>Debug;Release;AOT</Configurations>
-    <Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
-  </PropertyGroup>
-  
-  <ItemGroup>
-    <ProjectReference Include="..\..\LibGGPK3\LibGGPK3.csproj" />
-  </ItemGroup>
-  
-  <Import Project="../EtoForms.targets" />
-  
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+	</PropertyGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\..\LibGGPK3\LibGGPK3.csproj" />
+	</ItemGroup>
+	<Import Project="../EtoForms.targets" />
 </Project>

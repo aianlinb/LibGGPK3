@@ -1,41 +1,41 @@
 <Project>
-  <PropertyGroup>
-    <DefineConstants Condition="'$(RuntimeIdentifier.StartsWith(`osx`))' == 'true'">$(DefineConstants);MAC</DefineConstants>
-  </PropertyGroup>
-  
-  <Target Name="OSVerification" BeforeTargets="BeforeBuild">
-    <Error Condition="'$(RuntimeIdentifier)' != '' And '$(RuntimeIdentifier.StartsWith(`win`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`osx`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`linux`))' != 'true'" Text="Unsupported RuntimeIdentifier: '$(RuntimeIdentifier)'" />
-  </Target>
-  
-  <ItemGroup>
-    <PackageReference Include="Eto.Forms" Version="*" />
-  </ItemGroup>
-  
-  <Choose>
-    <When Condition="'$(RuntimeIdentifier.StartsWith(`win`))' == 'true' Or '$(RuntimeIdentifier)' == ''">
-      <PropertyGroup>
-        <TargetFramework>net6.0-windows</TargetFramework>
-      </PropertyGroup>
-      <ItemGroup>
-        <PackageReference Include="Eto.Platform.Windows" Version="*" />
-      </ItemGroup>
-    </When>
-    
-    <When Condition="'$(RuntimeIdentifier.StartsWith(`osx`))' == 'true'">
-      <PropertyGroup>
-        <MacBundleDotNet>true</MacBundleDotNet>
-      </PropertyGroup>
-      <ItemGroup>
-        <PackageReference Include="Eto.Platform.Mac64" Version="*" />
-        <PackageReference Condition="'$(RuntimeIdentifier.Contains(`64`))' != 'true'" Include="Eto.Platform.Mac" Version="*" />
-      </ItemGroup>
-    </When>
-    
-    <When Condition="'$(RuntimeIdentifier.StartsWith(`linux`))' == 'true'">
-      <ItemGroup>
-        <PackageReference Include="Eto.Platform.Gtk" Version="*" />
-      </ItemGroup>
-    </When>
-  </Choose>
-  
+	<PropertyGroup>
+		<DefineConstants Condition="'$(RuntimeIdentifier.StartsWith(`osx`))' == 'true'">$(DefineConstants);MAC</DefineConstants>
+	</PropertyGroup>
+	
+	<Target Name="OSVerification" BeforeTargets="BeforeBuild">
+		<Error Condition="'$(RuntimeIdentifier)' != '' And '$(RuntimeIdentifier.StartsWith(`win`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`osx`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`linux`))' != 'true'" Text="Unsupported RuntimeIdentifier: '$(RuntimeIdentifier)'" />
+	</Target>
+	
+	<ItemGroup>
+		<PackageReference Include="Eto.Forms" Version="*" />
+	</ItemGroup>
+	
+	<Choose>
+		<When Condition="'$(RuntimeIdentifier.StartsWith(`win`))' == 'true' Or '$(RuntimeIdentifier)' == ''">
+			<PropertyGroup>
+				<TargetFramework>net6.0-windows</TargetFramework>
+			</PropertyGroup>
+			<ItemGroup>
+				<PackageReference Include="Eto.Platform.Windows" Version="*" />
+			</ItemGroup>
+		</When>
+		
+		<When Condition="'$(RuntimeIdentifier.StartsWith(`osx`))' == 'true'">
+			<PropertyGroup>
+				<MacBundleDotNet>true</MacBundleDotNet>
+			</PropertyGroup>
+			<ItemGroup>
+				<PackageReference Include="Eto.Platform.Mac64" Version="*" />
+				<PackageReference Condition="'$(RuntimeIdentifier.Contains(`64`))' != 'true'" Include="Eto.Platform.Mac" Version="*" />
+			</ItemGroup>
+		</When>
+		
+		<When Condition="'$(RuntimeIdentifier.StartsWith(`linux`))' == 'true'">
+			<ItemGroup>
+				<PackageReference Include="Eto.Platform.Gtk" Version="*" />
+			</ItemGroup>
+		</When>
+	</Choose>
+	
 </Project>

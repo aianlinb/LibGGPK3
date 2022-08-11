@@ -2,41 +2,37 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 
 namespace LibGGPK3.Records {
 	public abstract class TreeNode : BaseRecord {
 		private static readonly byte[] HashOfEmpty = Convert.FromHexString("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855");
 
-		protected string _Name = "";
 		/// <summary>
 		/// File/Directory name
 		/// </summary>
+		public string Name { get; protected set; } = "";
+		/* 
 		public string Name {
 			get => _Name;
 			set {
 				_NameHash = null;
 				_Name = value;
-				if (Parent is DirectoryRecord dr) {
-					for (int i = 0; i < dr.Entries.Length; ++i) {
-						if (dr.Entries[i].NameHash == NameHash) {
-							dr.Entries[i].Offset = Offset;
-							Ggpk.GGPKStream.Seek(dr.EntriesBegin + i * 12 + 4, SeekOrigin.Begin);
-							Ggpk.GGPKStream.Write(Offset);
-							return;
-						}
-					}
-					throw new(GetPath() + " update namehash faild: " + Offset);
-				}
 			}
 		}
+		*/
 		/// <summary>
 		/// SHA256 hash of the file content
 		/// </summary>
-		public byte[] Hash = (byte[])HashOfEmpty.Clone();
+		public ReadOnlySpan<byte> Hash => _Hash;
+		/// <summary>
+		/// SHA256 hash of the file content
+		/// </summary>
+		protected internal byte[] _Hash = (byte[])HashOfEmpty.Clone();
 		/// <summary>
 		/// Parent node
 		/// </summary>
-		public DirectoryRecord? Parent;
+		public DirectoryRecord? Parent { get; protected internal set; }
 
 		protected TreeNode(int length, GGPK ggpk) : base(length, ggpk) {
 		}
@@ -47,7 +43,7 @@ namespace LibGGPK3.Records {
 		/// <param name="specify">The length of specified FreeRecord must not be between Length and Length-16 (exclusive)</param>
 		protected internal virtual void WriteWithNewLength(LinkedListNode<FreeRecord>? specify = null) {
 			var s = Ggpk.GGPKStream;
-			specify ??= Ggpk.FindBestFreeRecord(Length, out _);
+			specify ??= Ggpk.FindBestFreeRecord(Length);
 			if (specify == null) {
 				s.Seek(0, SeekOrigin.End); // Write to the end of GGPK
 				WriteRecordData();
@@ -67,7 +63,7 @@ namespace LibGGPK3.Records {
 			}
 		}
 
-		public virtual LinkedListNode<FreeRecord>? MoveWithNewLength(int newLength, LinkedListNode<FreeRecord>? specify = null) {
+		protected internal virtual LinkedListNode<FreeRecord>? MoveWithNewLength(int newLength, LinkedListNode<FreeRecord>? specify = null) {
 			if (newLength == Length && specify == null)
 				return null;
 			var free = MarkAsFreeRecord();
@@ -80,7 +76,7 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Set the record to a FreeRecord
 		/// </summary>
-		public virtual LinkedListNode<FreeRecord>? MarkAsFreeRecord() {
+		protected virtual LinkedListNode<FreeRecord>? MarkAsFreeRecord() {
 			var s = Ggpk.GGPKStream;
 			s.Seek(Offset, SeekOrigin.Begin);
 			LinkedListNode<FreeRecord>? rtn = null;
@@ -123,16 +119,15 @@ namespace LibGGPK3.Records {
 		/// Update the offset of this record in <see cref="Parent"/>.<see cref="DirectoryRecord.Entries"/>
 		/// </summary>
 		/// <param name="oldOffset">The original offset to be update</param>
-		public virtual void UpdateOffset() {
+		protected virtual void UpdateOffset() {
 			if (Parent is DirectoryRecord dr) {
-				for (int i = 0; i < dr.Entries.Length; ++i) {
+				for (int i = 0; i < dr.Entries.Length; ++i)
 					if (dr.Entries[i].NameHash == NameHash) {
 						dr.Entries[i].Offset = Offset;
 						Ggpk.GGPKStream.Seek(dr.EntriesBegin + i * 12 + 4, SeekOrigin.Begin);
 						Ggpk.GGPKStream.Write(Offset);
 						return;
 					}
-				}
 				throw new(GetPath() + " update offset faild: " + Offset);
 			} else if (this == Ggpk.Root) {
 				Ggpk.GgpkRecord.RootDirectoryOffset = Offset;
@@ -142,7 +137,10 @@ namespace LibGGPK3.Records {
 				throw new NullReferenceException(nameof(Parent));
 		}
 
-		public abstract int CaculateLength();
+		/// <summary>
+		/// Caculate the length of the record should be in ggpk file
+		/// </summary>
+		protected abstract int CaculateRecordLength();
 		/// <summary>
 		/// Get the full path in GGPK of this File/Directory
 		/// </summary>
@@ -162,37 +160,24 @@ namespace LibGGPK3.Records {
 		/// Use to sort the children of directory.
 		/// </summary>
 		public sealed class NodeComparer : IComparer<TreeNode> {
-			public static readonly IComparer<TreeNode> Instance = OperatingSystem.IsWindows() ? new NodeComparer_Windows() : new NodeComparer();
+			public static readonly NodeComparer Instance = new();
+			private NodeComparer() { }
 
+			[DllImport("shlwapi", CallingConvention = CallingConvention.Winapi, CharSet = CharSet.Unicode)]
+			private static extern int StrCmpLogicalW(string x, string y);
+			private static readonly Func<string, string, int> FuncCompare = OperatingSystem.IsWindows() ? StrCmpLogicalW : string.Compare;
 #pragma warning disable CS8767
 			public int Compare(TreeNode x, TreeNode y) {
 				if (x is DirectoryRecord)
 					if (y is DirectoryRecord)
-						return string.Compare(x.Name, y.Name);
+						return FuncCompare(x.Name, y.Name);
 					else
 						return -1;
 				else
 					if (y is DirectoryRecord)
 					return 1;
 				else
-					return string.Compare(x.Name, y.Name);
-			}
-
-			public sealed class NodeComparer_Windows : IComparer<TreeNode> {
-				[DllImport("shlwapi", CallingConvention = CallingConvention.Winapi, CharSet = CharSet.Unicode)]
-				public static extern int StrCmpLogicalW(string x, string y);
-				public int Compare(TreeNode x, TreeNode y) {
-					if (x is DirectoryRecord)
-						if (y is DirectoryRecord)
-							return StrCmpLogicalW(x.Name, y.Name);
-						else
-							return -1;
-					else
-						if (y is DirectoryRecord)
-						return 1;
-					else
-						return StrCmpLogicalW(x.Name, y.Name);
-				}
+					return FuncCompare(x.Name, y.Name);
 			}
 		}
 	}

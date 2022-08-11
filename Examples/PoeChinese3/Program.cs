@@ -43,7 +43,7 @@ namespace PoeChinese3 {
 						Console.WriteLine("Reading ggpk file . . .");
 						var ggpk = new BundledGGPK(args[0], false);
 						Console.WriteLine("正在套用 (Modifying) . . .");
-						Modify(ggpk.index);
+						Modify(ggpk.Index);
 						ggpk.Dispose();
 						Console.WriteLine("Done!");
 						Console.WriteLine("中文化完成！ 再次執行以還原");
@@ -139,7 +139,6 @@ namespace PoeChinese3 {
 			p.Dispose();
 			bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 			ms.Close();
-			br.UncompressedSize = bundle.UncompressedSize;
 			index.Save();
 		}
 	}

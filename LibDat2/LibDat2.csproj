@@ -4,12 +4,10 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <Authors>aianlinb</Authors>
-    <Copyright>Copyright © 2020-2022 aianlinb.</Copyright>
+    <Copyright>Copyright © 2020-2022 aianlinb</Copyright>
     <Version>0.14.1</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DebugType>embedded</DebugType>
-    <Configurations>Debug;Release;AOT</Configurations>
-    <Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
   </PropertyGroup>
 
   <ItemGroup>

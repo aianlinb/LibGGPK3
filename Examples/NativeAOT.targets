@@ -1,70 +1,25 @@
 <Project InitialTargets="AOTVerification">
-  
-  <Target Name="AOTVerification">
-    <Error Condition="'$(Configuration)' != 'AOT'" Text="Expected Configuration to be: AOT, but got: '$(Configuration)'" />
-  </Target>
-  
-  <PropertyGroup>
-    <IlcInvariantGlobalization>true</IlcInvariantGlobalization>
-    <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
-  </PropertyGroup>
-  
-  <ItemGroup>
-    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="*-*" />
+	
+	<Target Name="AOTVerification">
+		<Error Condition="'$(Configuration)' != 'AOT'" Text="Expected Configuration to be: 'AOT', but got: '$(Configuration)'" />
+	</Target>
+	
+	<PropertyGroup>
+		<Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
+		<IlcInvariantGlobalization>true</IlcInvariantGlobalization>
+		<IlcOptimizationPreference>Speed</IlcOptimizationPreference>
+	</PropertyGroup>
+	
+	<ItemGroup>
+		<PackageReference Include="Microsoft.DotNet.ILCompiler" Version="*-*" />
 
-    <RuntimeHostConfigurationOption Include="Switch.System.Reflection.Assembly.SimulatedCallingAssembly" Value="true" />
-    <RuntimeHostConfigurationOption Include="Switch.System.Reflection.Assembly.SimulatedLocationInBaseDirectory" Value="true" />
-    <RuntimeHostConfigurationOption Include="Switch.System.Reflection.Disabled.DoNotThrowForNames" Value="true" />
-    <RuntimeHostConfigurationOption Include="Switch.System.Reflection.Disabled.DoNotThrowForAssembly" Value="true" />
-    
-    <!--Remove the following if you don't have the libraries -->
-    <DirectPInvoke Include="oo2core" Condition="'$(RuntimeIdentifier)' != ''"/>
-  </ItemGroup>
-  
-  <Choose>
-    <When Condition="'$(RuntimeIdentifier.StartsWith(`win`))' == 'true'">
-      <ItemGroup>
-        <NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/oo2core_win64.lib" Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'" />
-        <NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/oo2core_win32.lib" Condition="'$(RuntimeIdentifier.Contains(`x86`))' == 'true'" />
-      </ItemGroup>
-    </When>
-    <When Condition="'$(RuntimeIdentifier.StartsWith(`osx`))' == 'true'">
-      <ItemGroup>
-        <NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coremac64.a" Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'" />
-      </ItemGroup>
-    </When>
-    <When Condition="'$(RuntimeIdentifier.StartsWith(`linux`))' == 'true'">
-      <ItemGroup>
-        <NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2corelinux64.a" Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'" />
-        <NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2corelinuxarm64.a" Condition="'$(RuntimeIdentifier.Contains(`arm64`))' == 'true'" />
-      </ItemGroup>
-    </When>
-    <When Condition="'$(RuntimeIdentifier.StartsWith(`ios`))' == 'true'">
-      <ItemGroup>
-        <NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coreios.a" />
-      </ItemGroup>
-    </When>
-    <When Condition="'$(RuntimeIdentifier.StartsWith(`tvos`))' == 'true'">
-      <ItemGroup>
-        <NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coretvos.a" />
-      </ItemGroup>
-    </When>
-    <When Condition="'$(RuntimeIdentifier.StartsWith(`android`))' == 'true'">
-      <Choose>
-        <When Condition="'$(RuntimeIdentifier.Contains(`64`))' == 'true'">
-          <ItemGroup>
-            <NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coreandroid64.a" Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'" />
-            <NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coreandroidarm64.a" Condition="'$(RuntimeIdentifier.Contains(`arm64`))' == 'true'" />
-          </ItemGroup>
-        </When>
-        <Otherwise>
-          <ItemGroup>
-            <NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coreandroidarm.a" Condition="'$(RuntimeIdentifier.Contains(`arm`))' == 'true'" />
-            <NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coreandroid.a" Condition="'$(RuntimeIdentifier.Contains(`arm`))' != 'true'" />
-          </ItemGroup>
-        </Otherwise>
-      </Choose>
-    </When>
-  </Choose>
-  
+		<RuntimeHostConfigurationOption Include="Switch.System.Reflection.Assembly.SimulatedCallingAssembly" Value="true" />
+		<RuntimeHostConfigurationOption Include="Switch.System.Reflection.Assembly.SimulatedLocationInBaseDirectory" Value="true" />
+		<RuntimeHostConfigurationOption Include="Switch.System.Reflection.Disabled.DoNotThrowForNames" Value="true" />
+		<RuntimeHostConfigurationOption Include="Switch.System.Reflection.Disabled.DoNotThrowForAssembly" Value="true" />
+		
+		<!--Remove the following if you don't have the libraries -->
+		<DirectPInvoke Include="oo2core" Condition="'$(RuntimeIdentifier)' != ''"/>
+	</ItemGroup>
+	
 </Project>

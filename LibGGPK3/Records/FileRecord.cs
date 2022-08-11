@@ -1,9 +1,7 @@
 ﻿using System;
 using System.IO;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
-using System.Xml.Linq;
 
 namespace LibGGPK3.Records {
 	/// <summary>
@@ -17,17 +15,17 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Offset in pack file where the raw data begins
 		/// </summary>
-		public long DataOffset;
+		public long DataOffset { get; protected set; }
 		/// <summary>
 		/// Length of the raw file data
 		/// </summary>
-		public int DataLength;
+		public int DataLength { get; protected internal set; }
 
 		protected unsafe internal FileRecord(int length, GGPK ggpk) : base(length, ggpk) {
 			var s = ggpk.GGPKStream;
 			Offset = s.Position - 8;
 			var nameLength = s.ReadInt32() - 1;
-			s.Read(Hash, 0, 32);
+			s.Read(_Hash, 0, 32);
 			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
 				var b = new byte[nameLength * 4];
 				s.Read(b, 0, b.Length);
@@ -46,10 +44,10 @@ namespace LibGGPK3.Records {
 
 		protected internal FileRecord(string name, GGPK ggpk) : base(default, ggpk) {
 			Name = name;
-			Length = CaculateLength();
+			Length = CaculateRecordLength();
 		}
 
-		public override int CaculateLength() {
+		protected override int CaculateRecordLength() {
 			return (Name.Length + 1) * (Ggpk.GgpkRecord.GGPKVersion == 4 ? 4 : 2) + 44 + DataLength; // (4 + 4 + 4 + Hash.Length + (Name + "\0").Length * 2) + DataLength
 		}
 
@@ -92,11 +90,11 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		public virtual void ReplaceContent(ReadOnlySpan<byte> NewContent) {
 			var s = Ggpk.GGPKStream;
-			if (!Hash256.TryComputeHash(NewContent, Hash, out _))
+			if (!Hash256.TryComputeHash(NewContent, _Hash, out _))
 				throw new("Unable to compute hash of the content");
 			if (NewContent.Length != DataLength) { // Replace a FreeRecord
 				DataLength = NewContent.Length;
-				MoveWithNewLength(CaculateLength());
+				MoveWithNewLength(CaculateRecordLength());
 				// Offset and DataOffset will be set from Write() in above method
 			}
 			s.Seek(DataOffset, SeekOrigin.Begin);

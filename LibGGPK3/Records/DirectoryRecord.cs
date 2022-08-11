@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -12,7 +11,7 @@ namespace LibGGPK3.Records {
 		public const uint Tag = 0x52494450;
 
 		[StructLayout(LayoutKind.Sequential, Size = 12, Pack = 1)]
-		public struct Entry {
+		protected internal struct Entry {
 			/// <summary>
 			/// Murmur2 hash of lowercase entry name
 			/// </summary>
@@ -31,11 +30,11 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Records (File/Directory) this directory contains.
 		/// </summary>
-		public Entry[] Entries;
+		protected internal Entry[] Entries;
 		/// <summary>
 		/// Offset in pack file where entries list begins. This is only here because it makes rewriting the entries list easier.
 		/// </summary>
-		public long EntriesBegin;
+		protected internal long EntriesBegin { get; protected set; }
 
 		/// <summary>
 		/// Read a DirectoryRecord from GGPK
@@ -45,7 +44,7 @@ namespace LibGGPK3.Records {
 			Offset = s.Position - 8;
 			var nameLength = s.ReadInt32() - 1;
 			var totalEntries = s.ReadInt32();
-			s.Read(Hash, 0, 32);
+			s.Read(_Hash, 0, 32);
 			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
 				var b = new byte[nameLength * 4];
 				s.Read(b, 0, b.Length);
@@ -66,11 +65,42 @@ namespace LibGGPK3.Records {
 		protected internal DirectoryRecord(string name, GGPK ggpk) : base(default, ggpk) {
 			Name = name;
 			Entries = Array.Empty<Entry>();
-			Length = CaculateLength();
+			Length = CaculateRecordLength();
 		}
 
 		protected Dictionary<uint, TreeNode>? _Children;
+		public virtual IEnumerable<TreeNode> Children {
+			get {
+				if (_Children?.Count == Entries.Length)
+					return _Children.Values;
+				return GetChildren();
+			}
+		}
+		protected virtual IEnumerable<TreeNode> GetChildren() {
+			if (_Children == null) {
+				_Children = new(Entries.Length);
+				foreach (var e in Entries) {
+					var node = (TreeNode)Ggpk.ReadRecord(e.Offset);
+					node.Parent = this;
+					_Children[e.NameHash] = node;
+					yield return node;
+				}
+			} else {
+				foreach (var e in Entries) {
+					if (!_Children.TryGetValue(e.NameHash, out var node)) {
+						node = (TreeNode)Ggpk.ReadRecord(e.Offset);
+						node.Parent = this;
+						_Children[e.NameHash] = node;
+					}
+					yield return node;
+				}
+			}
+		}
 
+		/// <summary>
+		/// Get child with the given namehash
+		/// </summary>
+		/// <param name="NameHash">namehash calculated from <see cref="TreeNode.GetNameHash"/></param>
 		public TreeNode? this[uint NameHash] {
 			get {
 				_Children ??= new(Entries.Length);
@@ -79,44 +109,36 @@ namespace LibGGPK3.Records {
 						if (e.NameHash == NameHash) {
 							node = (TreeNode)Ggpk.ReadRecord(e.Offset);
 							node.Parent = this;
-							_Children.Add(NameHash, node);
+							_Children[NameHash] = node;
 							break;
 						}
 				return node;
 			}
 		}
 
-		public virtual IEnumerable<TreeNode> Children {
-			get {
-				if (_Children?.Count == Entries.Length)
-					return _Children.Values;
-				return Entries.Select(e => this[e.NameHash]!);
-			}
-		}
-
-		public virtual DirectoryRecord AddDirectory(string name, Entry[]? entries = null) {
+		/// <summary>
+		/// Add a directory to this directory
+		/// </summary>
+		/// <param name="name">Name of the directory</param>
+		public virtual DirectoryRecord AddDirectory(string name) {
 			if (this == Ggpk.Root)
 				throw new InvalidOperationException("You can't add child elements to the root folder, otherwise it will break the GGPK when the game starts");
 			var dir = new DirectoryRecord(name, Ggpk) {
 				Parent = this
 			};
-			if (entries != null) {
-				dir.Entries = entries;
-				dir.Length = dir.CaculateLength();
-			}
 			dir.WriteWithNewLength();
 			Array.Resize(ref Entries, Entries.Length + 1);
 			Entries[^1] = new Entry(dir.NameHash, dir.Offset);
 			_Children ??= new(Entries.Length);
 			_Children.Add(dir.NameHash, dir);
-			MoveWithNewLength(CaculateLength());
+			MoveWithNewLength(CaculateRecordLength());
 			return dir;
 		}
 
 		/// <summary>
 		/// Add a file to this directory
 		/// </summary>
-		/// <param name="name">Name of the FileRecord</param>
+		/// <param name="name">Name of the file</param>
 		/// <param name="content"><see langword="null"/> for no content</param>
 		public virtual FileRecord AddFile(string name, ReadOnlySpan<byte> content = default) {
 			if (this == Ggpk.Root)
@@ -125,7 +147,7 @@ namespace LibGGPK3.Records {
 				Parent = this
 			};
 			if (content != null) {
-				if (!FileRecord.Hash256.TryComputeHash(content, file.Hash, out _))
+				if (!FileRecord.Hash256.TryComputeHash(content, file._Hash, out _))
 					throw new("Unable to compute hash of the content");
 				file.Length += file.DataLength = content.Length;
 				file.WriteWithNewLength();
@@ -137,12 +159,13 @@ namespace LibGGPK3.Records {
 			Entries[^1] = new Entry(file.NameHash, file.Offset);
 			_Children ??= new(Entries.Length);
 			_Children.Add(file.NameHash, file);
-			MoveWithNewLength(CaculateLength());
+			MoveWithNewLength(CaculateRecordLength());
 			return file;
 		}
 
 		/// <summary>
-		/// Add a exist TreeNode to this directory
+		/// Add an exist <see cref="TreeNode"/> to this directory,
+		/// <paramref name="node"/> must not be <see cref="GGPK.Root"/> which breaks ggpk
 		/// </summary>
 		public virtual void AddNode(TreeNode node) {
 			if (this == Ggpk.Root)
@@ -152,9 +175,13 @@ namespace LibGGPK3.Records {
 			Entries[^1] = new Entry(node.NameHash, node.Offset);
 			_Children ??= new(Entries.Length);
 			_Children.Add(node.NameHash, node);
-			MoveWithNewLength(CaculateLength());
+			MoveWithNewLength(CaculateRecordLength());
 		}
 
+		/// <summary>
+		/// Remove the child node with the given namehash
+		/// </summary>
+		/// <param name="NameHash">namehash calculated from <see cref="TreeNode.GetNameHash"/></param>
 		public virtual unsafe void RemoveChild(uint nameHash) {
 			_Children?.Remove(nameHash);
 			for (var i = 0; i < Entries.Length ; ++i) {
@@ -166,13 +193,13 @@ namespace LibGGPK3.Records {
 						Unsafe.CopyBlockUnaligned(e, old, (uint)offset);
 						Unsafe.CopyBlockUnaligned(e + offset, old + offset + sizeof(Entry), (uint)((tmp.Length - i) * sizeof(Entry)));
 					}
-					MoveWithNewLength(CaculateLength());
+					MoveWithNewLength(CaculateRecordLength());
 					break;
 				}
 			}
 		}
 
-		public override int CaculateLength() {
+		protected override int CaculateRecordLength() {
 			return Entries.Length * 12 + (Name.Length + 1) * (Ggpk.GgpkRecord.GGPKVersion == 4 ? 4 : 2) + 48; // 4 + 4 + 4 + 4 + Hash.Length + (Name + "\0").Length * 2 + Entries.Length * 12
 		}
 
@@ -196,6 +223,5 @@ namespace LibGGPK3.Records {
 			fixed (Entry* p = Entries)
 				s.Write(new(p, Entries.Length * 12));
 		}
-
 	}
 }

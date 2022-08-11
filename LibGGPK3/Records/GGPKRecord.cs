@@ -6,10 +6,10 @@
 		/// <summary>GGPK</summary>
 		public const uint Tag = 0x4B504747;
 
-		public uint GGPKVersion = 3; // 3 for PC, 4 for Mac, 2 for gmae-version before 3.11.2 which has no bundle in ggpk
+		public uint GGPKVersion { get; } = 3; // 3 for PC, 4 for Mac, 2 for gmae-version before 3.11.2 which has no bundle in ggpk
 
-		public long RootDirectoryOffset;
-		public long FirstFreeRecordOffset;
+		public long RootDirectoryOffset { get; protected internal set; }
+		public long FirstFreeRecordOffset { get; protected internal set; }
 
 		protected internal GGPKRecord(int length, GGPK ggpk) : base(length, ggpk) {
 			Offset = ggpk.GGPKStream.Position - 8;

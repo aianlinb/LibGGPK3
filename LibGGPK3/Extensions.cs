@@ -10,21 +10,23 @@ using System.Diagnostics;
 
 namespace LibGGPK3 {
 	public static class Extensions {
-#if AOT
-		public static string FastAllocateString(int length) => new('\0', length);
-#else
-		public static readonly Func<int, string> FastAllocateString = typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic)!.CreateDelegate<Func<int, string>>();
-#endif
-		public static string? ExpandPath(string path) {
+		/// <summary>
+		/// Allocate memory for string with specified count of char
+		/// </summary>
+		public static readonly Func<int, string> FastAllocateString = typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic)?.CreateDelegate<Func<int, string>>() ?? (length => new('\0', length));
+
+		public static string ExpandPath(string path) {
 			if (path.StartsWith('~')) {
-				var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None);
-				if (userProfile != "") {
-					if (path.Length == 1)
+				if (path.Length == 1) { // ~
+					var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None);
+					if (userProfile != "")
 						return Environment.ExpandEnvironmentVariables(userProfile);
-					if (path[1] is '/' or '\\')
+				} else if (path[1] is '/' or '\\') { // ~/...
+					var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None);
+					if (userProfile != "")
 						return Environment.ExpandEnvironmentVariables(userProfile + path[1..]);
 				}
-				try {
+				try { // ~username/...
 					if (!OperatingSystem.IsWindows()) {
 						string bash;
 						if (File.Exists("/bin/zsh"))
@@ -44,6 +46,7 @@ namespace LibGGPK3 {
 						});
 						p!.StandardInput.WriteLine("echo " + path);
 						var tmp = p.StandardOutput.ReadLine();
+						p.Kill();
 						p.Dispose();
 						if (!string.IsNullOrEmpty(tmp))
 							return tmp;
@@ -53,6 +56,9 @@ namespace LibGGPK3 {
 			return Environment.ExpandEnvironmentVariables(path);
 		}
 
+		/// <summary>
+		/// Get patch server url to download bundle files
+		/// </summary>
 		public static async Task<string> GetPatchServer(bool garena = false) {
 			var tcp = new Socket(SocketType.Stream, ProtocolType.Tcp);
 			if (garena)

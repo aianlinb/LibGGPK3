@@ -1,15 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <Authors>aianlinb</Authors>
-    <Copyright>Copyright © 2022 aianlinb</Copyright>
-    <Version>1.1.0</Version>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DebugType>embedded</DebugType>
-    <Configurations>Debug;Release;AOT</Configurations>
-    <Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
-  </PropertyGroup>
-
+	<PropertyGroup>
+		<Description>Library for Content.ggpk of game PathOfExile (Rewrite of LibGGPK2)</Description>
+	</PropertyGroup>
 </Project>

@@ -42,11 +42,11 @@ namespace PatchBundledGGPK3 {
 				Console.WriteLine("GGPK: " + args[0]);
 				Console.WriteLine("Patch file: " + args[1]);
 				Console.WriteLine("Reading ggpk file . . .");
-				var ggpk = new BundledGGPK(args[0]);
+				var ggpk = new BundledGGPK(args[0], false);
 				Console.WriteLine("Replacing files . . .");
 				var zip = ZipFile.OpenRead(args[1]);
 
-				ggpk.index.Replace(zip.Entries);
+				ggpk.Index.Replace(zip.Entries);
 				ggpk.Dispose();
 				Console.WriteLine("Done!");
 			} catch (Exception e) {

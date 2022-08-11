@@ -41,7 +41,7 @@ namespace PatchBundle3 {
 				Console.WriteLine("Index file: " + args[0]);
 				Console.WriteLine("Patch file: " + args[1]);
 				Console.WriteLine("Reading index file . . .");
-				var index = new LibBundle3.Index(args[0]);
+				var index = new LibBundle3.Index(args[0], false);
 				Console.WriteLine("Replacing files . . .");
 				var zip = ZipFile.OpenRead(args[1]);
 

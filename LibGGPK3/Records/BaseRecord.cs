@@ -6,17 +6,17 @@
 		/// <summary>
 		/// Length of the entire record in bytes
 		/// </summary>
-		public int Length;
+		public int Length { get; protected internal set; }
 
 		/// <summary>
 		/// Offset in pack file where record begins
 		/// </summary>
-		public long Offset;
+		public long Offset { get; protected internal set; }
 
 		/// <summary>
 		/// GGPK which contains this record
 		/// </summary>
-		public GGPK Ggpk;
+		public GGPK Ggpk { get; }
 
 		protected BaseRecord(int length, GGPK ggpk) {
 			Length = length;
