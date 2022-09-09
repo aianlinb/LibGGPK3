@@ -1,8 +1,4 @@
 <Project>
-	<PropertyGroup>
-		<DefineConstants Condition="'$(RuntimeIdentifier.StartsWith(`osx`))' == 'true'">$(DefineConstants);MAC</DefineConstants>
-	</PropertyGroup>
-	
 	<Target Name="OSVerification" BeforeTargets="BeforeBuild">
 		<Error Condition="'$(RuntimeIdentifier)' != '' And '$(RuntimeIdentifier.StartsWith(`win`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`osx`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`linux`))' != 'true'" Text="Unsupported RuntimeIdentifier: '$(RuntimeIdentifier)'" />
 	</Target>
@@ -14,15 +10,19 @@
 	<Choose>
 		<When Condition="'$(RuntimeIdentifier.StartsWith(`win`))' == 'true' Or '$(RuntimeIdentifier)' == ''">
 			<PropertyGroup>
+				<DefineConstants>Windows;$(DefineConstants)</DefineConstants>
+				<OperatorSystem>Windows</OperatorSystem>
 				<TargetFramework>net6.0-windows</TargetFramework>
 			</PropertyGroup>
 			<ItemGroup>
-				<PackageReference Include="Eto.Platform.Windows" Version="*" />
+				<PackageReference Include="Eto.Platform.Wpf" Version="*" />
 			</ItemGroup>
 		</When>
 		
 		<When Condition="'$(RuntimeIdentifier.StartsWith(`osx`))' == 'true'">
 			<PropertyGroup>
+				<DefineConstants>Mac;$(DefineConstants)</DefineConstants>
+				<OperatorSystem>Mac</OperatorSystem>
 				<MacBundleDotNet>true</MacBundleDotNet>
 			</PropertyGroup>
 			<ItemGroup>
@@ -32,6 +32,10 @@
 		</When>
 		
 		<When Condition="'$(RuntimeIdentifier.StartsWith(`linux`))' == 'true'">
+			<PropertyGroup>
+				<DefineConstants>Linux;$(DefineConstants)</DefineConstants>
+				<OperatorSystem>Linux</OperatorSystem>
+			</PropertyGroup>
 			<ItemGroup>
 				<PackageReference Include="Eto.Platform.Gtk" Version="*" />
 			</ItemGroup>

@@ -2,7 +2,7 @@
 	<PropertyGroup>
 		<Configurations>Debug;Release;AOT</Configurations>
 		<Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
-		<Description>Library for bundles in Content.ggpk of game PathOfExile (Rewrite of LibBundle2)</Description>
+		<Description>Library for bundles in Content.ggpk of game PathOfExile (Rewrite of LibBundle)</Description>
 	</PropertyGroup>
 	
 	<!-- Remove the following if you don't have the libraries (And you will need oo2core.dll/liboo2core.so/liboo2core.dylib at runtime) -->
@@ -12,14 +12,6 @@
 	</ItemGroup>
 	
 	<Choose>
-		<When Condition="'$(Configuration)' != 'AOT'">
-			<ItemGroup Condition="'$(RuntimeIdentifier.StartsWith(`win`))' == 'true' And '$(RuntimeIdentifier.EndsWith(`x64`))' == 'true'">
-				<None Update="oo2core\oo2core.dll">
-					<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-					<TargetPath>oo2core.dll</TargetPath>
-				</None>
-			</ItemGroup>
-		</When>
 		<When Condition="'$(RuntimeIdentifier.StartsWith(`win`))' == 'true'">
 			<ItemGroup>
 				<NativeLibrary Include="oo2core/oo2core_win64.lib" Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'" />

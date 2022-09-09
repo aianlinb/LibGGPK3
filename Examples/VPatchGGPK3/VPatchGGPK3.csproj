@@ -5,5 +5,5 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\LibGGPK3\LibGGPK3.csproj" />
 	</ItemGroup>
-	<Import Project="../EtoForms.targets" />
+	<Import Project="../EtoForms.props" />
 </Project>

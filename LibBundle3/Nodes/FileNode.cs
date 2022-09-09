@@ -2,13 +2,22 @@
 using System.IO;
 
 namespace LibBundle3.Nodes {
-	public class FileNode : BaseNode {
-		public readonly FileRecord Record;
-		
-		protected internal FileNode(FileRecord record, DirectoryNode parent) : base(Path.GetFileName(record.Path), parent) {
+	public class FileNode : IFileNode {
+		public virtual string Name { get; }
+
+		public virtual DirectoryNode Parent { get; }
+		ITreeNode? ITreeNode.Parent => Parent;
+
+		public FileRecord Record { get; }
+
+		protected FileNode(FileRecord record, DirectoryNode parent) {
+			Name = Path.GetFileName(record.Path);
+			Parent = parent;
 			Record = record;
 		}
-		
-		public override string GetPath() => Parent!.GetPath() + Name; // == Record.Path
+
+		protected internal static IFileNode CreateInstance(FileRecord record, IDirectoryNode parent) {
+			return new FileNode(record, (DirectoryNode)parent);
+		}
 	}
 }

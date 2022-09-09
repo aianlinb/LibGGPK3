@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics;
 
 namespace LibGGPK3.Records {
 	public abstract class TreeNode : BaseRecord {

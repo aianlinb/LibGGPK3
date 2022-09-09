@@ -1,20 +1,13 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
-using System.Net.Sockets;
 using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using System.Diagnostics;
 
 namespace LibGGPK3 {
 	public static class Extensions {
-		/// <summary>
-		/// Allocate memory for string with specified count of char
-		/// </summary>
-		public static readonly Func<int, string> FastAllocateString = typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic)?.CreateDelegate<Func<int, string>>() ?? (length => new('\0', length));
-
 		public static string ExpandPath(string path) {
 			if (path.StartsWith('~')) {
 				if (path.Length == 1) { // ~
@@ -59,17 +52,37 @@ namespace LibGGPK3 {
 		/// <summary>
 		/// Get patch server url to download bundle files
 		/// </summary>
-		public static async Task<string> GetPatchServer(bool garena = false) {
+		public static unsafe string GetPatchServer(bool garena = false) {
 			var tcp = new Socket(SocketType.Stream, ProtocolType.Tcp);
 			if (garena)
-				await tcp.ConnectAsync(Dns.GetHostAddresses("login.tw.pathofexile.com"), 12999);
+				tcp.Connect(Dns.GetHostAddresses("login.tw.pathofexile.com"), 12999);
 			else
-				await tcp.ConnectAsync(Dns.GetHostAddresses("us.login.pathofexile.com"), 12995);
-			var b = new byte[256];
-			await tcp.SendAsync(new byte[] { 1, 4 }, SocketFlags.None);
-			await tcp.ReceiveAsync(b, SocketFlags.None);
+				tcp.Connect(Dns.GetHostAddresses("us.login.pathofexile.com"), 12995);
+			Span<byte> b = stackalloc byte[256];
+			b[0] = 1;  b[1] = 4;
+			tcp.Send(b[0..2]);
+			tcp.Receive(b);
 			tcp.Close();
-			return Encoding.Unicode.GetString(b, 35, b[34] * 2);
+			return ((ReadOnlySpan<byte>)b).Slice(35, b[34] * 2).GetUnicodeString();
+		}
+
+		/// <summary>
+		/// Allocate memory for string with specified count of char
+		/// </summary>
+		public static readonly Func<int, string> FastAllocateString = typeof(string).GetMethod("FastAllocateString", BindingFlags.Static | BindingFlags.NonPublic)?.CreateDelegate<Func<int, string>>() ?? (length => new('\0', length));
+
+		public static unsafe string GetUnicodeString(this ReadOnlySpan<byte> buffer) {
+			var str = FastAllocateString(buffer.Length / 2);
+			fixed (char* p = str)
+				buffer.CopyTo(new(p, buffer.Length));
+			return str;
+		}
+
+		public static unsafe string ReadUnicodeString(this Stream stream, int length) {
+			var str = FastAllocateString(length);
+			fixed (char* p = str)
+				stream.Read(new(p, length * 2));
+			return str;
 		}
 
 		public static unsafe short ReadInt16(this Stream stream) {

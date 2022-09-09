@@ -84,7 +84,7 @@ namespace LibBundle3 {
 		/// Read the data with the given offset and length
 		/// </summary>
 		/// <exception cref="ArgumentOutOfRangeException"></exception>
-		public virtual Memory<byte> ReadData(int offset, int length) {
+		public virtual ReadOnlyMemory<byte> ReadData(int offset, int length) {
 			var endOffset = offset + length;
 			if (offset < 0 || offset >= header.uncompressed_size)
 				throw new ArgumentOutOfRangeException(nameof(offset));

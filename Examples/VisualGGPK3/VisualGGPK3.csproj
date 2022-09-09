@@ -3,8 +3,29 @@
 		<OutputType>WinExe</OutputType>
 	</PropertyGroup>
 	<ItemGroup>
+	  <None Remove="Resources\dir.ico" />
+	  <None Remove="Resources\file.ico" />
+	</ItemGroup>
+	<ItemGroup>
+	  <EmbeddedResource Include="Resources\dir.ico" />
+	  <EmbeddedResource Include="Resources\file.ico" />
+	</ItemGroup>
+	<ItemGroup>
 		<ProjectReference Include="..\..\LibBundledGGPK3\LibBundledGGPK3.csproj" />
 		<ProjectReference Include="..\..\LibDat2\LibDat2.csproj" />
 	</ItemGroup>
-	<Import Project="../EtoForms.targets" />
+	<ItemGroup>
+	  <Compile Update="Properties\Resources.Designer.cs">
+	    <DesignTime>True</DesignTime>
+	    <AutoGen>True</AutoGen>
+	    <DependentUpon>Resources.resx</DependentUpon>
+	  </Compile>
+	</ItemGroup>
+	<ItemGroup>
+	  <EmbeddedResource Update="Properties\Resources.resx">
+	    <Generator>ResXFileCodeGenerator</Generator>
+	    <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+	  </EmbeddedResource>
+	</ItemGroup>
+	<Import Project="../EtoForms.props" />
 </Project>

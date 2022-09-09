@@ -1,14 +1,27 @@
 ﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
 
 namespace LibBundle3.Nodes {
-	public class DirectoryNode : BaseNode {
-		public ReadOnlyCollection<BaseNode> Children => new(_Children);
-		protected internal readonly List<BaseNode> _Children = new();
+	public class DirectoryNode : IDirectoryNode {
+		public virtual string Name { get; }
+
+		public virtual DirectoryNode? Parent { get; }
+		ITreeNode? ITreeNode.Parent => Parent;
+
+		public virtual IList<ITreeNode> Children => _Children ??= new();
+		protected List<ITreeNode>? _Children;
+
+		/// <summary>
+		/// In <see cref="Children"/> starting from this index is not FileNode but DirectoryNode, or -1 if no DirectoryNode
+		/// </summary>
+		public virtual int DirectoryStart { get; set; }
 		
-		protected internal DirectoryNode(string name, DirectoryNode? parent) : base(name, parent) {
+		protected DirectoryNode(string name, DirectoryNode? parent) {
+			Name = name;
+			Parent = parent;
 		}
 
-		public override string GetPath() => Parent == null ? Name : Parent.GetPath() + Name + "/";
+		protected internal static IDirectoryNode CreateInstance(string name, IDirectoryNode? parent) {
+			return new DirectoryNode(name, parent as DirectoryNode);
+		}
 	}
 }

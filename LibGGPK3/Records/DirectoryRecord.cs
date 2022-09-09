@@ -51,9 +51,7 @@ namespace LibGGPK3.Records {
 				Name = Encoding.UTF32.GetString(b);
 				s.Seek(4, SeekOrigin.Current); // Null terminator
 			} else {
-				Name = Extensions.FastAllocateString(nameLength);
-				fixed (char* p = Name)
-					s.Read(new(p, nameLength * 2));
+				Name = s.ReadUnicodeString(nameLength);
 				s.Seek(2, SeekOrigin.Current); // Null terminator
 			}
 			EntriesBegin = s.Position;

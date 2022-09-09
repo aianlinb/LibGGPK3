@@ -1,7 +1,6 @@
 ﻿using LibBundle3.Nodes;
 using LibBundle3.Records;
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -10,8 +9,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
 
 namespace LibBundle3 {
 	public class Index : IDisposable {
@@ -26,36 +23,43 @@ namespace LibBundle3 {
 		protected readonly byte[] directoryBundleData;
 		protected int UncompressedSize; // For memory alloc when saving
 
-		protected DirectoryNode? _Root;
-		/// <summary>
-		/// Root node of the tree (This will cause the tree building when first calling)
-		/// </summary>
-		public virtual DirectoryNode Root {
-			get {
-				if (_Root == null) {
-					_Root = new("", null);
-					var files = _Files.Values.OrderBy(f => f.Path, PathComparer.Instance);
-					foreach (var f in files) {
-						var paths = f.Path.Split('/');
-						var parent = _Root;
-						var lastDirectory = paths.Length - 1;
-						for (var i = 0; i < lastDirectory; ++i) {
-							var next = parent._Children.Count > 0 ? parent._Children[^1] : null;
-							if (next is not DirectoryNode dr || dr.Name != paths[i])
-								parent._Children.Add(dr = new(paths[i], parent));
-							parent = dr;
-						}
-						parent._Children.Add(new FileNode(f, parent));
-					}
-				}
-				return _Root;
-			}
-		}
-
 		/// <summary>
 		/// Function to get <see cref="Bundle"/> instance with a <see cref="BundleRecord"/>
 		/// </summary>
 		public Func<BundleRecord, Bundle> FuncReadBundle = static (br) => new((br.Index.baseDirectory ?? "") + br.Path, br);
+
+		protected DirectoryNode? _Root;
+		/// <summary>
+		/// Root node of the tree (This will call <see cref="BuildTree"/> with default implementation when first calling).
+		/// You can also implement your custom class and use <see cref="BuildTree"/>.
+		/// </summary>
+		public virtual DirectoryNode Root => _Root ??= (DirectoryNode)BuildTree(DirectoryNode.CreateInstance, FileNode.CreateInstance);
+
+		public delegate IDirectoryNode CreateDirectoryInstance(string name, IDirectoryNode? parent);
+		public delegate IFileNode CreateFileInstance(FileRecord record, IDirectoryNode parent);
+		/// <summary>
+		/// Build a tree to represent the file and directory structure in bundles.
+		/// You can implement your custom class or just use the default implement by calling <see cref="Root"/>
+		/// </summary>
+		/// <param name="createDirectory">Function to create a instance of <see cref="IDirectoryNode"/></param>
+		/// <param name="createFile">Function to create a instance of <see cref="IFileNode"/></param>
+		/// <returns>The root node of the tree</returns>
+		public IDirectoryNode BuildTree(CreateDirectoryInstance createDirectory, CreateFileInstance createFile) {
+			var root = createDirectory("", null);
+			var files = _Files.Values.OrderBy(f => f.Path);
+			foreach (var f in files) {
+				var nodeNames = f.Path.Split('/');
+				var parent = root;
+				var lastDirectory = nodeNames.Length - 1;
+				for (var i = 0; i < lastDirectory; ++i) {
+					if (parent.Children.Count <= 0 || parent.Children[^1] is not IDirectoryNode dr || dr.Name != nodeNames[i])
+						parent.Children.Add(dr = createDirectory(nodeNames[i], parent));
+					parent = dr;
+				}
+				parent.Children.Add(createFile(f, parent));
+			}
+			return root;
+		}
 
 		protected internal static string ExpandPath(string path) {
 			if (path.StartsWith('~')) {
@@ -131,7 +135,7 @@ namespace LibBundle3 {
 					ptr += 2;
 					var bundle = _Bundles[*ptr++];
 					var f = new FileRecord(nameHash, bundle, *ptr++, *ptr++);
-					_Files[nameHash] = f;
+					_Files.Add(nameHash, f);
 					bundle._Files.Add(f);
 				}
 
@@ -181,8 +185,8 @@ namespace LibBundle3 {
 							while ((c = *ptr++) != 0)
 								sb.Append((char)c);
 							var str = sb.ToString();
-							*/  // See String.Ctor(sbyte* value)
-							var strlen = new ReadOnlySpan<byte>(ptr, d.Size).IndexOf((byte)0);
+							*/
+							var strlen = new ReadOnlySpan<byte>(ptr, d.Size).IndexOf((byte)0); // See String.Ctor(sbyte* value)
 							var str = new string((sbyte*)ptr, 0, strlen);
 							
 							if (index < temp.Count) {
@@ -244,9 +248,9 @@ namespace LibBundle3 {
 		/// </summary>
 		/// <param name="node">Node to extract (recursively)</param>
 		/// <param name="pathToSave">Path on disk</param>
-		public virtual void Extract(BaseNode node, string pathToSave) {
+		public virtual int Extract(ITreeNode node, string pathToSave) {
 			pathToSave = pathToSave.Replace('\\', '/');
-			if (node is FileNode fn) {
+			if (node is IFileNode fn) {
 				var d = Path.GetDirectoryName(pathToSave);
 				if (d != null && !pathToSave.EndsWith('/'))
 					Directory.CreateDirectory(d);
@@ -254,19 +258,18 @@ namespace LibBundle3 {
 				f.Write(fn.Record.Read().Span);
 				f.Flush();
 				f.Close();
-				return;
+				return 1;
 			}
 			pathToSave = pathToSave.TrimEnd('/');
 
 			var list = new List<FileRecord>();
 			RecursiveList(node, pathToSave, list, true);
 			if (list.Count == 0)
-				return;
+				return 0;
 
 			list.Sort(BundleComparer.Instance);
 			pathToSave += "/";
-			var pp = node.GetPath();
-			var trim = pp.Length;
+			var trim = ITreeNode.GetPath(node).Length;
 
 			var first = list[0];
 			if (list.Count == 1) {
@@ -274,9 +277,10 @@ namespace LibBundle3 {
 				f.Write(first.Read().Span);
 				f.Flush();
 				f.Close();
-				return;
+				return 1;
 			}
 
+			var count = 0;
 			var br = first.BundleRecord;
 			var err = false;
 			try {
@@ -302,9 +306,11 @@ namespace LibBundle3 {
 				f.Write(fr.Read().Span);
 				f.Flush();
 				f.Close();
+				++count;
 			}
 			if (!err)
 				br.Bundle.Dispose();
+			return count;
 		}
 
 		/// <summary>
@@ -312,7 +318,7 @@ namespace LibBundle3 {
 		/// </summary>
 		/// <param name="filePaths">Path of files to extract, <see langword="null"/> for all files in <see cref="_Files"/></param>
 		/// <returns>KeyValuePairs of path and data of each file</returns>
-		public virtual IEnumerable<KeyValuePair<string, Memory<byte>>> Extract(IEnumerable<string>? filePaths) {
+		public virtual IEnumerable<KeyValuePair<string, ReadOnlyMemory<byte>>> Extract(IEnumerable<string>? filePaths) {
 			var list = filePaths == null ? new List<FileRecord>(_Files.Values) : filePaths.Select(s => _Files[FNV1a64Hash(s.Replace('\\', '/').TrimEnd('/'))]).ToList();
 			if (list.Count == 0)
 				yield break;
@@ -343,11 +349,11 @@ namespace LibBundle3 {
 		/// <param name="node">Node to replace (recursively)</param>
 		/// <param name="pathToLoad">Path on disk</param>
 		/// <param name="dontChangeBundle">Whether to force all files to be written to their respective original bundle</param>
-		public virtual void Replace(BaseNode node, string pathToLoad, bool dontChangeBundle = false) {
-			if (node is FileNode fn) {
+		public virtual int Replace(ITreeNode node, string pathToLoad, bool dontChangeBundle = false) {
+			if (node is IFileNode fn) {
 				fn.Record.Write(File.ReadAllBytes(pathToLoad));
 				Save();
-				return;
+				return 1;
 			}
 
 			pathToLoad = pathToLoad.Replace('\\', '/').TrimEnd('/');
@@ -355,18 +361,19 @@ namespace LibBundle3 {
 			var list = new List<FileRecord>();
 			RecursiveList(node, pathToLoad, list);
 			if (list.Count == 0)
-				return;
+				return 0;
 
 			pathToLoad += "/";
-			var trim = node.GetPath().Length;
+			var trim = ITreeNode.GetPath(node).Length;
 
 			var first = list[0];
 			if (list.Count == 1) {
 				first.Write(File.ReadAllBytes(pathToLoad + first.Path[trim..]));
 				Save();
-				return;
+				return 1;
 			}
 
+			var count = 0;
 			if (dontChangeBundle) {
 				list.Sort(BundleComparer.Instance);
 
@@ -384,6 +391,7 @@ namespace LibBundle3 {
 					var b = File.ReadAllBytes(pathToLoad + fr.Path[trim..]);
 					ms.Write(b);
 					fr.Redirect(br, (int)ms.Length, b.Length);
+					++count;
 				}
 				br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 				ms.Close();
@@ -405,13 +413,16 @@ namespace LibBundle3 {
 						ms.Write(br.Bundle.ReadData());
 					}
 					var b = File.ReadAllBytes(pathToLoad + fr.Path);
-					fr.Redirect(br, (int)ms.Length, b.Length);
 					ms.Write(b);
+					fr.Redirect(br, (int)ms.Length, b.Length);
+					++count;
 				}
 				br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
 				ms.Close();
 			}
-			Save();
+			if (count != 0)
+				Save();
+			return count;
 		}
 
 		public delegate ReadOnlySpan<byte> FuncGetData(string filePath);
@@ -523,15 +534,16 @@ namespace LibBundle3 {
 			return _Files.TryGetValue(FNV1a64Hash(path), out file);
 		}
 
-		/// <param name="path">Relative path below <paramref name="root"/></param>
-		/// <param name="root">Node to start searching</param>
-		public virtual BaseNode? FindNode(string path, DirectoryNode? root = null) {
+		/// <param name="path">Relative path under <paramref name="root"/></param>
+		/// <param name="root">Node to start searching, or <see langword="null"/> for <see cref="Root"/></param>
+		/// <returns>The node found, or <see langword="null"/> when not found</returns>
+		public virtual ITreeNode? FindNode(string path, DirectoryNode? root = null) {
 			root ??= Root;
 			var SplittedPath = path.Split('/', '\\');
 			foreach (var name in SplittedPath) {
 				if (name == "")
 					return root;
-				var next = root._Children.FirstOrDefault(n => n.Name == name);
+				var next = root.Children.FirstOrDefault(n => n.Name == name);
 				if (next is not DirectoryNode dn)
 					return next;
 				root = dn;
@@ -568,19 +580,19 @@ namespace LibBundle3 {
 		/// <param name="path">Path on disk which don't end with a slash</param>
 		/// <param name="list">A collection to save the results</param>
 		/// <param name="createDirectory">Whether to create the directories of the files</param>
-		public static void RecursiveList(BaseNode node, string path, ICollection<FileRecord> list, bool createDirectory = false) {
-			if (node is FileNode fn)
+		public static void RecursiveList(ITreeNode node, string path, ICollection<FileRecord> list, bool createDirectory = false) {
+			if (node is IFileNode fn)
 				list.Add(fn.Record);
-			else if (node is DirectoryNode dn) {
+			else if (node is IDirectoryNode dn) {
 				if (createDirectory)
 					Directory.CreateDirectory(path);
-				foreach (var n in dn._Children)
+				foreach (var n in dn.Children)
 					RecursiveList(n, path + "/" + n.Name, list, createDirectory);
 			}
 		}
 
 		/// <summary>
-		/// Get the hash of a file path, only support ascii characters
+		/// Get the hash of a file path, supports ascii characters only
 		/// </summary>
 		public static unsafe ulong FNV1a64Hash(ReadOnlySpan<char> str) {
 			/*
@@ -634,22 +646,6 @@ namespace LibBundle3 {
 #pragma warning disable CS8767
 			public int Compare(FileRecord x, FileRecord y) {
 				return x.BundleRecord.BundleIndex - y.BundleRecord.BundleIndex;
-			}
-		}
-
-		/// <summary>
-		/// Use to sort nodes by their name
-		/// </summary>
-		public sealed class PathComparer : IComparer<string> {
-			public static readonly PathComparer Instance = new();
-			private PathComparer() { }
-
-			[DllImport("shlwapi", CallingConvention = CallingConvention.Winapi, CharSet = CharSet.Unicode)]
-			private static extern int StrCmpLogicalW(string x, string y);
-			private static readonly Func<string, string, int> FuncCompare = OperatingSystem.IsWindows() ? StrCmpLogicalW : string.Compare;
-#pragma warning disable CS8767
-			public int Compare(string x, string y) {
-				return FuncCompare(x, y);
 			}
 		}
 	}

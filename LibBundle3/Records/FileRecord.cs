@@ -22,7 +22,7 @@ namespace LibBundle3.Records {
 		/// <summary>
 		/// Read the content of the file
 		/// </summary>
-		public virtual Memory<byte> Read() {
+		public virtual ReadOnlyMemory<byte> Read() {
 			return BundleRecord.Bundle.ReadData(Offset, Size);
 		}
 

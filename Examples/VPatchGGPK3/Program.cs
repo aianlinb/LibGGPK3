@@ -8,7 +8,7 @@ namespace VPatchGGPK3 {
 		/// </summary>
 		[STAThread]
 		public static void Main() {
-#if MAC
+#if Mac
 			Eto.Style.Add<Eto.Mac.Forms.ApplicationHandler>(null, handler => handler.AllowClosingMainForm = true);
 #endif
 			var app = new Application();

@@ -9,5 +9,5 @@
 		<ProjectReference Include="..\..\LibDat2\LibDat2.csproj" />
 		<EmbeddedResource Include="DatDefinitions.json" />
 	</ItemGroup>
-	<Import Condition="'$(Configuration)' == 'AOT'" Project="../NativeAOT.targets" />
+	<Import Condition="'$(Configuration)' == 'AOT'" Project="../NativeAOT.props" />
 </Project>

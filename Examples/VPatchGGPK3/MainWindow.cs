@@ -9,6 +9,7 @@ using System.IO.Compression;
 using System.Net.Http;
 using System.Reflection;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace VPatchGGPK3 {
 	public class MainWindow : Form {
@@ -23,6 +24,11 @@ namespace VPatchGGPK3 {
 		private readonly TextBox pin;
 		private readonly TextArea output;
 		public MainWindow() {
+#if Mac
+			static void closed(object? sender, EventArgs e) => Application.Instance.Quit();
+			Closed += closed;
+			Application.Instance.Terminating += (s, e) => Closed -= closed;
+#endif
 			var version = Assembly.GetExecutingAssembly().GetName().Version!;
 			Title = $"VPatchGGPK3 (v{version.Major}.{version.Minor}.{version.Build})";
 			ClientSize = new(450, 280);
@@ -45,7 +51,7 @@ namespace VPatchGGPK3 {
 					ggpkPath.Text = ofd.FileName;
 			}) { Text = "瀏覽", Height = 35 });
 			layout.BeginCentered();
-			layout.AddSeparateRow(new Padding(8,0,0,0), controls: new Control[] {
+			layout.AddSeparateRow(new Padding(7,0,0,0), controls: new Control[] {
 				tw = new RadioButton() {
 					Text = "tw",
 					Size = new Size(40, 30),
@@ -56,7 +62,7 @@ namespace VPatchGGPK3 {
 				}
 			});
 			layout.AddSeparateRow(new Padding(0, 5), controls: new Control[] { new Label() {
-				Text = "PIN:",
+				Text = "PIN: ",
 				VerticalAlignment = VerticalAlignment.Center
 			}, pin = new TextBox() { Width = 50 } });
 			layout.EndCentered();
@@ -84,17 +90,9 @@ namespace VPatchGGPK3 {
 			layout.EndVertical();
 			LoadComplete += OnLoadComplete;
 			Content = layout;
-#if MAC
-			Closed += OnClosed;
-			Application.Instance.Terminating += (s, e) => Closed -= OnClosed;
-#endif
 		}
 
-		private void OnClosed(object? sender, EventArgs e) {
-			Application.Instance.Quit();
-		}
-
-		private void OnLoadComplete(object? sender, EventArgs _) {
+		private void OnLoadComplete(object? sender, EventArgs e) {
 			var path = AppContext.BaseDirectory;
 			if (string.IsNullOrEmpty(path))
 				path = Path.GetDirectoryName(Assembly.GetExecutingAssembly()?.Location ?? Assembly.GetEntryAssembly()?.Location ?? Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName);
@@ -108,47 +106,54 @@ namespace VPatchGGPK3 {
 					ggpkPath.Text = File.ReadAllText("VPatchGGPK3.txt");
 				else if (OperatingSystem.IsMacOS())
 					ggpkPath.Text = "~/Library/Application Support/Path of Exile/Content.ggpk";
+				else if (OperatingSystem.IsWindows())
+					ggpkPath.Text = @"C:\PathOfExile\Content.ggpk";
 			} catch {
 				if (OperatingSystem.IsMacOS())
 					ggpkPath.Text = "~/Library/Application Support/Path of Exile/Content.ggpk";
+				else if (OperatingSystem.IsWindows())
+					ggpkPath.Text = @"C:\PathOfExile\Content.ggpk";
 			}
 		}
 
-		private async void OnButtonClick(object? sender, EventArgs _) {
+		private async void OnButtonClick(object? sender, EventArgs e) {
 			try {
 				File.WriteAllText("VPatchGGPK3.txt", ggpkPath.Text);
 			} catch { }
 
 			try {
 				var json = (await JsonDocument.ParseAsync(await http.GetStreamAsync(tw.Checked ? "https://poedb.tw/fg/pin_tw.json" : "https://poedb.tw/fg/pin_cn.json"))).RootElement;
-				var url = await Extensions.GetPatchServer();
+				var url = await Task.Run(() => Extensions.GetPatchServer());
 				var officialVersion = url[(url.LastIndexOf('/', url.Length - 2) + 1)..^1];
 				if (json.GetProperty("version").GetString()! != officialVersion) {
 					MessageBox.Show(this, "Server Version not match Patch Version\r\n編年史中文化更新中，請稍待", "Error", MessageBoxType.Error);
+					output.Append("\r\nFailed!\r\n", true);
 					return;
 				}
 				if (json.GetProperty("pin").GetString()! != pin.Text) {
 					MessageBox.Show(this, "無效的PIN碼\r\n請詳閱: https://poedb.tw/chinese", "Error", MessageBoxType.Error);
+					output.Append("\r\nFailed!\r\n", true);
 					return;
 				}
-				var md5 = json.GetProperty("md5").GetString()!;
 
-				var ggpk = new GGPK(ggpkPath.Text);
+				output.Append("Reading ggpk: " + ggpkPath.Text, true);
+				var ggpk = await Task.Run(() => new GGPK(ggpkPath.Text));
+				var md5 = json.GetProperty("md5").GetString()!;
 				var zip = new ZipArchive(await http.GetStreamAsync("https://poedb.tw/fg/" + md5 + ".zip"));
-				foreach (var e in zip.Entries) {
-					if (e.FullName.EndsWith('/'))
+				foreach (var entry in zip.Entries) {
+					if (entry.FullName.EndsWith('/'))
 						continue;
-					if (ggpk.FindNode(e.FullName) is not FileRecord fr) {
-						output.Append("Unable to find in ggpk: " + e.FullName + "\r\n", true);
+					if (ggpk.FindNode(entry.FullName) is not FileRecord fr) {
+						output.Append("Unable to find in ggpk: " + entry.FullName + "\r\n", true);
 						continue;
 					}
-					var fs = e.Open();
-					var b = new byte[e.Length];
+					var fs = entry.Open();
+					var b = new byte[entry.Length];
 					for (var l = 0; l < b.Length;)
 						l += fs.Read(b, l, b.Length - l);
 					fs.Close();
 					fr.ReplaceContent(b);
-					output.Append("Replaced: " + e.FullName + "\r\n", true);
+					output.Append("Replaced: " + entry.FullName + "\r\n", true);
 				}
 				ggpk.Dispose();
 				output.Append("\r\nDone!\r\n", true);

@@ -12,14 +12,10 @@
 	
 	<ItemGroup>
 		<PackageReference Include="Microsoft.DotNet.ILCompiler" Version="*-*" />
-
 		<RuntimeHostConfigurationOption Include="Switch.System.Reflection.Assembly.SimulatedCallingAssembly" Value="true" />
 		<RuntimeHostConfigurationOption Include="Switch.System.Reflection.Assembly.SimulatedLocationInBaseDirectory" Value="true" />
 		<RuntimeHostConfigurationOption Include="Switch.System.Reflection.Disabled.DoNotThrowForNames" Value="true" />
 		<RuntimeHostConfigurationOption Include="Switch.System.Reflection.Disabled.DoNotThrowForAssembly" Value="true" />
-		
-		<!--Remove the following if you don't have the libraries -->
-		<DirectPInvoke Include="oo2core" Condition="'$(RuntimeIdentifier)' != ''"/>
 	</ItemGroup>
 	
 </Project>
