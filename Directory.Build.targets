@@ -1,7 +1,7 @@
 <Project>
 	<PropertyGroup>
 		<Authors>aianlinb</Authors>
-		<Copyright>Copyright © 2022 aianlinb</Copyright>
+		<Copyright>Copyright © 2022-2023 aianlinb</Copyright>
 		<PackageId>LibGGPK3.$(AssemblyName)</PackageId>
 		<PackageProjectUrl>https://github.com/aianlinb/LibGGPK3</PackageProjectUrl>
 		<RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>

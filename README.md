@@ -1,4 +1,4 @@
-[![NuGet](https://img.shields.io/nuget/v/LibGGPK3.LibGGPK3.svg)](https://www.nuget.org/packages?q=Tags:"LibGGPK3")
+[![NuGet](https://img.shields.io/nuget/v/LibGGPK3.LibGGPK3.svg)](https://www.nuget.org/packages?q=LibGGPK3)
 
 Library for Content.ggpk of game: Path of Exile.  
 Rewrite of https://github.com/aianlinb/LibGGPK2

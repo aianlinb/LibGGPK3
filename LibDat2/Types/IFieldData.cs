@@ -33,13 +33,13 @@ namespace LibDat2.Types {
 				"i16"			=> 2,
 				"u16"			=> 2,
 				"i32"			=> 4,
-				"enumrow"		=> 4,
 				"u32"			=> 4,
+				"enumrow" => 4,
 				"f32"			=> 4,
 				"i64"			=> 8,
 				"u64"			=> 8,
 				"f64"			=> 8,
-				"valuestring"	=> -1,
+				"valuestring"	=> -1, // Shouldn't be used
 				_ => throw new ArgumentException("Unknown Type: " + type, nameof(type))
 			};
 		}
@@ -61,6 +61,7 @@ namespace LibDat2.Types {
 				"u8"			=> new UInt8Data(dat),
 				"u16"			=> new UInt16Data(dat),
 				"u32"			=> new UInt32Data(dat),
+				"enumrow"		=> new UInt32Data(dat),
 				"u64"			=> new UInt64Data(dat),
 				"f32"			=> new Float32Data(dat),
 				"f64"			=> new Float64Data(dat),
@@ -92,6 +93,7 @@ namespace LibDat2.Types {
 				"u8"			=> new UInt8Data(dat),
 				"u16"			=> new UInt16Data(dat),
 				"u32"			=> new UInt32Data(dat),
+				"enumrow"		=> new UInt32Data(dat),
 				"u64"			=> new UInt64Data(dat),
 				"f32"			=> new Float32Data(dat),
 				"f64"			=> new Float64Data(dat),

@@ -94,7 +94,7 @@
 		"IsManuallyCasted": "bool",
 		"Input_StatKeys": "array|foreignrow",
 		"Output_StatKeys": "array|foreignrow",
-		"MinionActiveSkillTypes": "array|foreignrow",
+		"MinionActiveSkillTypes": "array|i32",
 		"Flag2": "bool",
 		"Flag3": "bool",
 		"Keys0": "array|foreignrow",
@@ -123,7 +123,7 @@
 		"Unknown3": "i32",
 		"Unknown4": "bool",
 		"Unknown5": "i32",
-		"Unknown6": "array|foreignrow"
+		"Unknown6": "i32"
 	},
 	"AddBuffToTargetVarieties": {
 		"Unknown0": "foreignrow",
@@ -359,11 +359,13 @@
 	"ArchnemesisMods": {
 		"Mod": "foreignrow",
 		"Unknown0": "i32",
+		"Unknown1": "i32",
+		"Unknown2": "i32",
+		"Unknown3": "i32",
 		"Name": "string",
 		"Visual": "foreignrow",
-		"TextStyles": "array|string",
-		"Unknown1": "bool",
-		"Unknown2": "bool"
+		"Unknown4": "i32",
+		"DisplayColors": "array|string"
 	},
 	"ArchnemesisModVisuals": {
 		"Id": "string",
@@ -1350,8 +1352,7 @@
 		"Unknown9": "foreignrow",
 		"Unknown10": "foreignrow",
 		"Flag7": "bool",
-		"Flag8": "bool",
-		"Key6": "foreignrow"
+		"Flag8": "bool"
 	},
 	"ClientLeagueAction": {
 		"Id": "string",
@@ -3834,11 +3835,11 @@
 	"MapConnections": {
 		"MapPinsKey0": "foreignrow",
 		"MapPinsKey1": "foreignrow",
-		"Unknown0": "foreignrow",
+		"Unknown0": "i32",
 		"RestrictedAreaText": "string",
-		"Unknown1": "foreignrow",
-		"Unknown2": "foreignrow",
-		"Unknown3": "foreignrow",
+		"Unknown1": "i32",
+		"Unknown2": "i32",
+		"Unknown3": "i32",
 		"Unknown4": "array|foreignrow"
 	},
 	"MapCreationInformation": {
@@ -4346,9 +4347,7 @@
 		"ModsKey2": "foreignrow",
 		"Unknown0": "bool"
 	},
-	"ModFamily": {
-		"Id": "string"
-	},
+	"ModFamily": {},
 	"ModGenerationType": {},
 	"Mods": {
 		"Id": "string",
@@ -4362,7 +4361,7 @@
 		"Domain": "i32",
 		"Name": "string",
 		"GenerationType": "i32",
-		"Families": "array|foreignrow",
+		"CorrectGroup": "string",
 		"Stat1Min": "i32",
 		"Stat1Max": "i32",
 		"Stat2Min": "i32",
@@ -4404,9 +4403,9 @@
 		"Heist_AddStatValue1": "i32",
 		"Heist_AddStatValue2": "i32",
 		"InfluenceTypes": "i32",
-		"ImplicitTagsKeys": "array|foreignrow",
-		"Unknown4": "bool",
+		"Unknown4": "array|foreignrow",
 		"Unknown5": "i32",
+		"Flag0": "bool",
 		"Unknown6": "i32",
 		"Unknown7": "i32",
 		"Unknown8": "i32",
@@ -4422,12 +4421,10 @@
 		"Unknown18": "i32",
 		"Unknown19": "i32",
 		"Unknown20": "i32",
-		"BuffTemplate": "row",
+		"BuffTemplateKey0": "row",
 		"ArchnemesisMinionMod": "foreignrow",
 		"HASH32": "u32",
-		"Unknown21": "array|foreignrow",
-		"Unknown22": "i32",
-		"Unknown23": "array|foreignrow"
+		"BuffTemplateKey1": "array|foreignrow"
 	},
 	"ModSellPriceTypes": {
 		"Id": "string"
@@ -4605,8 +4602,7 @@
 		"MonsterPacksKey": "foreignrow",
 		"Unknown0": "bool",
 		"Unknown1": "i32",
-		"MonsterVarietiesKey": "foreignrow",
-		"Unknown2": "string"
+		"MonsterVarietiesKey": "foreignrow"
 	},
 	"MonsterPacks": {
 		"Id": "string",
@@ -4804,8 +4800,7 @@
 		"Unknown37": "i32",
 		"Unknown38": "array|string",
 		"Unknown39": "i32",
-		"Unknown40": "i32",
-		"Unknown41": "i32"
+		"Unknown40": "i32"
 	},
 	"MonsterVarietiesArtVariations": {
 		"Id": "string",
@@ -4936,8 +4931,8 @@
 		"OggFiles": "array|string",
 		"Data1": "array|i32",
 		"VolumePercentage": "i32",
-		"Unknown0": "foreignrow",
-		"Unknown1": "foreignrow",
+		"Unknown0": "i32",
+		"Unknown1": "i32",
 		"Unknown2": "i32",
 		"Unknown3": "i32"
 	},
@@ -4981,11 +4976,11 @@
 		"Unknown3": "i32",
 		"Unknown4": "i32",
 		"Unknown5": "i32",
+		"Unknown6": "i32",
 		"Unknown7": "bool",
 		"Unknown8": "bool",
 		"Unknown9": "array|i32",
 		"Unknown10": "array|i32",
-		"Unknown6": "i32",
 		"Unknown11": "i32",
 		"Unknown12": "bool",
 		"Unknown13": "bool"
@@ -5018,7 +5013,7 @@
 		"Id": "string",
 		"Name": "string",
 		"Metadata": "string",
-		"Unknown0": "foreignrow",
+		"Unknown0": "i32",
 		"NPCMasterKey": "foreignrow",
 		"ShortName": "string",
 		"Unknown1": "i32",
@@ -5049,14 +5044,14 @@
 		"NPCKey": "foreignrow",
 		"Unknown0": "i32",
 		"DialogueOption": "string",
-		"Data0": "array|foreignrow",
-		"Data1": "array|foreignrow",
-		"Data2": "array|foreignrow",
+		"Data0": "array|u32",
+		"Data1": "array|u32",
+		"Data2": "array|u32",
 		"Script": "string",
-		"Unknown1": "foreignrow",
+		"Unknown1": "i32",
 		"NPCTalkCategoryKey": "foreignrow",
 		"QuestRewardOffersKey": "foreignrow",
-		"Unknown3": "foreignrow",
+		"Unknown3": "i32",
 		"NPCTextAudioKeys": "array|foreignrow",
 		"Script2": "string",
 		"Flag0": "bool",
@@ -5439,17 +5434,17 @@
 	"QuestRewardOffers": {
 		"Id": "string",
 		"QuestKey": "foreignrow",
-		"Unknown0": "foreignrow",
+		"Unknown0": "i32",
 		"Unknown1": "i32",
-		"RewardWindowTake": "foreignrow",
+		"ClientStringsKey0": "foreignrow",
 		"Flag0": "bool",
 		"Flag1": "bool",
-		"RewardWindowTitle": "foreignrow"
+		"ClientStringsKey1": "foreignrow"
 	},
 	"QuestRewards": {
 		"RewardOffer": "foreignrow",
 		"Unknown0": "i32",
-		"Character": "array|foreignrow",
+		"Character": "foreignrow",
 		"Reward": "foreignrow",
 		"RewardLevel": "i32",
 		"Unknown1": "foreignrow",
@@ -5471,8 +5466,8 @@
 	"QuestStates": {
 		"QuestKey": "foreignrow",
 		"Unknown0": "i32",
-		"QuestStates": "array|foreignrow",
-		"Data0": "array|foreignrow",
+		"QuestStates": "array|u32",
+		"Data0": "array|u32",
 		"Text": "string",
 		"Flag0": "bool",
 		"Message": "string",
@@ -5489,7 +5484,7 @@
 		"Key2": "foreignrow"
 	},
 	"QuestStaticRewards": {
-		"Unknown0": "foreignrow",
+		"Unknown0": "i32",
 		"Unknown1": "i32",
 		"StatsKeys": "array|foreignrow",
 		"StatValues": "array|i32",
@@ -5510,15 +5505,13 @@
 	"Races": {
 		"Id": "string",
 		"Unknown0": "array|foreignrow",
-		"Unknown1": "string",
+		"Unknown2": "string",
 		"Url": "string",
-		"Unknown2": "i32",
 		"Unknown3": "i32",
-		"Unknown4": "array|foreignrow",
+		"Unknown4": "i32",
+		"Unknown5": "array|foreignrow",
 		"Flag0": "bool",
-		"Unknown5": "i32",
-		"Unknown6": "array|i32",
-		"Unknown7": "array|foreignrow"
+		"Unknown7": "i32"			
 	},
 	"RaceTimes": {
 		"RacesKey": "foreignrow",
@@ -6504,7 +6497,7 @@
 		"Text": "string",
 		"AcceptText": "string",
 		"RejectText": "string",
-		"Unknown0": "foreignrow"
+		"Unknown0": "i32"
 	},
 	"WarbandsGraph": {
 		"WorldAreasKey": "foreignrow",
@@ -6646,14 +6639,14 @@
 		"Unknown1": "i32",
 		"Unknown2": "i32",
 		"LoadingScreen_DDSFile": "string",
-		"Unknown3": "foreignrow",
-		"Data0": "array|foreignrow",
+		"Unknown3": "i32",
+		"Data0": "array|i32",
 		"Unknown4": "i32",
 		"TopologiesKeys": "array|foreignrow",
 		"ParentTown_WorldAreasKey": "row",
 		"Unknown5": "i32",
-		"Unknown6": "foreignrow",
-		"Unknown7": "foreignrow",
+		"Unknown6": "i32",
+		"Unknown7": "i32",
 		"Bosses_MonsterVarietiesKeys": "array|foreignrow",
 		"Monsters_MonsterVarietiesKeys": "array|foreignrow",
 		"SpawnWeight_TagsKeys": "array|foreignrow",

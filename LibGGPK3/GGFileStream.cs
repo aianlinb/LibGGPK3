@@ -15,7 +15,7 @@ namespace LibGGPK3 {
 				if (_Buffer == null) {
 					_Buffer = new(Record.DataLength);
 					_Buffer.Write(Record.ReadFileContent(), 0, Record.DataLength);
-					_Buffer.Seek(0, SeekOrigin.Begin);
+					_Buffer.Seek(_Position, SeekOrigin.Begin);
 				}
 				return _Buffer;
 			}
@@ -38,17 +38,44 @@ namespace LibGGPK3 {
 		}
 
 		public override int Read(byte[] buffer, int offset, int count) {
-			return Buffer.Read(buffer, offset, count);
+			if (_Buffer != null)
+				return Buffer.Read(buffer, offset, count);
+			Record.Ggpk.GGPKStream.Seek(Record.DataOffset + _Position, SeekOrigin.Begin);
+			var read = Record.Ggpk.GGPKStream.Read(buffer, offset, count);
+			_Position += read;
+			return read;
 		}
 
 		public override int Read(Span<byte> buffer) {
-			return Buffer.Read(buffer);
+			if (_Buffer != null)
+				return _Buffer.Read(buffer);
+			Record.Ggpk.GGPKStream.Seek(Record.DataOffset + _Position, SeekOrigin.Begin);
+			var read = Record.Ggpk.GGPKStream.Read(buffer);
+			_Position += read;
+			return read;
 		}
 
-		public override int ReadByte() => Buffer.ReadByte();
+		public override int ReadByte() {
+			if (_Buffer != null)
+				return _Buffer.ReadByte();
+			Record.Ggpk.GGPKStream.Seek(Record.DataOffset + _Position, SeekOrigin.Begin);
+			var value = Record.Ggpk.GGPKStream.ReadByte();
+			_Position += 1;
+			return value;
+		}
 
 		public override long Seek(long offset, SeekOrigin origin) {
-			return Buffer.Seek(offset, origin);
+			if (_Buffer != null)
+				return _Position = _Buffer.Seek(offset, origin);
+			var pos = origin switch {
+				SeekOrigin.Begin => offset,
+				SeekOrigin.Current => _Position + offset,
+				SeekOrigin.End => Length + offset,
+				_ => throw new ArgumentOutOfRangeException(nameof(origin), origin, null),
+			};
+			if (pos < 0)
+				throw new ArgumentOutOfRangeException(nameof(offset), offset, null);
+			return _Position = pos;
 		}
 
 		public override void SetLength(long value) {
@@ -89,9 +116,17 @@ namespace LibGGPK3 {
 
 		public override bool CanWrite => Record.Ggpk.GGPKStream.CanWrite;
 
-		public override long Length => Buffer.Length;
+		public override long Length => _Buffer?.Length ?? Record.DataLength;
 
-		public override long Position { get => Buffer.Position; set => Buffer.Position = value; }
+		protected long _Position;
+		public override long Position {
+			get => _Buffer?.Position ?? _Position;
+			set {
+				if (_Buffer != null)
+					_Buffer.Position = value;
+				_Position = value;
+			}
+		}
 
 		protected override void Dispose(bool disposing) {
 			if (disposing) {

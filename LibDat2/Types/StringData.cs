@@ -13,14 +13,10 @@ namespace LibDat2.Types {
 			var offset = dat.x64 ? reader.ReadInt64() : reader.ReadInt32();
 			if (dat.ReferenceDatas.TryGetValue(offset, out IReferenceData? rd) && rd is StringData s)
 				return s;
-
 			reader.BaseStream.Seek(dat.x64 ? -8 : -4, SeekOrigin.Current);
-			var sd = new StringData(dat);
-			sd.Read(reader);
-
-			return sd;
+			return new StringData(dat).Read(reader);
 		}
-
+		
 		public override StringData Read(BinaryReader reader) {
 			if (Value != default)
 				Dat.ReferenceDataOffsets.Remove(ToString());
@@ -52,10 +48,7 @@ namespace LibDat2.Types {
 		public static StringData FromString(string value, DatContainer dat) {
 			if (dat.ReferenceDataOffsets.TryGetValue(value, out long offset) && dat.ReferenceDatas.TryGetValue(offset, out IReferenceData? rd) && rd is StringData s)
 				return s;
-
-			var sd = new StringData(dat);
-			sd.FromString(value);
-			return sd;
+			return new StringData(dat).FromString(value);
 		}
 
 		/// <summary>

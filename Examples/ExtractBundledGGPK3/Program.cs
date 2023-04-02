@@ -6,7 +6,9 @@ using System.Reflection;
 namespace ExtractBundledGGPK3 {
 	public class Program {
 		public static void Main(string[] args) {
+#if !DEBUG
 			try {
+#endif
 				var version = Assembly.GetExecutingAssembly().GetName().Version!;
 				Console.WriteLine($"ExtractBundledGGPK3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb"); // ©
 				Console.WriteLine();
@@ -51,9 +53,11 @@ namespace ExtractBundledGGPK3 {
 				ggpk.Index.Extract(node, args[2]);
 				ggpk.Dispose();
 				Console.WriteLine("Done!");
+#if !DEBUG
 			} catch (Exception e) {
 				Console.Error.WriteLine(e);
 			}
+#endif
 			Console.WriteLine();
 			Console.WriteLine("Enter to exit . . .");
 			Console.ReadLine();

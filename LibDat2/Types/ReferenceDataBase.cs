@@ -50,7 +50,8 @@ namespace LibDat2.Types {
 			Length = (int)(reader.BaseStream.Position - begin);
 			reader.BaseStream.Seek(previousPos, SeekOrigin.Begin);
 
-			Dat.ReferenceDataOffsets[ToString()] = Offset;
+			if (Length != 0)
+				Dat.ReferenceDataOffsets[ToString()] = Offset;
 			return this;
 		}
 
@@ -69,7 +70,6 @@ namespace LibDat2.Types {
 				var fd = Dat.ReferenceDatas[offset];
 				if (fd == this)
 					contains = true;
-				// Prevent confusion between array|int and array|long etc...
 				// Array is a special case that will cause the game to crash if two fields point to the same position even if their datas are completely equal
 				if (fd is not IArrayData) {
 					if (Dat.x64)

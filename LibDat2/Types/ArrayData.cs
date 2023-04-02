@@ -40,9 +40,7 @@ namespace LibDat2.Types {
 				return a;
 
 			reader.BaseStream.Seek(dat.x64 ? -16 : -8, SeekOrigin.Current);
-			var ad = new ArrayData<TypeOfValueInArray>(dat, typeOfarrayInArray);
-			ad.Read(reader);
-			return ad;
+			return new ArrayData<TypeOfValueInArray>(dat, typeOfarrayInArray).Read(reader);
 		}
 
 		/// <summary>
@@ -249,7 +247,7 @@ namespace LibDat2.Types {
 				newValue = new TypeOfValueInArray[sarray.Length];
 				if (TypeOfValue.EndsWith("string"))
 					for (var n = 0; n < sarray.Length; ++n)
-						newValue[n] = (TypeOfValueInArray)IFieldData.FromString(sarray[n], TypeOfValue, Dat);
+						newValue[n] = (TypeOfValueInArray)IFieldData.FromString(sarray[n].Trim('"', ' '), TypeOfValue, Dat);
 				else
 					for (var n = 0; n < sarray.Length; ++n)
 						newValue[n] = (TypeOfValueInArray)IFieldData.FromString(sarray[n], TypeOfValue, Dat).Value;
@@ -264,7 +262,8 @@ namespace LibDat2.Types {
 				Dat.CurrentOffset += Length;
 				Dat.ReferenceDatas[Offset] = this;
 			}
-			Dat.ReferenceDataOffsets[value] = Offset;
+			if (Length != 0)
+				Dat.ReferenceDataOffsets[ToString()] = Offset;
 			return this;
 		}
 
@@ -273,18 +272,26 @@ namespace LibDat2.Types {
 			if (Value == null)
 				return "{null}";
 			var s = new StringBuilder("[");
-			foreach (var f in Value) {
-				s.Append(f?.ToString() ?? "{null}");
-				if (Value is uint or ulong)
-					s.Append('U');
-				if (Value is long or ulong)
-					s.Append('L');
-				else if (Value is float)
-					s.Append('F');
-				else if (Value is double)
-					s.Append('D');
-				s.Append(", ");
-			}
+
+			if (TypeOfValue.EndsWith("string"))
+				foreach (var f in Value) {
+					s.Append(f == null ? "{null}" : $"\"{f}\"");
+					s.Append(", ");
+				}
+			else
+				foreach (var f in Value) {
+					s.Append(f?.ToString() ?? "{null}");
+					if (Value is uint or ulong)
+						s.Append('U');
+					if (Value is long or ulong)
+						s.Append('L');
+					else if (Value is float)
+						s.Append('F');
+					else if (Value is double)
+						s.Append('D');
+					s.Append(", ");
+				}
+			
 			if (s.Length > 2)
 				s.Remove(s.Length - 2, 2);
 			s.Append(']');

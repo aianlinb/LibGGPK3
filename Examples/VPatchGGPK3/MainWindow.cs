@@ -122,6 +122,7 @@ namespace VPatchGGPK3 {
 			} catch { }
 
 			try {
+				output.Append("Getting patch information . . .\r\n", true);
 				var json = (await JsonDocument.ParseAsync(await http.GetStreamAsync(tw.Checked ? "https://poedb.tw/fg/pin_tw.json" : "https://poedb.tw/fg/pin_cn.json"))).RootElement;
 				var url = await Task.Run(() => Extensions.GetPatchServer());
 				var officialVersion = url[(url.LastIndexOf('/', url.Length - 2) + 1)..^1];
@@ -136,9 +137,10 @@ namespace VPatchGGPK3 {
 					return;
 				}
 
-				output.Append("Reading ggpk: " + ggpkPath.Text, true);
+				output.Append("Reading ggpk: " + ggpkPath.Text + "\r\n", true);
 				var ggpk = await Task.Run(() => new GGPK(ggpkPath.Text));
 				var md5 = json.GetProperty("md5").GetString()!;
+				output.Append("Downloading patch file . . .\r\n", true);
 				var zip = new ZipArchive(await http.GetStreamAsync("https://poedb.tw/fg/" + md5 + ".zip"));
 				foreach (var entry in zip.Entries) {
 					if (entry.FullName.EndsWith('/'))
@@ -147,16 +149,18 @@ namespace VPatchGGPK3 {
 						output.Append("Unable to find in ggpk: " + entry.FullName + "\r\n", true);
 						continue;
 					}
-					var fs = entry.Open();
-					var b = new byte[entry.Length];
-					for (var l = 0; l < b.Length;)
-						l += fs.Read(b, l, b.Length - l);
-					fs.Close();
-					fr.ReplaceContent(b);
+					await Task.Run(() => {
+						var fs = entry.Open();
+						var b = new byte[entry.Length];
+						for (var l = 0; l < b.Length;)
+							l += fs.Read(b, l, b.Length - l);
+						fs.Close();
+						fr.ReplaceContent(b);
+					});
 					output.Append("Replaced: " + entry.FullName + "\r\n", true);
 				}
-				ggpk.Dispose();
 				output.Append("\r\nDone!\r\n", true);
+				ggpk.Dispose();
 			} catch (Exception ex) {
 				MessageBox.Show(this, ex.ToString(), "Error", MessageBoxType.Error);
 			}
