@@ -45,7 +45,7 @@ namespace LibDat2.Types {
 
 		/// <summary>
 		/// Read the pointer and call <see cref="ReadInDataSection"/>.
-		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="Read(BinaryReader, DatContainer, FieldType)"/> instead.
+		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="Read(BinaryReader, DatContainer, string)"/> instead.
 		/// </summary>
 		public override ArrayData<TypeOfValueInArray> Read(BinaryReader reader) {
 			if (Value != default)

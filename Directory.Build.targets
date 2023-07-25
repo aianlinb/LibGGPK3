@@ -12,7 +12,7 @@
 		<IncludeSymbols>True</IncludeSymbols>
 		<IncludeSource>True</IncludeSource>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
-		<Tags>LibGGPK3,libggpk,POE,PathOfExile</Tags>
+		<PackageTags>LibGGPK3,libggpk,POE,PathOfExile</PackageTags>
 	</PropertyGroup>
 
 	<Target Name="NugetPack" BeforeTargets="Build">

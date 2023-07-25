@@ -52,7 +52,7 @@ namespace LibDat2.Types {
 		}
 
 		/// <summary>
-		/// Read the <see cref="Value"/> from its string representation
+		/// Read the <see cref="IFieldData.Value"/> from its string representation
 		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="FromString(string, DatContainer)"/> instead.
 		/// </summary>
 		public override StringData FromString(string value) {

@@ -22,8 +22,8 @@ namespace LibDat2.Types {
 		#endregion FileDependent
 
 		/// <summary>
-		/// Read the pointer and call <see cref="ReadInDataSection"/>.
-		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="StringData.Read(BinaryReader, DatContainer)"/> or <see cref="ArrayData{TypeOfValueInArray}.Read(BinaryReader, DatContainer, FieldType)"/> instead.
+		/// Read the pointer and call <see cref="ReferenceDataBase{TypeOfValue}.ReadInDataSection"/>.
+		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="StringData.Read(BinaryReader, DatContainer)"/> or <see cref="ArrayData{TypeOfValueInArray}.Read(BinaryReader, DatContainer, string)"/> instead.
 		/// </summary>
 		public new IReferenceData Read(BinaryReader reader);
 
@@ -33,8 +33,8 @@ namespace LibDat2.Types {
 		public new void Write(BinaryWriter writer);
 
 		/// <summary>
-		/// Read the <see cref="Value"/> from its string representation
-		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="StringData.FromString(string, DatContainer)"/> or <see cref="ArrayData{TypeOfValueInArray}.FromString(string, DatContainer, FieldType)"/> instead.
+		/// Read the <see cref="IFieldData.Value"/> from its string representation
+		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="StringData.FromString(string, DatContainer)"/> or <see cref="ArrayData{TypeOfValueInArray}.FromString(string, DatContainer, string)"/> instead.
 		/// </summary>
 		public new IReferenceData FromString(string value);
 

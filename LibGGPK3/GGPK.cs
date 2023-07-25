@@ -187,6 +187,7 @@ namespace LibGGPK3 {
 		/// Full defragment the ggpk to remove all FreeRecords to reduce its size to the smallest possible size and save it to <paramref name="streamToSave"/>
 		/// </summary>
 		/// <param name="progress">returns the number of Records remaining to be written.</param>
+		/// <param name="nodes">nodes to save</param>
 		public virtual Task FullCompactAsync(Stream streamToSave, CancellationToken? cancellation = null, IProgress<int>? progress = null, IList<TreeNode>? nodes = null) {
 			return Task.Run(() => {
 				var oldStream = GGPKStream;

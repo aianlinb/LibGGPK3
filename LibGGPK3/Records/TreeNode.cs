@@ -117,7 +117,6 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Update the offset of this record in <see cref="Parent"/>.<see cref="DirectoryRecord.Entries"/>
 		/// </summary>
-		/// <param name="oldOffset">The original offset to be update</param>
 		protected virtual void UpdateOffset() {
 			if (Parent is DirectoryRecord dr) {
 				for (int i = 0; i < dr.Entries.Length; ++i)

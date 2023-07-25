@@ -9,6 +9,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace LibBundle3 {
 	public class Index : IDisposable {
@@ -103,14 +104,14 @@ namespace LibBundle3 {
 		}
 
 		/// <param name="filePath">Path to _.index.bin</param>
-		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> and <see cref="FileRecord.DirectoryRecord"/> in each of <see cref="_Files"/> will be <see langword="null"/></param>
+		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> in each of <see cref="_Files"/> will be <see langword="null"/></param>
 		public Index(string filePath, bool parsePaths = true) : this(File.Open(filePath = ExpandPath(filePath), FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false, parsePaths) {
 			baseDirectory = Path.GetDirectoryName(Path.GetFullPath(filePath)) + "/";
 		}
 
 		/// <param name="stream">Stream of _.index.bin</param>
 		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> after this instance has been disposed</param>
-		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> and <see cref="FileRecord.DirectoryRecord"/> in each of <see cref="_Files"/> will be <see langword="null"/></param>
+		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> in each of <see cref="_Files"/> will be <see langword="null"/></param>
 		public unsafe Index(Stream stream, bool leaveOpen = true, bool parsePaths = true) {
 			bundle = new(stream, leaveOpen);
 			var data = bundle.ReadData();
@@ -167,7 +168,7 @@ namespace LibBundle3 {
 			fixed (byte* p = directory) {
 				var ptr = p;
 				foreach (var d in _Directories) {
-					var temp = new List<string>();
+					var temp = new List<IEnumerable<byte>>();
 					var Base = false;
 					var offset = ptr = p + d.Offset;
 					while (ptr - offset <= d.Size - 4) {
@@ -187,19 +188,23 @@ namespace LibBundle3 {
 							var str = sb.ToString();
 							*/
 							var strlen = new ReadOnlySpan<byte>(ptr, d.Size).IndexOf((byte)0); // See String.Ctor(sbyte* value)
-							var str = new string((sbyte*)ptr, 0, strlen);
-							
+							//var str = new string((sbyte*)ptr, 0, strlen); // Unicode string
+							IEnumerable<byte> str = new ReadOnlySpan<byte>(ptr, strlen).ToArray(); // UTF8 string
+
 							if (index < temp.Count) {
-								str = temp[index] + str;
+								str = temp[index].Concat(str);
 								if (Base)
 									temp.Add(str);
-								else
-									_Files[FNV1a64Hash(str)].Path = str;
+								else {
+									var b = str.ToArray();
+									fixed (byte* bp = b)
+										_Files[NameHash(b)].Path = new string((sbyte*)bp, 0, b.Length);
+								}
 							} else {
 								if (Base)
 									temp.Add(str);
 								else
-									_Files[FNV1a64Hash(new ReadOnlySpan<byte>(ptr, strlen))].Path = str;
+									_Files[NameHash(new ReadOnlySpan<byte>(ptr, strlen))].Path = new string((sbyte*)ptr, 0, strlen);
 							}
 							ptr += strlen + 1; // '\0'
 						}
@@ -319,7 +324,7 @@ namespace LibBundle3 {
 		/// <param name="filePaths">Path of files to extract, <see langword="null"/> for all files in <see cref="_Files"/></param>
 		/// <returns>KeyValuePairs of path and data of each file</returns>
 		public virtual IEnumerable<KeyValuePair<string, ReadOnlyMemory<byte>>> Extract(IEnumerable<string>? filePaths) {
-			var list = filePaths == null ? new List<FileRecord>(_Files.Values) : filePaths.Select(s => _Files[FNV1a64Hash(s.Replace('\\', '/').TrimEnd('/'))]).ToList();
+			var list = filePaths == null ? new List<FileRecord>(_Files.Values) : filePaths.Select(s => _Files[NameHash(s.Replace('\\', '/').TrimEnd('/'))]).ToList();
 			if (list.Count == 0)
 				yield break;
 			list.Sort(BundleComparer.Instance);
@@ -433,7 +438,7 @@ namespace LibBundle3 {
 		/// <param name="funcGetDataFromFilePath">For getting new data with the path of the file</param>
 		/// <param name="dontChangeBundle">Whether to force all files to be written to their respective original bundle</param>
 		public virtual void Replace(IEnumerable<string>? filePaths, FuncGetData funcGetDataFromFilePath, bool dontChangeBundle = false) {
-			var list = filePaths == null ? new List<FileRecord>(_Files.Values) : filePaths.Select(s => _Files[FNV1a64Hash(s.Replace('\\', '/').TrimEnd('/'))]).ToList();
+			var list = filePaths == null ? new List<FileRecord>(_Files.Values) : filePaths.Select(s => _Files[NameHash(s.Replace('\\', '/').TrimEnd('/'))]).ToList();
 			if (list.Count == 0)
 				return;
 
@@ -504,7 +509,7 @@ namespace LibBundle3 {
 			foreach (var zip in zipEntries) {
 				if (zip.FullName.EndsWith('/'))
 					continue;
-				if (!_Files.TryGetValue(FNV1a64Hash(zip.FullName), out var f))
+				if (!_Files.TryGetValue(NameHash(zip.FullName), out var f))
 					continue;
 				if (ms.Length >= maxSize) {
 					br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
@@ -531,7 +536,7 @@ namespace LibBundle3 {
 		/// </summary>
 		/// <returns>Null when not found</returns>
 		public virtual bool TryGetFile(string path, [NotNullWhen(true)] out FileRecord? file) {
-			return _Files.TryGetValue(FNV1a64Hash(path), out file);
+			return _Files.TryGetValue(NameHash(path), out file);
 		}
 
 		/// <param name="path">Relative path under <paramref name="root"/></param>
@@ -592,36 +597,80 @@ namespace LibBundle3 {
 		}
 
 		/// <summary>
-		/// Get the hash of a file path, supports ascii characters only
+		/// Get the hash of a file path
 		/// </summary>
-		public static unsafe ulong FNV1a64Hash(ReadOnlySpan<char> str) {
-			/*
-			if (str.EndsWith('/'))
-				str = str.TrimEnd('/') + "++";
-			else
-				str = str.ToLower() + "++";
-			var bs = Encoding.UTF8.GetBytes(str);
-			return bs.Aggregate(0xCBF29CE484222325UL, (current, by) => (current ^ by) * 0x100000001B3UL);
-			*/
-			var hash = 0xCBF29CE484222325UL;
-			if (str[^1] == '/') {
-				str = str[..^1]; // TrimEnd('/')
-				foreach (ulong by in str)
-					hash = (hash ^ by) * 0x100000001B3UL;
+		public unsafe ulong NameHash(ReadOnlySpan<char> name) {
+			if (_Directories[0].PathHash == 0xF42A94E69CFF42FE || name[^1] != '/') {
+				var c = stackalloc char[name.Length];
+				var count = name.ToLowerInvariant(new(c, name.Length));
+				var b = stackalloc byte[count];
+				count = Encoding.UTF8.GetBytes(c, count, b, count);
+				return NameHash(new ReadOnlySpan<byte>(b, count));
 			} else
-				foreach (ulong by in str) {
-					if (by < 91 && by >= 65)
-						hash = (hash ^ (by + 32)) * 0x100000001B3UL; // ToLower
-					else
-						hash = (hash ^ by) * 0x100000001B3UL;
+				fixed(char* p = name) {
+					var b = stackalloc byte[name.Length];
+					var count = Encoding.UTF8.GetBytes(p, name.Length, b, name.Length);
+					return NameHash(new ReadOnlySpan<byte>(b, count));
 				}
-			return (((hash ^ 43) * 0x100000001B3UL) ^ 43) * 0x100000001B3UL; // "++" ('+'==43)
 		}
 
 		/// <summary>
-		/// Get the hash of a UTF-8 file path
+		/// Get the hash of a file path,
+		/// <paramref name="utf8Str"/> must be lowercased unless it comes from ggpk before patch 3.21.2
 		/// </summary>
-		public static unsafe ulong FNV1a64Hash(ReadOnlySpan<byte> utf8Str) {
+		protected unsafe ulong NameHash(ReadOnlySpan<byte> utf8Str) {
+			return _Directories[0].PathHash switch {
+				0xF42A94E69CFF42FE => MurmurHash64A(utf8Str), // since poe 3.21.2 patch
+				0x07E47507B4A92E53 => FNV1a64Hash(utf8Str),
+				_ => throw new("Unable to detect namehash algorithm"),
+			};
+		}
+
+		/// <summary>
+		/// Get the hash of a file path, <paramref name="utf8Str"/> must be lowercased
+		/// </summary>
+		protected static unsafe ulong MurmurHash64A(ReadOnlySpan<byte> utf8Str, ulong seed = 0x1337B33F) {
+			if (utf8Str[^1] == '/') // TrimEnd('/')
+				utf8Str = utf8Str[..^1];
+			var length = utf8Str.Length;
+
+			const ulong m = 0xC6A4A7935BD1E995UL;
+			const int r = 47;
+
+			ulong h = seed ^ ((ulong)length * m);
+
+			fixed (byte* data = utf8Str) {
+				ulong* p = (ulong*)data;
+				int numberOfLoops = length >> 3; // div 8
+				while (numberOfLoops-- != 0) {
+					ulong k = *p++;
+					k *= m;
+					k ^= k >> r;
+					k *= m;
+
+					h ^= k;
+					h *= m;
+				}
+
+				int remainingBytes = length & 0b111; // mod 8
+				if (remainingBytes != 0) {
+					int offset = (8 - remainingBytes) << 3; // mul 8
+					h ^= *p & (0xFFFFFFFFFFFFFFFFUL >> offset);
+					h *= m;
+				}
+			}
+
+			h ^= h >> r;
+			h *= m;
+			h ^= h >> r;
+
+			return h;
+		}
+
+		/// <summary>
+		/// Get the hash of a file path with ggpk before patch 3.21.2
+		/// </summary>
+		protected static unsafe ulong FNV1a64Hash(ReadOnlySpan<byte> utf8Str) {
 			var hash = 0xCBF29CE484222325UL;
 			if (utf8Str[^1] == '/') {
 				utf8Str = utf8Str[..^1]; // TrimEnd('/')

@@ -71,7 +71,6 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Get the file content of this record
 		/// </summary>
-		/// <param name="ggpkStream">Stream of GGPK file</param>
 		public virtual byte[] ReadFileContent() {
 			var buffer = new byte[DataLength];
 			var s = Ggpk.GGPKStream;

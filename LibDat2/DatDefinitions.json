@@ -2801,14 +2801,15 @@
 		"Id": "string",
 		"Art": "string",
 		"RewardTypeName": "string",
-		"Key0": "row",
+		"Unknown0": "row",
 		"RewardRoomName": "string",
 		"MinLevel": "i32",
 		"MaxLevel": "i32",
 		"Weight": "i32",
 		"RewardRoomName2": "string",
-		"Keys0": "array|foreignrow",
-		"Unknown0": "i32"
+		"HeistJobsKey": "array|foreignrow",
+		"Unknown1": "i32",
+		"Unknown2": "i32"
 	},
 	"HeistChests": {
 		"ChestsKey": "foreignrow",

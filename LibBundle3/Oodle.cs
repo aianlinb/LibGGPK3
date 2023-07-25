@@ -27,7 +27,7 @@ namespace LibBundle3 {
 			/// </summary>
 			Leviathan = 13,
 			/// <summary>
-			/// Mermaid is between Kraken & Selkie - crazy fast, still decent compression.
+			/// Mermaid is between Kraken &amp; Selkie - crazy fast, still decent compression.
 			/// </summary>
 			Mermaid = 9,
 			/// <summary>

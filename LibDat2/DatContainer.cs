@@ -18,7 +18,6 @@ namespace LibDat2 {
 		/// <summary>
 		/// Structure definition of dat files
 		/// </summary>
-#pragma warning disable CA2211
 		public static Dictionary<string, KeyValuePair<string, string>[]>? DatDefinitions;
 
 		/// <summary>
@@ -32,9 +31,8 @@ namespace LibDat2 {
 		public readonly bool SchemaMin;
 
 		/// <summary>
-		/// Call <see cref="ReloadDefinitions"/>
+		/// Download schema.min.json into <see cref="SchemaMinDatDefinitions"/>
 		/// </summary>
-
 		public static void DownloadSchemaMin() {
 			var http = new HttpClient() { Timeout = Timeout.InfiniteTimeSpan };
 			try {

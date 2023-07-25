@@ -40,34 +40,30 @@
 using System;
 
 internal static unsafe class MurmurHash2Unsafe {
-	const UInt32 m = 0x5bd1e995;
+	const UInt32 m = 0x5BD1E995;
 	const Int32 r = 24;
 
-	public static UInt32 Hash(String name, UInt32 seed = 0xc58f1a7b) {
+	public static UInt32 Hash(String name, UInt32 seed = 0xC58F1A7B) {
 		fixed (char* p = name)
 			return Hash(new ReadOnlySpan<Byte>(p, name.Length * 2), seed);
 	}
 
-	public static UInt32 Hash(ReadOnlySpan<Byte> data, UInt32 seed = 0xc58f1a7b) {
+	public static UInt32 Hash(ReadOnlySpan<Byte> data, UInt32 seed = 0xC58F1A7B) {
 		Int32 length = data.Length;
-		if (length == 0)
-			return 0;
 
 		UInt32 h = seed ^ (UInt32)length;
 		Int32 remainingBytes = length & 3; // mod 4
 		Int32 numberOfLoops = length >> 2; // div 4
 		fixed (byte* firstByte = data) {
 			UInt32* realData = (UInt32*)firstByte;
-			while (numberOfLoops != 0) {
-				UInt32 k = *realData;
+			while (numberOfLoops-- != 0) {
+				UInt32 k = *realData++;
 				k *= m;
 				k ^= k >> r;
 				k *= m;
 
 				h *= m;
 				h ^= k;
-				--numberOfLoops;
-				++realData;
 			}
 			switch (remainingBytes) {
 				case 3:

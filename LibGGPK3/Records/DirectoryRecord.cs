@@ -179,7 +179,7 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Remove the child node with the given namehash
 		/// </summary>
-		/// <param name="NameHash">namehash calculated from <see cref="TreeNode.GetNameHash"/></param>
+		/// <param name="nameHash">namehash calculated from <see cref="TreeNode.GetNameHash"/></param>
 		public virtual unsafe void RemoveChild(uint nameHash) {
 			_Children?.Remove(nameHash);
 			for (var i = 0; i < Entries.Length ; ++i) {

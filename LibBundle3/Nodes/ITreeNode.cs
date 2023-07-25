@@ -12,7 +12,7 @@ namespace LibBundle3.Nodes {
 		public string Name { get; }
 
 		/// <summary>
-		/// Get the absolute path of <paramref name="node"/> in the tree, not starts with '/', and ends with '/' if <see cref="IsDirectory"/>
+		/// Get the absolute path of <paramref name="node"/> in the tree, not starts with '/', and ends with '/' if this is a directory
 		/// </summary>
 		public static string GetPath(ITreeNode node) {
 			if (node is IDirectoryNode) {

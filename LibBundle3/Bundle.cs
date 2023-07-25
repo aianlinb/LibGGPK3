@@ -21,7 +21,7 @@ namespace LibBundle3 {
 			public int unknown5; // 0
 			public int unknown6; // 0
 
-			public int GetLastChunkSize() {
+			public readonly int GetLastChunkSize() {
 				return uncompressed_size - (chunk_size * (chunk_count - 1));
 			}
 		}
@@ -42,6 +42,7 @@ namespace LibBundle3 {
 
 		/// <param name="stream">Stream of the bundle</param>
 		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> after this instance has been disposed</param>
+		/// <param name="record">Record of this bundle file</param>
 		public unsafe Bundle(Stream stream, bool leaveOpen = false, BundleRecord? record = null) {
 			baseStream = stream ?? throw new ArgumentNullException(nameof(stream));
 			streamLeaveOpen = leaveOpen;
@@ -99,7 +100,7 @@ namespace LibBundle3 {
 		}
 
 		/// <summary>
-		/// Read chunks (with size of <see cref="Header.chunk_size"/>) start with the chunk with index of <paramref name="start"/> and combine them to a <see cref="byte[]"/>
+		/// Read chunks (with size of <see cref="Header.chunk_size"/>) start with the chunk with index of <paramref name="start"/> and combine them to a <see cref="byte"/>[]
 		/// </summary>
 		/// <param name="start">Index of a chunk</param>
 		/// <param name="count">Number of chunks to read</param>

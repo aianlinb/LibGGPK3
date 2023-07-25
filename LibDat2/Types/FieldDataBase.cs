@@ -36,7 +36,7 @@ namespace LibDat2.Types {
 		protected virtual void RaisePropertyChanged(object sender, PropertyChangedEventArgs e) => PropertyChanged(sender, e);
 
 		/// <summary>
-		/// Create an instance of <see cref="FieldDataBase{TypeOfValue}"/> with the <paramref name="value"/>
+		/// Create an instance of <see cref="FieldDataBase{TypeOfValue}"/>
 		/// </summary>
 #pragma warning disable CS8618
 		public FieldDataBase(DatContainer dat) {

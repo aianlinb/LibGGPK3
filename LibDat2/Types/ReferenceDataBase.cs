@@ -38,7 +38,7 @@ namespace LibDat2.Types {
 
 		/// <summary>
 		/// Read the pointer and call <see cref="ReadInDataSection(BinaryReader)"/>.
-		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="StringData.Read(BinaryReader, DatContainer)"/> or <see cref="ArrayData{TypeOfValueInArray}.Read(BinaryReader, DatContainer, FieldType)"/> instead.
+		/// This won't check the <see cref="DatContainer.ReferenceDatas"/>, use <see cref="StringData.Read(BinaryReader, DatContainer)"/> or <see cref="ArrayData{TypeOfValueInArray}.Read(BinaryReader, DatContainer, string)"/> instead.
 		/// </summary>
 		public override ReferenceDataBase<TypeOfValue> Read(BinaryReader reader) {
 			Offset = Dat.x64 ? reader.ReadInt64() : reader.ReadInt32();

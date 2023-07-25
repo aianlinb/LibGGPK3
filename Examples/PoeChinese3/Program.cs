@@ -95,7 +95,7 @@ namespace PoeChinese3 {
 				Console.ForegroundColor = ConsoleColor.Yellow;
 				Console.WriteLine("Warning: Cannot find file: Art/UIImages1.txt");
 				Console.WriteLine("Warning: The national flag pattern in start menu won't be replaced");
-				Console.WriteLine("警告: 找不到 UIImages1.txt ， 登入畫面的國旗圖案將不會改變");
+				Console.WriteLine("警告: 找不到 UIImages1.txt，登入畫面的國旗圖案將不會改變");
 				Console.ForegroundColor = color;
 				lang.Write(dat.Save(false, false)); // also saved the index
 				return;

@@ -5,9 +5,11 @@
     <Nullable>enable</Nullable>
     <Authors>aianlinb</Authors>
     <Copyright>Copyright © 2020-2022 aianlinb</Copyright>
-    <Version>0.15.5</Version>
+    <Version>0.15.6</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DebugType>embedded</DebugType>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
