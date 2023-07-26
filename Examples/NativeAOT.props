@@ -5,13 +5,19 @@
 	</Target>
 	
 	<PropertyGroup>
+		<TargetFramework>net7.0</TargetFramework>
+		<PublishAOT>true</PublishAOT>
 		<Optimize>true</Optimize>
+		<StripSymbols>true</StripSymbols>
+		<TrimMode>Link</TrimMode>
 		<IlcInvariantGlobalization>true</IlcInvariantGlobalization>
 		<IlcOptimizationPreference>Speed</IlcOptimizationPreference>
+		<IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+		<IlcTrimMetadata>true</IlcTrimMetadata>
 	</PropertyGroup>
 	
 	<ItemGroup>
-		<PackageReference Include="Microsoft.DotNet.ILCompiler" Version="*-*" />
+		<IlcArg Include="--reflectedonly" />
 		<RuntimeHostConfigurationOption Include="Switch.System.Reflection.Assembly.SimulatedCallingAssembly" Value="true" />
 		<RuntimeHostConfigurationOption Include="Switch.System.Reflection.Assembly.SimulatedLocationInBaseDirectory" Value="true" />
 		<RuntimeHostConfigurationOption Include="Switch.System.Reflection.Disabled.DoNotThrowForNames" Value="true" />

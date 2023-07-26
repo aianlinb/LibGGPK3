@@ -27,3 +27,4 @@ cp -f -T Examples/VisualGGPK3/Info.plist publish/osx-arm64/VisualGGPK3.app/Conte
 cp -f -T Examples/VPatchGGPK3/Info.plist publish/osx-arm64/VPatchGGPK3.app/Contents/Info.plist
 (echo "chmod -R +x ." && echo "xattr -c -r .") > publish/osx-x64/FirstRun.sh
 (echo "chmod -R +x ." && echo "xattr -c -r .") > publish/osx-arm64/FirstRun.sh
+rm -r -f publish/*/*.deps.json

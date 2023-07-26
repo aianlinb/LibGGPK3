@@ -147,6 +147,7 @@ namespace VPatchGGPK3 {
 				var md5 = json.GetProperty("md5").GetString()!;
 				output.Append("Downloading patch file . . .\r\n", true);
 				var zip = new ZipArchive(await http.GetStreamAsync("https://poedb.tw/fg/" + md5 + ".zip"));
+				// if (md5 != System.Security.Cryptography.MD5.HashData(...)) ...
 				foreach (var entry in zip.Entries) {
 					if (entry.FullName.EndsWith('/'))
 						continue;
@@ -165,6 +166,7 @@ namespace VPatchGGPK3 {
 					output.Append("Replaced: " + entry.FullName + "\r\n", true);
 				}
 				output.Append("\r\nDone!\r\n", true);
+				output.Append("中文化完成!\r\n", true);
 				ggpk.Dispose();
 			} catch (Exception ex) {
 				MessageBox.Show(this, ex.ToString(), "Error", MessageBoxType.Error);

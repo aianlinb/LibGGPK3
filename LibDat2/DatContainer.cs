@@ -55,7 +55,7 @@ namespace LibDat2 {
 							type = "array|" + type;
 						array[index++] = new(name, type);
 					}
-					SchemaMinDatDefinitions.Add(dat.GetProperty("name").GetString()!, array);
+					SchemaMinDatDefinitions.Add(dat.GetProperty("name").GetString()!.ToLowerInvariant(), array);
 				}
 				json.Dispose();
 			} finally {
@@ -117,7 +117,8 @@ namespace LibDat2 {
 		/// <param name="SchemaMin">Whether to use schema.min.json</param>
 		public DatContainer(Stream stream, string fileName, bool SchemaMin = false) {
 			this.SchemaMin = SchemaMin;
-			switch (Path.GetExtension(fileName)) {
+			var name = fileName.ToLowerInvariant();
+			switch (Path.GetExtension(name)) {
 				case ".dat":
 					x64 = false;
 					UTF32 = false;
@@ -138,7 +139,7 @@ namespace LibDat2 {
 					throw new ArgumentException("The provided file name must be a dat file", nameof(fileName));
 			}
 
-			Name = Path.GetFileNameWithoutExtension(fileName);
+			Name = Path.GetFileNameWithoutExtension(name);
 			var reader = new BinaryReader(stream, UTF32 ? Encoding.UTF32 : Encoding.Unicode);
 			var Count = reader.ReadInt32();
 			string def;
@@ -159,7 +160,7 @@ namespace LibDat2 {
 				FieldDefinitions = new(kvps);
 			}
 
-			if (Name != "Languages") {
+			if (Name != "languages") {
 				var actualRecordLength = GetActualRecordLength(reader, Count);
 				DataSectionOffset = Count * actualRecordLength + 4;
 				// DataSectionDataLength = Length - DataSectionOffset - 8;
@@ -271,7 +272,8 @@ namespace LibDat2 {
 		/// <param name="SchemaMin">Whether to use schema.min.json</param>
 		public DatContainer(string fileName, List<IFieldData[]> fieldDatas, bool SchemaMin = false) {
 			this.SchemaMin = SchemaMin;
-			switch (Path.GetExtension(fileName)) {
+			var name = fileName.ToLowerInvariant();
+			switch (Path.GetExtension(name)) {
 				case ".dat":
 					x64 = false;
 					UTF32 = false;
@@ -292,7 +294,7 @@ namespace LibDat2 {
 					throw new ArgumentException("The provided file name must be a dat file", nameof(fileName));
 			}
 
-			Name = Path.GetFileNameWithoutExtension(fileName);
+			Name = Path.GetFileNameWithoutExtension(name);
 
 			if (SchemaMin) {
 				if (SchemaMinDatDefinitions == null)
@@ -520,7 +522,7 @@ namespace LibDat2 {
 			using var json = JsonDocument.Parse(content, new() { CommentHandling = JsonCommentHandling.Skip });
 			DatDefinitions = new();
 			foreach (var dat in json.RootElement.EnumerateObject())
-				DatDefinitions.Add(dat.Name, dat.Value.EnumerateObject().Select(p => new KeyValuePair<string, string>(p.Name, p.Value.GetString()!.ToLower())).ToArray());
+				DatDefinitions.Add(dat.Name.ToLowerInvariant(), dat.Value.EnumerateObject().Select(p => new KeyValuePair<string, string>(p.Name, p.Value.GetString()!.ToLower())).ToArray());
 		}
 
 		/// <summary>
@@ -532,7 +534,7 @@ namespace LibDat2 {
 			using var json = JsonDocument.Parse(stream, new() { CommentHandling = JsonCommentHandling.Skip });
 			DatDefinitions = new();
 			foreach (var dat in json.RootElement.EnumerateObject())
-				DatDefinitions.Add(dat.Name, dat.Value.EnumerateObject().Select(p => new KeyValuePair<string, string>(p.Name, p.Value.GetString()!.ToLower())).ToArray());
+				DatDefinitions.Add(dat.Name.ToLowerInvariant(), dat.Value.EnumerateObject().Select(p => new KeyValuePair<string, string>(p.Name, p.Value.GetString()!.ToLower())).ToArray());
 		}
 	}
 }

@@ -4,8 +4,8 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <Authors>aianlinb</Authors>
-    <Copyright>Copyright © 2020-2022 aianlinb</Copyright>
-    <Version>0.15.6</Version>
+    <Copyright>Copyright © 2020-2023 aianlinb</Copyright>
+    <Version>0.16.1</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DebugType>embedded</DebugType>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

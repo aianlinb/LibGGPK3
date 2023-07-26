@@ -22,7 +22,7 @@ namespace LibDat2.Types {
 				short ch;
 				while ((ch = reader.ReadInt16()) != 0)
 				sb.Append((char)ch);
-				if (Dat.Name != "Languages" && reader.ReadInt16() != 0) // string should end with 4 bytes of zero
+				if (Dat.Name != "languages" && reader.ReadInt16() != 0) // string should end with 4 bytes of zero
 					throw new("Not found \\0 at the end of the string");
 			}
 			Value = sb.ToString();
@@ -37,7 +37,7 @@ namespace LibDat2.Types {
 				else
 					fixed (char* c = Value) // string is stored in UTF-16 in C#, so we can directly get its bytes for writing
 						writer.BaseStream.Write(new ReadOnlySpan<byte>(c, Value.Length * 2));
-			if (Dat.Name == "Languages")
+			if (Dat.Name == "languages")
 				writer.Write((short)0);
 			else
 				writer.Write(0); // \0 at the end of string
