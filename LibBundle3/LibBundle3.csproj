@@ -1,13 +1,12 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<Configurations>Debug;Release;AOT</Configurations>
 		<Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
 		<Description>Library for bundles in Content.ggpk of game PathOfExile (Rewrite of LibBundle)</Description>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 	</PropertyGroup>
-	
+
 	<!-- Remove the following if you don't have the libraries (And you will need oo2core.dll/liboo2core.so/liboo2core.dylib at runtime) -->
-	
 	<ItemGroup Condition="'$(Configuration)' == 'AOT'">
 		<DirectPInvoke Include="oo2core" Condition="'$(RuntimeIdentifier)' != ''" />
 	</ItemGroup>

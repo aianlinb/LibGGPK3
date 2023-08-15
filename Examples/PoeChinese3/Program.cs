@@ -13,7 +13,7 @@ namespace PoeChinese3 {
 				Console.OutputEncoding = Encoding.UTF8;
 				var assembly = Assembly.GetExecutingAssembly();
 				var version = assembly.GetName().Version!;
-				Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb"); // ©
+				Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022-2023 aianlinb"); // ©
 				Console.WriteLine($"流亡黯道 - 啟/禁用繁體中文語系  By aianlinb");
 				Console.WriteLine();
 

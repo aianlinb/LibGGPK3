@@ -84,7 +84,7 @@ namespace VPatchGGPK3 {
 				 ReadOnly = true
 			}, null, true);
 			layout.Add(new Label() {
-				Text = "Copyright © 2022 aianlinb",
+				Text = "Copyright © 2022-2023 aianlinb",
 				TextAlignment = TextAlignment.Right,
 				VerticalAlignment = VerticalAlignment.Bottom,
 				Size = new Size(100, 20)

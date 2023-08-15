@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <Authors>aianlinb</Authors>
     <Copyright>Copyright © 2020-2023 aianlinb</Copyright>
-    <Version>0.16.1</Version>
+    <Version>0.16.2</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DebugType>embedded</DebugType>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
