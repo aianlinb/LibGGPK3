@@ -3,8 +3,8 @@
 Library for Content.ggpk of game: Path of Exile.  
 Rewrite of https://github.com/aianlinb/LibGGPK2
 
-Expected to work on Windows, Linux and MacOS
-
+Expected to work on Windows, Linux and MacOS  
+[macOS usage / macOS 使用方法](document.md)
 ## Notice
 All projects in this repository are not thread-safe  
 Do not process a single ggpk file with more than one thread
