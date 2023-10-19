@@ -3,6 +3,6 @@
 		<OutputType>Exe</OutputType>
 	</PropertyGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\..\LibBundledGGPK3\LibBundledGGPK3.csproj" />
+		<ProjectReference Include="../../LibBundledGGPK3/LibBundledGGPK3.csproj" />
 	</ItemGroup>
 </Project>

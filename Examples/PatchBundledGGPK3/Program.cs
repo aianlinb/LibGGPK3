@@ -1,4 +1,4 @@
-﻿using LibBundledGGPK;
+﻿using LibBundledGGPK3;
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -42,13 +42,12 @@ namespace PatchBundledGGPK3 {
 				Console.WriteLine("GGPK: " + args[0]);
 				Console.WriteLine("Patch file: " + args[1]);
 				Console.WriteLine("Reading ggpk file . . .");
-				var ggpk = new BundledGGPK(args[0], false);
+				using var ggpk = new BundledGGPK(args[0], false);
 				Console.WriteLine("Replacing files . . .");
-				var zip = ZipFile.OpenRead(args[1]);
-
-				ggpk.Index.Replace(zip.Entries);
-				ggpk.Dispose();
+				using var zip = ZipFile.OpenRead(args[1]);
+				var count = LibBundle3.Index.Replace(ggpk.Index, zip.Entries);
 				Console.WriteLine("Done!");
+				Console.WriteLine($"Replced {count} files");
 			} catch (Exception e) {
 				Console.Error.WriteLine(e);
 			}

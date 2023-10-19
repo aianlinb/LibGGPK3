@@ -2,6 +2,6 @@
 
 namespace LibBundle3.Nodes {
 	public interface IFileNode : ITreeNode {
-		public FileRecord Record { get; }
+		public abstract FileRecord Record { get; }
 	}
 }

@@ -1,23 +1,26 @@
 ﻿using LibBundle3;
-using LibBundle3.Records;
 using LibGGPK3;
+using LibGGPK3.Records;
+using System.IO;
 
-namespace LibBundledGGPK {
+namespace LibBundledGGPK3 {
 	public class BundledGGPK : GGPK {
+		/// For processing bundles in ggpk
 		public Index Index { get; }
 
-		/// <param name="parsePathsInIndex">Whether to parse the file paths in <see cref="index"/>. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> and <see cref="FileRecord.DirectoryRecord"/> in each of <see cref="Index._Files"/> will be <see langword="null"/></param>
+		/// <param name="parsePathsInIndex">Whether to parse the file paths in <see cref="Index"/>.
+		/// <see langword="false"/> to speed up reading but all <see cref="LibBundle3.Records.FileRecord.Path"/> in each of <see cref="Index.Files"/> will be <see langword="null"/></param>
+		/// <exception cref="FileNotFoundException" />
 		public BundledGGPK(string filePath, bool parsePathsInIndex = true) : base(filePath) {
-			var f = (LibGGPK3.Records.FileRecord)FindNode("Bundles2/_.index.bin")!;
-			Index = new(new GGFileStream(f), false, parsePathsInIndex) {
-				FuncReadBundle = (br) => new(new GGFileStream((LibGGPK3.Records.FileRecord)FindNode("Bundles2/" + br.Path)!), false, br)
-			};
+			var bundles2 = Root["Bundles2"] as DirectoryRecord ?? throw new("Cannot find directory \"Bundles2\" in GGPK: " + filePath);
+			var index = bundles2["_.index.bin"] as FileRecord ?? throw new("Cannot find file \"Bundles2/_.index.bin\" in GGPK: " + filePath);
+			Index = new(new GGFileStream(index), false, parsePathsInIndex, new GGPKBundleFactory(this, bundles2));
 		}
 
 #pragma warning disable CA1816
 		public override void Dispose() {
 			Index.Dispose();
-			base.Dispose();
+			base.Dispose(); // GC.SuppressFinalize(this) in here
 		}
 	}
 }

@@ -9,7 +9,7 @@ namespace LibGGPK3.Records {
 	/// </summary>
 	public class FreeRecord : BaseRecord {
 		/// <summary>FREE</summary>
-		public const uint Tag = 0x45455246;
+		public const int Tag = 0x45455246;
 
 		/// <summary>
 		/// Offset of next FreeRecord
@@ -17,9 +17,9 @@ namespace LibGGPK3.Records {
 		public long NextFreeOffset { get; protected internal set; }
 
 		protected internal FreeRecord(int length, GGPK ggpk) : base(length, ggpk) {
-			Offset = ggpk.GGPKStream.Position - 8;
-			NextFreeOffset = ggpk.GGPKStream.ReadInt64();
-			ggpk.GGPKStream.Seek(Length - 16, SeekOrigin.Current);
+			Offset = ggpk.baseStream.Position - 8;
+			NextFreeOffset = ggpk.baseStream.Read<long>();
+			ggpk.baseStream.Seek(Length - sizeof(long) * 2, SeekOrigin.Current);
 		}
 
 		/// <summary>
@@ -27,26 +27,25 @@ namespace LibGGPK3.Records {
 		/// Please calls <see cref="UpdateOffset"/> after this to add the FreeRecord to <see cref="GGPK.FreeRecords"/>
 		/// </summary>
 		protected internal FreeRecord(long offset, int length, long nextFreeOffset, GGPK ggpk) : base(length, ggpk) {
+			Offset = offset;
 			NextFreeOffset = nextFreeOffset;
-			Ggpk.GGPKStream.Seek(offset, SeekOrigin.Begin);
-			WriteRecordData();
 		}
 
 		protected internal override void WriteRecordData() {
-			var s = Ggpk.GGPKStream;
+			var s = Ggpk.baseStream;
 			Offset = s.Position;
 			s.Write(Length);
 			s.Write(Tag);
 			s.Write(NextFreeOffset);
-			s.Seek(Length - 16, SeekOrigin.Current);
+			s.Seek(Length - sizeof(long) * 2, SeekOrigin.Current);
 		}
 
 		/// <summary>
 		/// Remove this FreeRecord from the Linked FreeRecord List
 		/// </summary>
 		/// <param name="node">Node in <see cref="GGPK.FreeRecords"/> to remove</param>
-		public virtual void RemoveFromList(LinkedListNode<FreeRecord>? node = null) {
-			var s = Ggpk.GGPKStream;
+		protected internal virtual void RemoveFromList(LinkedListNode<FreeRecord>? node = null) {
+			var s = Ggpk.baseStream;
 			node ??= Ggpk.FreeRecords.Find(this);
 			if (node == null)
 				return;
@@ -55,20 +54,20 @@ namespace LibGGPK3.Records {
 			if (next == null)
 				if (previous == null) {
 					Ggpk.GgpkRecord.FirstFreeRecordOffset = 0;
-					s.Seek(Ggpk.GgpkRecord.Offset + 20, SeekOrigin.Begin);
+					s.Position = Ggpk.GgpkRecord.Offset + (sizeof(long) * 2 + sizeof(int));
 					s.Write((long)0);
 				} else {
 					previous.NextFreeOffset = 0;
-					s.Seek(previous.Offset + 8, SeekOrigin.Begin);
+					s.Position = previous.Offset + sizeof(long);
 					s.Write((long)0);
 				}
 			else if (previous == null) {
 				Ggpk.GgpkRecord.FirstFreeRecordOffset = next.Offset;
-				s.Seek(Ggpk.GgpkRecord.Offset + 20, SeekOrigin.Begin);
+				s.Position = Ggpk.GgpkRecord.Offset + (sizeof(long) * 2 + sizeof(int));
 				s.Write(next.Offset);
 			} else {
 				previous.NextFreeOffset = next.Offset;
-				s.Seek(previous.Offset + 8, SeekOrigin.Begin);
+				s.Position = previous.Offset + sizeof(long);
 				s.Write(next.Offset);
 			}
 			Ggpk.FreeRecords.Remove(node);
@@ -79,17 +78,17 @@ namespace LibGGPK3.Records {
 		/// Update the link after the Offset of this FreeRecord is changed
 		/// </summary>
 		/// <param name="node">Node in <see cref="GGPK.FreeRecords"/> to remove</param>
-		public virtual LinkedListNode<FreeRecord> UpdateOffset(LinkedListNode<FreeRecord>? node = null) {
-			var s = Ggpk.GGPKStream;
+		protected internal virtual LinkedListNode<FreeRecord> UpdateOffset(LinkedListNode<FreeRecord>? node = null) {
+			var s = Ggpk.baseStream;
 			node ??= Ggpk.FreeRecords.Find(this);
 			var lastFree = node == null ? Ggpk.FreeRecords.Last?.Value : node.Previous?.Value;
 			if (lastFree == null) { // First FreeRecord
 				Ggpk.GgpkRecord.FirstFreeRecordOffset = Offset;
-				s.Seek(Ggpk.GgpkRecord.Offset + 20, SeekOrigin.Begin);
+				s.Position = Ggpk.GgpkRecord.Offset + (sizeof(long) * 2 + sizeof(int));
 				s.Write(Offset);
 			} else {
 				lastFree.NextFreeOffset = Offset;
-				s.Seek(lastFree.Offset + 8, SeekOrigin.Begin);
+				s.Position = lastFree.Offset + sizeof(long);
 				s.Write(Offset);
 			}
 			return node ?? Ggpk.FreeRecords.AddLast(this);

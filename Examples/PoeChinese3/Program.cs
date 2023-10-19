@@ -1,4 +1,5 @@
-﻿using LibBundledGGPK;
+﻿using LibBundle3.Records;
+using LibBundledGGPK3;
 using LibDat2;
 using System;
 using System.IO;
@@ -9,23 +10,27 @@ using Index = LibBundle3.Index;
 namespace PoeChinese3 {
 	public class Program {
 		public static void Main(string[] args) {
+#if !DEBUG
 			try {
-				Console.OutputEncoding = Encoding.UTF8;
+#endif
+			Console.OutputEncoding = Encoding.UTF8;
 				var assembly = Assembly.GetExecutingAssembly();
 				var version = assembly.GetName().Version!;
-				Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022-2023 aianlinb"); // ©
+				if (version.Revision != 0)
+					Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})  Copyright (C) 2022-2023 aianlinb"); // ©
+				else
+					Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022-2023 aianlinb"); // ©
 				Console.WriteLine($"流亡黯道 - 啟/禁用繁體中文語系  By aianlinb");
 				Console.WriteLine();
 
-				var definitions = assembly.GetManifestResourceStream("PoeChinese3.DatDefinitions.json")!;
-				DatContainer.ReloadDefinitions(definitions);
-				definitions.Close();
+				using (var definitions = assembly.GetManifestResourceStream("PoeChinese3.DatDefinitions.json")!)
+					DatContainer.ReloadDefinitions(definitions);
 
 				if (args.Length == 0) {
 					args = new string[1];
 					Console.WriteLine($"請輸入檔案路徑 (原版 / Steam版)");
 					Console.Write("Path to (Content.ggpk / _.index.bin): ");
-					args[0] = Console.ReadLine()!.Trim('\'', '"', ' ', '\r', '\n', '\t');
+					args[0] = Console.ReadLine()?.Trim('\'', '"', ' ', '\r', '\n', '\t')!;
 					Console.WriteLine();
 				}
 				if (!File.Exists(args[0])) {
@@ -35,26 +40,26 @@ namespace PoeChinese3 {
 					Console.ReadLine();
 					return;
 				}
-				args[0] = Path.GetFullPath(args[0]);
+				args[0] = Path.GetFullPath(args[0].Trim('"', ' ', '\r', '\n', '\t'));
 
 				switch (Path.GetExtension(args[0]).ToLower()) {
 					case ".ggpk":
 						Console.WriteLine("GGPK path: " + args[0]);
 						Console.WriteLine("Reading ggpk file . . .");
-						var ggpk = new BundledGGPK(args[0], false);
-						Console.WriteLine("正在套用 (Modifying) . . .");
-						Modify(ggpk.Index);
-						ggpk.Dispose();
+						using (var ggpk = new BundledGGPK(args[0], false)) {
+							Console.WriteLine("正在套用 (Modifying) . . .");
+							Modify(ggpk.Index);
+						}
 						Console.WriteLine("Done!");
 						Console.WriteLine("中文化完成！ 再次執行以還原");
 						break;
 					case ".bin":
 						Console.WriteLine("Index path: " + args[0]);
 						Console.WriteLine("Reading index file . . .");
-						var index = new Index(args[0], false);
-						Console.WriteLine("正在套用 (Modifying) . . .");
-						Modify(index);
-						index.Dispose();
+						using (var index = new Index(args[0], false)) {
+							Console.WriteLine("正在套用 (Modifying) . . .");
+							Modify(index);
+						}
 						Console.WriteLine("Done!");
 						Console.WriteLine("中文化完成！ 再次執行以還原");
 						break;
@@ -62,12 +67,14 @@ namespace PoeChinese3 {
 						Console.WriteLine("Unknown file extension: " + Path.GetFileName(args[0]));
 						break;
 				}
+#if !DEBUG
 			} catch (Exception e) {
 				var color = Console.ForegroundColor;
 				Console.ForegroundColor = ConsoleColor.Red;
 				Console.Error.WriteLine(e);
 				Console.ForegroundColor = color;
 			}
+#endif
 			Console.WriteLine();
 			Console.WriteLine("Enter to exit . . .");
 			Console.ReadLine();
@@ -76,7 +83,9 @@ namespace PoeChinese3 {
 		public static unsafe void Modify(Index index) {
 			if (!index.TryGetFile("Data/Languages.dat", out var lang))
 				throw new("Cannot find file: Data/Languages.dat");
-			var dat = new DatContainer(lang.Read().ToArray(), "Languages.dat");
+			var dat = new DatContainer(lang.Read().ToArray(), "Languages.dat"); // TODO: LibDat3 rewrite
+
+			// Traditional Chinese applying
 			int frn = 1, tch = 6;
 			for (var i = 0; i < dat.FieldDatas.Count; ++i) {
 				var s = (string)dat.FieldDatas[i][1].Value;
@@ -89,57 +98,60 @@ namespace PoeChinese3 {
 			var rowTch = dat.FieldDatas[tch];
 			(rowTch[1], rowFrn[1]) = (rowFrn[1], rowTch[1]); // swap
 			(rowTch[2], rowFrn[2]) = (rowFrn[2], rowTch[2]);
+			var data = dat.Save(false, false);
 
 			if (!index.TryGetFile("Art/UIImages1.txt", out var uiImages)) {
 				var color = Console.ForegroundColor;
 				Console.ForegroundColor = ConsoleColor.Yellow;
 				Console.WriteLine("Warning: Cannot find file: Art/UIImages1.txt");
-				Console.WriteLine("Warning: The national flag pattern in start menu won't be replaced");
-				Console.WriteLine("警告: 找不到 UIImages1.txt，登入畫面的國旗圖案將不會改變");
+				Console.WriteLine("The national flag pattern in start menu won't be replaced");
+				Console.WriteLine("警告: 找不到 Art/UIImages1.txt，登入畫面的國旗圖案將不會改變");
 				Console.ForegroundColor = color;
-				lang.Write(dat.Save(false, false)); // also saved the index
+				lang.Write(data); // also saved the index
 				return;
 			}
+
+			// National flag changing
 			var memory = uiImages.Read();
-			var p = memory.Pin();
-			var span = new Span<char>(p.Pointer, memory.Length); // Or memory.Span for Span<byte>
-			var span2 = span[span.IndexOf("\"Art/2DArt/UIImages/Common/FlagIcons/")..];
-			var fr4K = span2.IndexOf("\"Art/2DArt/UIImages/Common/FlagIcons/4K/fr\"");
-			var zhTW4K = span2.IndexOf("\"Art/2DArt/UIImages/Common/FlagIcons/4K/zhTW\"");
-			if (fr4K < zhTW4K) {
-				span2[(fr4K + 43)..zhTW4K].CopyTo(span2[(fr4K + 45)..]); // move two chars back
-				"zhTW\"".CopyTo(span2[(fr4K + 40)..]);
-				"\"Art/2DArt/UIImages/Common/FlagIcons/4K/fr\"".CopyTo(span2[(zhTW4K + 2)..]);
-			} else {
-				span2[(zhTW4K + 45)..fr4K].CopyTo(span2[(zhTW4K + 43)..]); // move two chars forward
-				"fr\"".CopyTo(span2[(zhTW4K + 40)..]);
-				"\"Art/2DArt/UIImages/Common/FlagIcons/4K/zhTW\"".CopyTo(span2[(fr4K - 2)..]);
-			}
-			var fr = span2.IndexOf("\"Art/2DArt/UIImages/Common/FlagIcons/fr\"");
-			var zhTW = span2.IndexOf("\"Art/2DArt/UIImages/Common/FlagIcons/zhTW\"");
-			if (fr < zhTW) {
-				span2[(fr + 40)..zhTW].CopyTo(span2[(fr + 42)..]); // move two chars back
-				"zhTW\"".CopyTo(span2[(fr + 37)..]);
-				"\"Art/2DArt/UIImages/Common/FlagIcons/fr\"".CopyTo(span2[(zhTW + 2)..]);
-			} else {
-				span2[(zhTW + 42)..fr].CopyTo(span2[(zhTW + 40)..]); // move two chars forward
-				"fr\"".CopyTo(span2[(zhTW + 37)..]);
-				"\"Art/2DArt/UIImages/Common/FlagIcons/zhTW\"".CopyTo(span2[(fr - 2)..]);
+			// memory.Span will return ReadOnlySpan<byte>, so use memory.Pin() instead for modifying
+			// This may modfiy the cached data directly, but this program won't use it anymore, so it's fine
+			using (var p = memory.Pin()) {
+				var span = new Span<char>(p.Pointer, memory.Length);
+				var span2 = span[span.IndexOf("Common/FlagIcons/")..];
+				var fr4K = span2.IndexOf("Common/FlagIcons/4K/fr\"");
+				var zhTW4K = span2.IndexOf("Common/FlagIcons/4K/zhTW\"");
+				if (fr4K < zhTW4K) {
+					span2[(fr4K + 23)..(zhTW4K + 20)].CopyTo(span2[(fr4K + 25)..]); // move two chars back
+					"zhTW\"".CopyTo(span2[(fr4K + 20)..]);
+					"fr\"".CopyTo(span2[(zhTW4K + 22)..]);
+				} else {
+					span2[(zhTW4K + 25)..(fr4K + 20)].CopyTo(span2[(zhTW4K + 23)..]); // move two chars forward
+					"fr\"".CopyTo(span2[(zhTW4K + 20)..]);
+					"zhTW\"".CopyTo(span2[(fr4K + 18)..]);
+				}
+				var fr = span2.IndexOf("Common/FlagIcons/fr\"");
+				var zhTW = span2.IndexOf("Common/FlagIcons/zhTW\"");
+				if (fr < zhTW) {
+					span2[(fr + 20)..(zhTW + 17)].CopyTo(span2[(fr + 22)..]); // move two chars back
+					"zhTW\"".CopyTo(span2[(fr + 17)..]);
+					"fr\"".CopyTo(span2[(zhTW + 19)..]);
+				} else {
+					span2[(zhTW + 22)..(fr + 17)].CopyTo(span2[(zhTW + 20)..]); // move two chars forward
+					"fr\"".CopyTo(span2[(zhTW + 17)..]);
+					"zhTW\"".CopyTo(span2[(fr + 15)..]);
+				}
 			}
 
-			var br = index.GetSmallestBundle();
-			var bundle = br.Bundle;
-			var ms = new MemoryStream(bundle.UncompressedSize);
-			ms.Write(bundle.ReadData());
-			var langDat = dat.Save(false, false);
-			lang.Redirect(br, (int)ms.Length, langDat.Length);
-			ms.Write(langDat);
-			uiImages.Redirect(br, (int)ms.Length, span.Length);
-			ms.Write(new(p.Pointer, memory.Length));
-			p.Dispose();
-			bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-			ms.Close();
-			index.Save();
+			// Save
+			Index.Replace(new FileRecord[] { lang, uiImages }, (FileRecord fr, int _, out ReadOnlySpan<byte> content) => {
+				if (fr == lang)
+					content = data;
+				else if (fr == uiImages)
+					content = memory.Span;
+				else
+					throw new("Unexpected error in replacement");
+				return true;
+			});
 		}
 	}
 }

@@ -2,6 +2,6 @@
 
 namespace LibBundle3.Nodes {
 	public interface IDirectoryNode : ITreeNode {
-		public IList<ITreeNode> Children { get; }
+		public abstract IList<ITreeNode> Children { get; }
 	}
 }

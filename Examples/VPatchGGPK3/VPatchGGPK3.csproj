@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
-	<PropertyGroup>
-		<OutputType>WinExe</OutputType>
-	</PropertyGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\..\LibGGPK3\LibGGPK3.csproj" />
+		<ProjectReference Include="../../LibGGPK3/LibGGPK3.csproj" />
 	</ItemGroup>
 	<Import Project="../EtoForms.props" />
 </Project>

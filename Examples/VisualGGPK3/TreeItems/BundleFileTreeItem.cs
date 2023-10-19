@@ -6,8 +6,8 @@ using System.IO;
 namespace VisualGGPK3.TreeItems {
 	public class BundleFileTreeItem : FileTreeItem, IFileNode {
 		public FileRecord Record { get; }
-		public new BundleDirectoryTreeItem Parent => (BundleDirectoryTreeItem)base.Parent;
-		ITreeNode ITreeNode.Parent => (ITreeNode)base.Parent;
+		public override BundleDirectoryTreeItem Parent => (BundleDirectoryTreeItem)base.Parent;
+		IDirectoryNode ITreeNode.Parent => Parent;
 
 		protected internal BundleFileTreeItem(FileRecord record, BundleDirectoryTreeItem parent) : base(Path.GetFileName(record.Path), parent) {
 			Record = record;

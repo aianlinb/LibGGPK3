@@ -4,7 +4,7 @@
 	/// </summary>
 	public class GGPKRecord : BaseRecord {
 		/// <summary>GGPK</summary>
-		public const uint Tag = 0x4B504747;
+		public const int Tag = 0x4B504747;
 
 		public uint GGPKVersion { get; } = 3; // 3 for PC, 4 for Mac, 2 for gmae-version before 3.11.2 which has no bundle in ggpk
 
@@ -12,14 +12,14 @@
 		public long FirstFreeRecordOffset { get; protected internal set; }
 
 		protected internal GGPKRecord(int length, GGPK ggpk) : base(length, ggpk) {
-			Offset = ggpk.GGPKStream.Position - 8;
-			GGPKVersion = (uint)ggpk.GGPKStream.ReadInt32(); // 3 for PC, 4 for Mac
-			RootDirectoryOffset = ggpk.GGPKStream.ReadInt64();
-			FirstFreeRecordOffset = ggpk.GGPKStream.ReadInt64();
+			Offset = ggpk.baseStream.Position - 8;
+			GGPKVersion = (uint)ggpk.baseStream.Read<int>(); // 3 for PC, 4 for Mac
+			RootDirectoryOffset = ggpk.baseStream.Read<long>();
+			FirstFreeRecordOffset = ggpk.baseStream.Read<long>();
 		}
 
 		protected internal override void WriteRecordData() {
-			var s = Ggpk.GGPKStream;
+			var s = Ggpk.baseStream;
 			Offset = s.Position;
 			s.Write(Length); // 28
 			s.Write(Tag);

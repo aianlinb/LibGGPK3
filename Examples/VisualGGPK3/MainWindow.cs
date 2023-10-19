@@ -1,8 +1,8 @@
 ﻿using Eto.Drawing;
 using Eto.Forms;
-using LibBundle3;
-using LibBundledGGPK;
+using LibBundledGGPK3;
 using LibGGPK3;
+using LibGGPK3.Records;
 using System;
 using System.IO;
 using System.Reflection;
@@ -26,8 +26,16 @@ namespace VisualGGPK3 {
 
 #pragma warning disable CS8618
 		public MainWindow(string? path = null) {
+#if Mac
+			static void closed(object? sender, EventArgs e) => Application.Instance.Quit();
+			Closed += closed;
+			Application.Instance.Terminating += (s, e) => Closed -= closed;
+#endif
 			var version = Assembly.GetExecutingAssembly().GetName().Version!;
-			Title = $"VisualGGPK3 (v{version.Major}.{version.Minor}.{version.Build})";
+			if (version.Revision != 0)
+				Title = $"VisualGGPK3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})";
+			else
+				Title = $"VisualGGPK3 (v{version.Major}.{version.Minor}.{version.Build})";
 			try {
 				var bounds = Screen.Bounds;
 				if (bounds.Width <= 1280 || bounds.Height <= 720)
@@ -41,7 +49,7 @@ namespace VisualGGPK3 {
 			var h = Handler;
 			static void WindowsFix(TreeView tree) {
 				var etree = ((Eto.Wpf.Forms.Controls.TreeViewHandler)tree.Handler).Control; // EtoTreeView
-				// Virtualizing
+																							// Virtualizing
 				etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.IsVirtualizingProperty, true);
 				etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.VirtualizationModeProperty, System.Windows.Controls.VirtualizationMode.Recycling);
 				// Fix expand binding
@@ -88,11 +96,11 @@ namespace VisualGGPK3 {
 					Panel1MinimumSize = 10,
 					Panel2 = ImagePanel,
 					Panel2MinimumSize = 10,
-					SplitterWidth = 2,
+					SplitterWidth = 4,
 					Position = 240
 				},
 				Panel2MinimumSize = 20,
-				SplitterWidth = 2,
+				SplitterWidth = 4,
 				Position = 120
 			};
 
@@ -112,8 +120,8 @@ namespace VisualGGPK3 {
 					var ofd = new OpenFileDialog() {
 						FileName = "Content.ggpk",
 						Filters = {
-							new() { Name = "GGPK File", Extensions = new string[] { "*.ggpk" } },
-							new() { Name = "Index File", Extensions = new string[] { "*.index.bin" } }
+							new() { Name = "GGPK/Index File", Extensions = new string[] { ".ggpk", ".index.bin" } },
+							new() { Extensions = new string[] { "" } }
 						}
 					};
 					if (ofd.ShowDialog(this) != DialogResult.Ok) {
@@ -122,10 +130,10 @@ namespace VisualGGPK3 {
 					}
 					path = ofd.FileName;
 				}
-				
+
 				if (path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)) {
 					await Task.Run(() => Index = new(path));
-					GGPKTree.DataStore = new DriveDirectoryTreeItem(Directory.GetParent(path)!.FullName, null, GGPKTree) {
+					GGPKTree.DataStore = new DriveDirectoryTreeItem(Path.GetDirectoryName(path)!, null, GGPKTree) {
 						Expanded = true
 					};
 				} else {
@@ -140,7 +148,7 @@ namespace VisualGGPK3 {
 				BundleTree.DataStore = bundles;
 			}
 		}
-		
+
 		protected virtual void OnSelectionChanged(object? sender, EventArgs e) {
 			var item = (sender as TreeView)?.SelectedItem;
 			if (item == null)
@@ -152,47 +160,54 @@ namespace VisualGGPK3 {
 			if (item is FileTreeItem fileItem) {
 				var panel = (Splitter)((Splitter)Content).Panel2;
 				var format = fileItem.Format;
-				switch (format) {
-					case FileTreeItem.DataFormat.Text:
-						var span = fileItem.Read().Span;
-						if (span.Length > 20971520) {
-							if (MessageBox.Show(this, "This text file is huge, are you sure to show its content?", "Confirm", MessageBoxButtons.YesNo, MessageBoxType.Warning) != DialogResult.Yes)
-								return;
-						}
-						if (span[0] == 0xFF)
-							TextPanel.Text = span[2..].GetUnicodeString();
-						else if (Path.GetExtension(fileItem.Name).Equals(".amd", StringComparison.OrdinalIgnoreCase))
-							TextPanel.Text = span.GetUnicodeString();
-						else
-							TextPanel.Text = Encoding.UTF8.GetString(span);
-						panel.Panel2 = TextPanel;
-						break;
-					case FileTreeItem.DataFormat.Image:
-						imageName = Path.GetFileNameWithoutExtension(fileItem.Name);
-						if (fileItem is GGPKFileTreeItem g)
-							ImagePanel.Image = new Bitmap(g.Record.ReadFileContent());
-						else if (fileItem is DriveFileTreeItem d)
-							using (var stream = File.OpenRead(d.Path))
-								ImagePanel.Image = new Bitmap(stream);
-						else
-							ImagePanel.Image = new Bitmap(fileItem.Read().ToArray());
-						panel.Panel2 = ImagePanel;
-						break;
-					case FileTreeItem.DataFormat.Dds:
-						imageName = Path.GetFileNameWithoutExtension(fileItem.Name);
-						// TODO
-						//panel.Panel2 = ImagePanel;
-						break;
-					case FileTreeItem.DataFormat.Dat:
+				try {
+					switch (format) {
+						case FileTreeItem.DataFormat.Text:
+							var span = fileItem.Read().Span;
+#if Windows
+							if (span.Length > 204800) {
+								MessageBox.Show(this, "This text file is too large, only first 200KB will be shown", "Warning", MessageBoxButtons.OK, MessageBoxType.Warning);
+								span = span[..204800];
+							}
+#endif
+							if (span[0] == 0xFF)
+								TextPanel.Text = span[2..].GetUTF16String();
+							else if (Path.GetExtension(fileItem.Name).Equals(".amd", StringComparison.OrdinalIgnoreCase))
+								TextPanel.Text = span.GetUTF16String();
+							else
+								TextPanel.Text = Encoding.UTF8.GetString(span);
+							panel.Panel2 = TextPanel;
+							break;
+						case FileTreeItem.DataFormat.Image:
+							imageName = Path.GetFileNameWithoutExtension(fileItem.Name);
+							if (fileItem is GGPKFileTreeItem g)
+								ImagePanel.Image = new Bitmap(g.Record.Read());
+							else if (fileItem is DriveFileTreeItem d)
+								using (var stream = File.OpenRead(d.Path))
+									ImagePanel.Image = new Bitmap(stream);
+							else
+								ImagePanel.Image = new Bitmap(fileItem.Read().ToArray());
+							panel.Panel2 = ImagePanel;
+							break;
+						case FileTreeItem.DataFormat.Dds:
+							imageName = Path.GetFileNameWithoutExtension(fileItem.Name);
+							// TODO
+							//panel.Panel2 = ImagePanel;
+							break;
+						case FileTreeItem.DataFormat.Dat:
 						// TODO
 						//panel.Panel2 = DatPanel;
 						//break;
-					default:
-						ImagePanel.Image = null;
-						TextPanel.Text = "";
-						DatPanel.DataStore = null;
-						panel.Panel2 = TextPanel;
-						break;
+						default:
+							TextPanel.Text = "";
+							panel.Panel2 = TextPanel;
+							ImagePanel.Image = null;
+							DatPanel.DataStore = null;
+							break;
+					}
+				} catch (Exception ex) {
+					TextPanel.Text = ex.ToString();
+					panel.Panel2 = TextPanel;
 				}
 			}
 		}
@@ -207,10 +222,9 @@ namespace VisualGGPK3 {
 				};
 				if (sfd.ShowDialog(this) != DialogResult.Ok)
 					return;
-				var f = File.Create(sfd.FileName);
 				var span = fi.Read().Span;
-				f.Write(span);
-				f.Close();
+				using (var f = File.Create(sfd.FileName, 0, FileOptions.SequentialScan))
+					f.Write(span);
 				MessageBox.Show(this, $"Extracted {span.Length} bytes to\r\n{sfd.FileName}", "Done", MessageBoxType.Information);
 			} else if (clickedItem is DirectoryTreeItem di) {
 				var sfd = new SaveFileDialog() {
@@ -222,22 +236,11 @@ namespace VisualGGPK3 {
 				};
 				if (sfd.ShowDialog(this) != DialogResult.Ok)
 					return;
-				var dir = Path.GetDirectoryName(sfd.FileName)! + Path.PathSeparator + di.Name;
-				int count;
-				if (di is BundleDirectoryTreeItem bdi)
-					count = Index.Extract(bdi, dir);
-				else if (di is GGPKDirectoryTreeItem gdi)
-					count = GGPK.Extract(gdi.Record, dir);
-				else if (di is DriveDirectoryTreeItem ddi)
-					count = ddi.Extract(dir);
-				else {
-					MessageBox.Show(this, "Unexpected type: " + di.GetType().ToString(), "Error", MessageBoxType.Error);
-					return;
-				}
-				MessageBox.Show(this, $"Extracted {count} files to\r\n{dir}", "Done", MessageBoxType.Information);
+				var dir = Path.GetDirectoryName(sfd.FileName)!;
+				MessageBox.Show(this, $"Extracted {di.Extract(dir)} files to\r\n{dir}", "Done", MessageBoxType.Information);
 			}
 		}
-		
+
 		protected virtual void OnReplaceClicked(object? sender, EventArgs e) {
 			if (clickedItem is FileTreeItem fi) {
 				var ofd = new OpenFileDialog() {
@@ -259,19 +262,10 @@ namespace VisualGGPK3 {
 						new() { Name = "All Files", Extensions = new string[] { "*" } }
 					}
 				};
-				var dir = Path.GetDirectoryName(ofd.FileName)!;
-				int count;
-				if (di is BundleDirectoryTreeItem bdi)
-					count = Index.Replace(bdi, dir);
-				else if (di is GGPKDirectoryTreeItem gdi)
-					count = GGPK.Replace(gdi.Record, dir);
-				else if (di is DriveDirectoryTreeItem ddi)
-					count = ddi.Replace(dir);
-				else {
-					MessageBox.Show(this, "Unexpected type: " + di.GetType().ToString(), "Error", MessageBoxType.Error);
+				if (ofd.ShowDialog(this) != DialogResult.Ok)
 					return;
-				}
-				MessageBox.Show(this, $"Replaced {count} files from\r\n{dir}", "Done", MessageBoxType.Information);
+				var dir = Path.GetDirectoryName(ofd.FileName)!;
+				MessageBox.Show(this, $"Replaced {di.Replace(dir)} files from\r\n{dir}", "Done", MessageBoxType.Information);
 			}
 		}
 

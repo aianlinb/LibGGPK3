@@ -3,6 +3,6 @@
 		<OutputType>Exe</OutputType>
 	</PropertyGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\..\LibBundle3\LibBundle3.csproj" />
+		<ProjectReference Include="../../LibBundle3/LibBundle3.csproj" />
 	</ItemGroup>
 </Project>

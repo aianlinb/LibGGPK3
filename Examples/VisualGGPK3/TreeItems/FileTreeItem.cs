@@ -6,7 +6,14 @@ using System.Reflection;
 
 namespace VisualGGPK3.TreeItems {
 	public abstract class FileTreeItem : ITreeItem {
-		protected internal static readonly Bitmap FileIcon = new(Assembly.GetExecutingAssembly().GetManifestResourceStream("VisualGGPK3.Resources.file.ico"));
+		protected internal static readonly Bitmap FileIcon;
+		static FileTreeItem() {
+			try {
+				FileIcon = new(Assembly.GetExecutingAssembly().GetManifestResourceStream("VisualGGPK3.Resources.file.ico"));
+			} catch {
+				FileIcon = null!;
+			}
+		}
 		public virtual string Name { get; }
 		public virtual string Text { get => Name; set => throw new InvalidOperationException(); }
 		public virtual Image Image => FileIcon;
@@ -17,7 +24,7 @@ namespace VisualGGPK3.TreeItems {
 			Name = name;
 			Parent = parent;
 		}
-		
+
 		public abstract ReadOnlyMemory<byte> Read();
 		public abstract void Write(ReadOnlySpan<byte> content);
 
@@ -29,23 +36,22 @@ namespace VisualGGPK3.TreeItems {
 		public virtual bool Expanded { get; set; }
 		string IListItem.Key => Name;
 
+		public enum DataFormat {
+			Unknown,
+			Text,
+			Dat,
+			Image,
+			Dds,
+			OGG
+		}
 		public DataFormat Format => Path.GetExtension(Name).ToLower() switch {
 			".act" or ".ais" or ".amd" or ".ao" or ".aoc" or ".arl" or ".arm" or ".atlas" or ".cht" or ".clt" or ".dct" or ".ddt" or ".dgr" or ".dlp" or ".ecf" or ".edp" or ".env" or ".epk" or ".et" or ".ffx" or ".fxgraph" or ".gft" or ".gt" or ".idl" or ".idt" or ".json" or ".mat" or ".mtd" or ".ot" or ".otc" or ".pet" or ".red" or ".rs" or ".sm" or ".tgr" or ".tgt" or ".trl" or ".tsi" or ".tst" or ".ui" or ".xml" // Unicode
 			or ".txt" or ".csv" or ".filter" or ".fx" or ".hlsl" or ".mel" or ".properties" or ".slt" => DataFormat.Text, // UTF8
 			".dat" or ".dat64" or ".datl" or ".datl64" => DataFormat.Dat,
 			".dds" or ".header" => DataFormat.Dds,
 			".jpg" or ".png" or ".bmp" or ".gif" or ".jpeg" or ".ico" or ".tiff" => DataFormat.Image,
-			".ogg" or "ogv" or "oga" or "spx" or "ogx" => DataFormat.OGG,
+			".ogg" or ".ogv" or ".oga" or ".spx" or ".ogx" => DataFormat.OGG,
 			_ => DataFormat.Unknown
 		};
-		public enum DataFormat {
-			Unknown,
-			Text,
-			UTF8,
-			Image,
-			Dds,
-			Dat,
-			OGG
-		}
 	}
 }

@@ -5,8 +5,10 @@
 		<NeutralLanguage>zh-TW</NeutralLanguage>
 	</PropertyGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\..\LibBundledGGPK3\LibBundledGGPK3.csproj" />
-		<ProjectReference Include="..\..\LibDat2\LibDat2.csproj" />
+		<ProjectReference Include="../../LibBundledGGPK3/LibBundledGGPK3.csproj" />
+		<Reference Include="LibDat2">
+			<HintPath>..\LibDat2.dll</HintPath>
+		</Reference>
 		<EmbeddedResource Include="DatDefinitions.json" />
 	</ItemGroup>
 	<Import Condition="'$(Configuration)' == 'AOT'" Project="../NativeAOT.props" />

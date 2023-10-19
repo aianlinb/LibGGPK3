@@ -1,9 +1,11 @@
-﻿using Eto.Forms;
+﻿using Eto;
+using Eto.Forms;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 
 namespace VisualGGPK3.TreeItems {
+	[ContentProperty("ChildItems")]
 	public class DriveDirectoryTreeItem : DirectoryTreeItem {
 		public virtual string Path { get; }
 		public override DriveDirectoryTreeItem? Parent { get; }
@@ -13,27 +15,27 @@ namespace VisualGGPK3.TreeItems {
 			Parent = parent;
 		}
 
-		protected ReadOnlyCollection<ITreeItem>? _Children;
-		public override ReadOnlyCollection<ITreeItem> Children {
+		protected ReadOnlyCollection<ITreeItem>? _ChildItems;
+		public override ReadOnlyCollection<ITreeItem> ChildItems {
 			get {
-				if (_Children == null) {
-					var list = Directory.EnumerateDirectories(Path).OrderBy(p => p).Select(p => (ITreeItem)new DriveDirectoryTreeItem(p, this, Tree)).ToList();
-					list.AddRange(Directory.EnumerateFiles(Path).OrderBy(p => p).Select(p => (ITreeItem)new DriveFileTreeItem(p, this)));
-					_Children = new(list);
+				if (_ChildItems == null) {
+					var list = Directory.EnumerateDirectories(Path)/*.OrderBy(p => p)*/.Select(p => (ITreeItem)new DriveDirectoryTreeItem(p, this, Tree)).ToList();
+					list.AddRange(Directory.EnumerateFiles(Path)/*.OrderBy(p => p)*/.Select(p => (ITreeItem)new DriveFileTreeItem(p, this)));
+					list.TrimExcess();
+					_ChildItems = new(list);
 				}
-				return _Children;
+				return _ChildItems;
 			}
 		}
 
-		public int Extract(string path) {
+		public override int Extract(string path) {
 			Directory.CreateDirectory(path);
-			path += "\\" + Name;
 			var count = 0;
-			foreach (var f in Children) {
+			foreach (var f in ChildItems) {
 				if (f is DriveDirectoryTreeItem di) {
-					count += di.Extract(path);
+					count += di.Extract($"{path}/{di.Name}");
 				} else if (f is DriveFileTreeItem fi) {
-					File.Copy(fi.Path, path);
+					File.Copy(fi.Path, $"{path}/{fi.Name}");
 					++count;
 				} else
 					throw new("Unexpected type: " + f.GetType().ToString());
@@ -41,13 +43,13 @@ namespace VisualGGPK3.TreeItems {
 			return count;
 		}
 
-		public int Replace(string path) {
-			path += "\\" + Name;
+		public override int Replace(string path) {
 			var count = 0;
-			foreach (var f in Children) {
+			foreach (var f in ChildItems) {
 				if (f is DriveDirectoryTreeItem di) {
-					count += di.Replace(path);
+					count += di.Replace($"{path}/{di.Name}");
 				} else if (f is DriveFileTreeItem fi) {
+					path = $"{path}/{fi.Name}";
 					if (File.Exists(path)) {
 						File.Copy(path, fi.Path);
 						++count;

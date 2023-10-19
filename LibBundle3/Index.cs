@@ -1,33 +1,44 @@
 ﻿using LibBundle3.Nodes;
 using LibBundle3.Records;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace LibBundle3 {
 	public class Index : IDisposable {
-		protected BundleRecord[] _Bundles;
-		protected Dictionary<ulong, FileRecord> _Files;
-		internal DirectoryRecord[] _Directories;
-		public virtual ReadOnlySpan<BundleRecord> Bundles => _Bundles;
-		public virtual ReadOnlyDictionary<ulong, FileRecord> Files => new(_Files);
-
-		protected readonly Bundle bundle;
-		protected readonly string? baseDirectory;
-		protected readonly byte[] directoryBundleData;
-		protected int UncompressedSize; // For memory alloc when saving
-
 		/// <summary>
-		/// Function to get <see cref="Bundle"/> instance with a <see cref="BundleRecord"/>
+		/// <see cref="Bundle"/> instance of "_.index.bin"
 		/// </summary>
-		public Func<BundleRecord, Bundle> FuncReadBundle = static (br) => new((br.Index.baseDirectory ?? "") + br.Path, br);
+		protected readonly Bundle baseBundle;
+		/// <summary>
+		/// Data for <see cref="ParsePaths"/>
+		/// </summary>
+		protected readonly byte[] directoryBundleData;
+		/// <summary>
+		/// Bundles ceated by this library for writing modfied files.
+		/// </summary>
+		protected readonly List<BundleRecord> CustomBundles = new();
+		protected BundleRecord[] _Bundles;
+		protected internal readonly DirectoryRecord[] _Directories;
+		protected readonly Dictionary<ulong, FileRecord> _Files;
+
+		public virtual ReadOnlySpan<BundleRecord> Bundles => _Bundles;
+		protected ReadOnlyDictionary<ulong, FileRecord>? _readonlyFiles;
+		public virtual ReadOnlyDictionary<ulong, FileRecord> Files => _readonlyFiles ??= new(_Files);
+
+		protected internal readonly IBundleFileFactory bundleFactory;
+		/// <summary>
+		/// Size to limit each bundle when writing, default to 200MB
+		/// </summary>
+		public virtual int MaxBundleSize { get; set; } = 209715200;
 
 		protected DirectoryNode? _Root;
 		/// <summary>
@@ -45,15 +56,16 @@ namespace LibBundle3 {
 		/// <param name="createDirectory">Function to create a instance of <see cref="IDirectoryNode"/></param>
 		/// <param name="createFile">Function to create a instance of <see cref="IFileNode"/></param>
 		/// <returns>The root node of the tree</returns>
-		public IDirectoryNode BuildTree(CreateDirectoryInstance createDirectory, CreateFileInstance createFile) {
+		public virtual IDirectoryNode BuildTree(CreateDirectoryInstance createDirectory, CreateFileInstance createFile) {
+			EnsureNotDisposed();
 			var root = createDirectory("", null);
-			var files = _Files.Values.OrderBy(f => f.Path);
-			foreach (var f in files) {
+			foreach (var f in _Files.Values.OrderBy(f => f.Path)) {
 				var nodeNames = f.Path.Split('/');
 				var parent = root;
 				var lastDirectory = nodeNames.Length - 1;
 				for (var i = 0; i < lastDirectory; ++i) {
-					if (parent.Children.Count <= 0 || parent.Children[^1] is not IDirectoryNode dr || dr.Name != nodeNames[i])
+					var count = parent.Children.Count;
+					if (count <= 0 || parent.Children[count - 1] is not IDirectoryNode dr || dr.Name != nodeNames[i])
 						parent.Children.Add(dr = createDirectory(nodeNames[i], parent));
 					parent = dr;
 				}
@@ -62,60 +74,25 @@ namespace LibBundle3 {
 			return root;
 		}
 
-		protected internal static string ExpandPath(string path) {
-			if (path.StartsWith('~')) {
-				if (path.Length == 1) { // ~
-					var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None);
-					if (userProfile != "")
-						return Environment.ExpandEnvironmentVariables(userProfile);
-				} else if (path[1] is '/' or '\\') { // ~/...
-					var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None);
-					if (userProfile != "")
-						return Environment.ExpandEnvironmentVariables(userProfile + path[1..]);
-				}
-				try { // ~username/...
-					if (!OperatingSystem.IsWindows()) {
-						string bash;
-						if (File.Exists("/bin/zsh"))
-							bash = "/bin/zsh";
-						else if (File.Exists("/bin/var/bash"))
-							bash = "/bin/var/bash";
-						else if (File.Exists("/bin/bash"))
-							bash = "/bin/bash";
-						else
-							return Environment.ExpandEnvironmentVariables(path);
-						var p = Process.Start(new ProcessStartInfo(bash) {
-							CreateNoWindow = true,
-							ErrorDialog = true,
-							RedirectStandardInput = true,
-							RedirectStandardOutput = true,
-							WindowStyle = ProcessWindowStyle.Hidden
-						});
-						p!.StandardInput.WriteLine("echo " + path);
-						var tmp = p.StandardOutput.ReadLine();
-						p.Kill();
-						p.Dispose();
-						if (!string.IsNullOrEmpty(tmp))
-							return tmp;
-					}
-				} catch { }
-			}
-			return Environment.ExpandEnvironmentVariables(path);
-		}
-
 		/// <param name="filePath">Path to _.index.bin</param>
 		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> in each of <see cref="_Files"/> will be <see langword="null"/></param>
-		public Index(string filePath, bool parsePaths = true) : this(File.Open(filePath = ExpandPath(filePath), FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false, parsePaths) {
-			baseDirectory = Path.GetDirectoryName(Path.GetFullPath(filePath)) + "/";
-		}
+		/// <param name="bundleFactory">Factory to handle .bin files of <see cref="Bundle"/></param>
+		/// <exception cref="FileNotFoundException" />
+		public Index(string filePath, bool parsePaths = true, IBundleFileFactory? bundleFactory = null) : this(
+				  File.Open(filePath = Extensions.ExpandPath(filePath), FileMode.Open, FileAccess.ReadWrite, FileShare.Read),
+				  false,
+				  parsePaths,
+				  bundleFactory ?? new DriveBundleFactory(Path.GetDirectoryName(Path.GetFullPath(filePath))!)
+			) { }
 
 		/// <param name="stream">Stream of _.index.bin</param>
 		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> after this instance has been disposed</param>
 		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> in each of <see cref="_Files"/> will be <see langword="null"/></param>
-		public unsafe Index(Stream stream, bool leaveOpen = true, bool parsePaths = true) {
-			bundle = new(stream, leaveOpen);
-			var data = bundle.ReadData();
-			UncompressedSize = data.Length;
+		/// <param name="bundleFactory">Factory to handle .bin files of <see cref="Bundle"/></param>
+		public unsafe Index(Stream stream, bool leaveOpen = true, bool parsePaths = true, IBundleFileFactory? bundleFactory = null) {
+			baseBundle = new(stream ?? throw new ArgumentNullException(nameof(stream)), leaveOpen);
+			this.bundleFactory = bundleFactory ?? new DriveBundleFactory(string.Empty);
+			var data = baseBundle.ReadWithoutCache();
 			fixed (byte* p = data) {
 				var ptr = (int*)p;
 
@@ -127,6 +104,8 @@ namespace LibBundle3 {
 					ptr = (int*)((byte*)ptr + pathLength);
 					var uncompressedSize = *ptr++;
 					_Bundles[i] = new BundleRecord(path, uncompressedSize, this, i);
+					if (path.StartsWith(CUSTOM_BUNDLE_BASE_PATH))
+						CustomBundles.Add(_Bundles[i]);
 				}
 
 				var fileCount = *ptr++;
@@ -153,24 +132,28 @@ namespace LibBundle3 {
 				}
 				*/
 
-				directoryBundleData = data[(int)((byte*)ptr - p)..];
+				directoryBundleData = data[(int)((byte*)ptr - p)..].ToArray();
 			}
 
 			if (parsePaths)
 				ParsePaths();
-			return;
 		}
 
+		/// <summary>
+		/// Parse the <see cref="FileRecord.Path"/> of files in <see cref="Files"/>.
+		/// Automatically called by constructor if <see langword="true"/> passed to the last parameter (default to <see langword="true"/>).
+		/// </summary>
 		public virtual unsafe void ParsePaths() {
-			var directoryBundle = new Bundle(new MemoryStream(directoryBundleData), false);
-			var directory = directoryBundle.ReadData();
-			directoryBundle.Dispose();
+			EnsureNotDisposed();
+			ReadOnlySpan<byte> directory;
+			using (var directoryBundle = new Bundle(new MemoryStream(directoryBundleData), false))
+				directory = directoryBundle.ReadWithoutCache();
 			fixed (byte* p = directory) {
-				var ptr = p;
 				foreach (var d in _Directories) {
 					var temp = new List<IEnumerable<byte>>();
 					var Base = false;
-					var offset = ptr = p + d.Offset;
+					var offset = p + d.Offset;
+					var ptr = offset;
 					while (ptr - offset <= d.Size - 4) {
 						var index = *(int*)ptr;
 						ptr += 4;
@@ -188,7 +171,7 @@ namespace LibBundle3 {
 							var str = sb.ToString();
 							*/
 							var strlen = new ReadOnlySpan<byte>(ptr, d.Size).IndexOf((byte)0); // See String.Ctor(sbyte* value)
-							//var str = new string((sbyte*)ptr, 0, strlen); // Unicode string
+																							   //var str = new string((sbyte*)ptr, 0, strlen); // Unicode string
 							IEnumerable<byte> str = new ReadOnlySpan<byte>(ptr, strlen).ToArray(); // UTF8 string
 
 							if (index < temp.Count) {
@@ -214,402 +197,408 @@ namespace LibBundle3 {
 		}
 
 		/// <summary>
-		/// Save the _.index.bin. Call this after any file changed
+		/// Save the _.index.bin.
+		/// Call this after <see cref="FileRecord.Redirect"/>
 		/// </summary>
 		public virtual unsafe void Save() {
-			var ms = new MemoryStream(UncompressedSize);
-			var bw = new BinaryWriter(ms);
+			EnsureNotDisposed();
+			using var ms = new MemoryStream(baseBundle.UncompressedSize);
 
-			bw.Write(_Bundles.Length);
+			ms.Write(_Bundles.Length);
 			foreach (var b in _Bundles)
-				b.Save(bw);
+				b.Serialize(ms);
 
-			bw.Write(_Files.Count);
+			var cap = (int)ms.Length + (sizeof(int) + sizeof(int)) + _Files.Count * FileRecord.RecordLength + _Directories.Length * DirectoryRecord.RecordLength + directoryBundleData.Length;
+			if (ms.Capacity < cap)
+				ms.Capacity = cap;
+			
+			ms.Write(_Files.Count);
 			foreach (var f in _Files.Values)
-				f.Save(bw);
+				f.Serialize(ms);
 
-			bw.Write(_Directories.Length);
-			/*
-			foreach (var d in _Directories) {
-				bw.Write(d.PathHash);
-				bw.Write(d.Offset);
-				bw.Write(d.Size);
-				bw.Write(d.RecursiveSize);
-			}
-			*/
-			fixed (DirectoryRecord* drp = _Directories)
-				bw.Write(new ReadOnlySpan<byte>(drp, _Directories.Length * 20));
+			ms.Write(_Directories.Length);
+			/*foreach (var d in _Directories)
+				ms.Write(d);*/
+			fixed (DirectoryRecord* p = _Directories)
+				ms.Write(new ReadOnlySpan<byte>(p, _Directories.Length * sizeof(DirectoryRecord)));
 
-			bw.Write(directoryBundleData);
-
-			bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-			UncompressedSize = (int)ms.Length;
-			ms.Close();
-			bw.Close();
+			ms.Write(directoryBundleData, 0, directoryBundleData.Length);
+			baseBundle.Save(new(ms.GetBuffer(), 0, (int)ms.Length));
 		}
 
 		/// <summary>
-		/// Extract files to disk, and skip all files in unavailable bundles
-		/// </summary>
-		/// <param name="node">Node to extract (recursively)</param>
-		/// <param name="pathToSave">Path on disk</param>
-		public virtual int Extract(ITreeNode node, string pathToSave) {
-			pathToSave = pathToSave.Replace('\\', '/');
-			if (node is IFileNode fn) {
-				var d = Path.GetDirectoryName(pathToSave);
-				if (d != null && !pathToSave.EndsWith('/'))
-					Directory.CreateDirectory(d);
-				var f = File.Create(pathToSave);
-				f.Write(fn.Record.Read().Span);
-				f.Flush();
-				f.Close();
-				return 1;
-			}
-			pathToSave = pathToSave.TrimEnd('/');
-
-			var list = new List<FileRecord>();
-			RecursiveList(node, pathToSave, list, true);
-			if (list.Count == 0)
-				return 0;
-
-			list.Sort(BundleComparer.Instance);
-			pathToSave += "/";
-			var trim = ITreeNode.GetPath(node).Length;
-
-			var first = list[0];
-			if (list.Count == 1) {
-				var f = File.Create(pathToSave + first.Path[trim..]);
-				f.Write(first.Read().Span);
-				f.Flush();
-				f.Close();
-				return 1;
-			}
-
-			var count = 0;
-			var br = first.BundleRecord;
-			var err = false;
-			try {
-				br.Bundle.ReadDataAndCache();
-			} catch {
-				err = true;
-			}
-			foreach (var fr in list) {
-				if (br != fr.BundleRecord) {
-					if (!err)
-						br.Bundle.Dispose();
-					br = fr.BundleRecord;
-					try {
-						br.Bundle.ReadDataAndCache();
-						err = false;
-					} catch {
-						err = true;
-					}
-				}
-				if (err)
-					continue;
-				var f = File.Create(pathToSave + fr.Path[trim..]);
-				f.Write(fr.Read().Span);
-				f.Flush();
-				f.Close();
-				++count;
-			}
-			if (!err)
-				br.Bundle.Dispose();
-			return count;
-		}
-
-		/// <summary>
-		/// Extract files with their path, throw when a file couldn't be found
-		/// </summary>
-		/// <param name="filePaths">Path of files to extract, <see langword="null"/> for all files in <see cref="_Files"/></param>
-		/// <returns>KeyValuePairs of path and data of each file</returns>
-		public virtual IEnumerable<KeyValuePair<string, ReadOnlyMemory<byte>>> Extract(IEnumerable<string>? filePaths) {
-			var list = filePaths == null ? new List<FileRecord>(_Files.Values) : filePaths.Select(s => _Files[NameHash(s.Replace('\\', '/').TrimEnd('/'))]).ToList();
-			if (list.Count == 0)
-				yield break;
-			list.Sort(BundleComparer.Instance);
-
-			var first = list[0];
-			if (list.Count == 1) {
-				yield return new(first.Path, first.Read());
-				yield break;
-			}
-
-			var br = first.BundleRecord;
-			br.Bundle.ReadDataAndCache();
-			foreach (var fr in list) {
-				if (br != fr.BundleRecord) {
-					br.Bundle.Dispose();
-					br = fr.BundleRecord;
-					br.Bundle.ReadDataAndCache();
-				}
-				yield return new(fr.Path, fr.Read());
-			}
-			br.Bundle.Dispose();
-		}
-
-		/// <summary>
-		/// Replace files from disk
-		/// </summary>
-		/// <param name="node">Node to replace (recursively)</param>
-		/// <param name="pathToLoad">Path on disk</param>
-		/// <param name="dontChangeBundle">Whether to force all files to be written to their respective original bundle</param>
-		public virtual int Replace(ITreeNode node, string pathToLoad, bool dontChangeBundle = false) {
-			if (node is IFileNode fn) {
-				fn.Record.Write(File.ReadAllBytes(pathToLoad));
-				Save();
-				return 1;
-			}
-
-			pathToLoad = pathToLoad.Replace('\\', '/').TrimEnd('/');
-
-			var list = new List<FileRecord>();
-			RecursiveList(node, pathToLoad, list);
-			if (list.Count == 0)
-				return 0;
-
-			pathToLoad += "/";
-			var trim = ITreeNode.GetPath(node).Length;
-
-			var first = list[0];
-			if (list.Count == 1) {
-				first.Write(File.ReadAllBytes(pathToLoad + first.Path[trim..]));
-				Save();
-				return 1;
-			}
-
-			var count = 0;
-			if (dontChangeBundle) {
-				list.Sort(BundleComparer.Instance);
-
-				var br = first.BundleRecord;
-				var ms = new MemoryStream(br.Bundle.UncompressedSize);
-				ms.Write(br.Bundle.ReadData());
-				foreach (var fr in list) {
-					if (br != fr.BundleRecord) {
-						br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-						ms.Close();
-						br = fr.BundleRecord;
-						ms = new(br.Bundle.UncompressedSize);
-						ms.Write(br.Bundle.ReadData());
-					}
-					var b = File.ReadAllBytes(pathToLoad + fr.Path[trim..]);
-					ms.Write(b);
-					fr.Redirect(br, (int)ms.Length, b.Length);
-					++count;
-				}
-				br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-				ms.Close();
-			} else {
-				var maxSize = 209715200; //200MB
-				var br = GetSmallestBundle();
-				while (br.Bundle.UncompressedSize >= maxSize)
-					maxSize *= 2;
-				var ms = new MemoryStream(br.Bundle.UncompressedSize);
-				ms.Write(br.Bundle.ReadData());
-				foreach (var fr in list) {
-					if (ms.Length >= maxSize) {
-						br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-						ms.Close();
-						br = GetSmallestBundle();
-						while (br.Bundle.UncompressedSize >= maxSize)
-							maxSize *= 2;
-						ms = new(br.Bundle.UncompressedSize);
-						ms.Write(br.Bundle.ReadData());
-					}
-					var b = File.ReadAllBytes(pathToLoad + fr.Path);
-					ms.Write(b);
-					fr.Redirect(br, (int)ms.Length, b.Length);
-					++count;
-				}
-				br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-				ms.Close();
-			}
-			if (count != 0)
-				Save();
-			return count;
-		}
-
-		public delegate ReadOnlySpan<byte> FuncGetData(string filePath);
-		/// <summary>
-		/// Replace files with their path, throw when a file couldn't be found
-		/// </summary>
-		/// <param name="filePaths">Path of files to replace, <see langword="null"/> for all files in <see cref="_Files"/></param>
-		/// <param name="funcGetDataFromFilePath">For getting new data with the path of the file</param>
-		/// <param name="dontChangeBundle">Whether to force all files to be written to their respective original bundle</param>
-		public virtual void Replace(IEnumerable<string>? filePaths, FuncGetData funcGetDataFromFilePath, bool dontChangeBundle = false) {
-			var list = filePaths == null ? new List<FileRecord>(_Files.Values) : filePaths.Select(s => _Files[NameHash(s.Replace('\\', '/').TrimEnd('/'))]).ToList();
-			if (list.Count == 0)
-				return;
-
-			var first = list[0];
-			if (list.Count == 1) {
-				first.Write(funcGetDataFromFilePath(first.Path));
-				Save();
-				return;
-			}
-
-			if (dontChangeBundle) {
-				list.Sort(BundleComparer.Instance);
-
-				var br = first.BundleRecord;
-				var ms = new MemoryStream(br.Bundle.UncompressedSize);
-				ms.Write(br.Bundle.ReadData());
-				foreach (var fr in list) {
-					if (br != fr.BundleRecord) {
-						br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-						ms.Close();
-						br = fr.BundleRecord;
-						ms = new(br.Bundle.UncompressedSize);
-						ms.Write(br.Bundle.ReadData());
-					}
-					var b = funcGetDataFromFilePath(fr.Path);
-					ms.Write(b);
-					fr.Redirect(br, (int)ms.Length, b.Length);
-				}
-				br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-				ms.Close();
-			} else {
-				var maxSize = 209715200; //200MB
-				var br = GetSmallestBundle();
-				while (br.Bundle.UncompressedSize >= maxSize)
-					maxSize *= 2;
-				var ms = new MemoryStream(br.Bundle.UncompressedSize);
-				ms.Write(br.Bundle.ReadData());
-				foreach (var fr in list) {
-					if (ms.Length >= maxSize) {
-						br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-						ms.Close();
-						br = GetSmallestBundle();
-						while (br.Bundle.UncompressedSize >= maxSize)
-							maxSize *= 2;
-						ms = new(br.Bundle.UncompressedSize);
-						ms.Write(br.Bundle.ReadData());
-					}
-					var b = funcGetDataFromFilePath(fr.Path);
-					fr.Redirect(br, (int)ms.Length, b.Length);
-					ms.Write(b);
-				}
-				br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-				ms.Close();
-			}
-			Save();
-		}
-
-		/// <summary>
-		/// Patch with a zip file and ignore its files that couldn't be found
-		/// </summary>
-		public virtual void Replace(IEnumerable<ZipArchiveEntry> zipEntries) {
-			var maxSize = 209715200; //200MB
-			var br = GetSmallestBundle();
-			while (br.Bundle.UncompressedSize >= maxSize)
-				maxSize *= 2;
-			var ms = new MemoryStream(br.Bundle.UncompressedSize);
-			ms.Write(br.Bundle.ReadData());
-			foreach (var zip in zipEntries) {
-				if (zip.FullName.EndsWith('/'))
-					continue;
-				if (!_Files.TryGetValue(NameHash(zip.FullName), out var f))
-					continue;
-				if (ms.Length >= maxSize) {
-					br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-					ms.Close();
-					br = GetSmallestBundle();
-					while (br.Bundle.UncompressedSize >= maxSize)
-						maxSize *= 2;
-					ms = new MemoryStream(br.Bundle.UncompressedSize);
-					ms.Write(br.Bundle.ReadData());
-				}
-				var b = zip.Open();
-				f.Redirect(br, (int)ms.Length, (int)zip.Length);
-				b.CopyTo(ms);
-			}
-			br.Bundle.SaveData(new(ms.GetBuffer(), 0, (int)ms.Length));
-			ms.Close();
-
-			Save();
-		}
-
-		/// <summary>
-		/// Get a FileRecord from its path (This won't cause the tree building),
+		/// Get a FileRecord from its absolute path (This won't cause the tree building),
 		/// The separator of the <paramref name="path"/> must be forward slash '/'
 		/// </summary>
+		/// <param name="path"><see cref="FileRecord.Path"/> </param>
 		/// <returns>Null when not found</returns>
-		public virtual bool TryGetFile(string path, [NotNullWhen(true)] out FileRecord? file) {
+		public virtual bool TryGetFile(ReadOnlySpan<char> path, [NotNullWhen(true)] out FileRecord? file) {
+			EnsureNotDisposed();
 			return _Files.TryGetValue(NameHash(path), out file);
 		}
 
-		/// <param name="path">Relative path under <paramref name="root"/></param>
+		/// <summary>
+		/// Find a node in the tree. You should use <see cref="TryGetFile"/> instead of this if you have the absolute path of the file
+		/// </summary>
+		/// <param name="path">Relative path (which not start or end with slash) under <paramref name="root"/></param>
+		/// <param name="node">The node found, or null when not found, or <paramref name="root"/> if <paramref name="path"/> is empty</param>
 		/// <param name="root">Node to start searching, or <see langword="null"/> for <see cref="Root"/></param>
-		/// <returns>The node found, or <see langword="null"/> when not found</returns>
-		public virtual ITreeNode? FindNode(string path, DirectoryNode? root = null) {
+		/// <returns>Whether found a node</returns>
+		public virtual bool TryFindNode(string path, [NotNullWhen(true)] out ITreeNode? node, DirectoryNode? root = null) {
+			EnsureNotDisposed();
 			root ??= Root;
-			var SplittedPath = path.Split('/', '\\');
-			foreach (var name in SplittedPath) {
-				if (name == "")
-					return root;
-				var next = root.Children.FirstOrDefault(n => n.Name == name);
+			if (path == string.Empty) {
+				node = root;
+				return true;
+			}
+			var splittedPath = path.Split('/'); // TODO: .Net 8 ReadOnlySpan<char>.Split()
+			foreach (var name in splittedPath) {
+				var next = root.Children.FirstOrDefault(n => name.Equals(n.Name, StringComparison.OrdinalIgnoreCase));
 				if (next is not DirectoryNode dn)
-					return next;
+					return (node = next) != null;
 				root = dn;
 			}
-			return root;
+			node = root;
+			return true;
+		}
+
+		#region Extract/Replace
+		/// <summary>
+		/// Extract files in batch.
+		/// Use <see cref="FileRecord.Read"/> instead if only single file (each bundle) is needed.
+		/// </summary>
+		/// <returns>KeyValuePair of each file and its content. The value can be null if the file failed to extract (bundle not found).</returns>
+		public static IEnumerable<(FileRecord, ReadOnlyMemory<byte>?)> Extract(IEnumerable<FileRecord> files) {
+			var groups = files.GroupBy(f => f.BundleRecord);
+			foreach (var g in groups) {
+				if (!g.Key.TryGetBundle(out var bd))
+					foreach (var f in g)
+						yield return new(f, null);
+				else
+					foreach (var f in g)
+						yield return new(f, f.Read(bd));
+			}
 		}
 
 		/// <summary>
+		/// Extract files under a node in batch. 
+		/// Use <see cref="FileRecord.Read"/> instead if only single file (each bundle) is needed.
+		/// </summary>
+		/// <param name="node">Node to extract (recursively)</param>
+		/// <returns>KeyValuePair of each file and its content. The value can be null if the file failed to extract (bundle not found).</returns>
+		public static IEnumerable<(FileRecord, ReadOnlyMemory<byte>?)> Extract(ITreeNode node) {
+			return Extract(Recursefiles(node).Select(n => n.Record));
+		}
+
+		/// <summary>
+		/// Extract files under a node to disk in batch. 
+		/// Use <see cref="FileRecord.Read"/> instead if only single file (each bundle) is needed.
+		/// </summary>
+		/// <param name="node">Node to extract (recursively)</param>
+		/// <param name="path">Path on disk to extract to</param>
+		/// <returns>Number of files extracted</returns>
+		public static int Extract(ITreeNode node, string path) {
+			path = Extensions.ExpandPath(path.TrimEnd('/', '\\')) + "/";
+			var count = 0;
+			var trim = Path.GetDirectoryName(ITreeNode.GetPath(node).TrimEnd('/'))!.Length;
+			if (trim > 0) ++trim; // '/'
+			foreach (var (f, b) in Extract(Recursefiles(node, path).Select(n => n.Record))) {
+				if (!b.HasValue)
+					continue;
+				using (var fs = File.Create(path + f.Path[trim..]))
+					fs.Write(b.Value.Span);
+				++count;
+			}
+			return count;
+		}
+
+		/// <summary>
+		/// Extract files parallelly.
+		/// </summary>
+		/// <param name="files">Files to extract</param>
+		/// <param name="action">Action to execute on each file</param>
+		public static void ExtractParallel(IEnumerable<FileRecord> files, Action<FileRecord, ReadOnlyMemory<byte>> action) {
+			files.GroupBy(f => f.BundleRecord).AsParallel().ForAll(g => {
+				if (g.Key.TryGetBundle(out var bd))
+					foreach (var f in g)
+						action(f, f.Read(bd));
+			});
+		}
+
+		/// <summary>
+		/// Function for Replace() to get data for replacing and to report progress
+		/// </summary>
+		/// <param name="record">Record of data content currently being requested</param>
+		/// <param name="fileWritten">Number of files processed so far</param>
+		/// <param name="content">New content of the file to replace with</param>
+		/// <returns>Whether to process this file, <see langword="false"/> to skip replacing this file</returns>
+		public delegate bool GetDataHandler(FileRecord record, int fileWritten, out ReadOnlySpan<byte> content);
+
+		/// <summary>
+		/// Write files in batch.
+		/// This call <see cref="Save"/> automatically.
+		/// </summary>
+		/// <param name="funcGetData">Function to get the content to write for each file</param>
+		/// <returns>Number of files replaced</returns>
+		public static int Replace(IEnumerable<FileRecord> files, GetDataHandler funcGetData, bool saveIndex = true) {
+			var first = files.FirstOrDefault();
+			if (first == null)
+				return 0;
+
+			var index = first.BundleRecord.Index;
+			var count = 0;
+			var b = index.GetBundleToWrite(out var originalSize);
+			try {
+				using var ms = new MemoryStream(originalSize);
+				ms.Write(b.ReadWithoutCache(0, originalSize)); // Read original data of bundle
+				foreach (var fr in files) {
+					if (fr.BundleRecord.Index != index)
+						throw new InvalidOperationException("Attempt to mixedly use FileRecords come from different Index");
+					if (ms.Length >= index.MaxBundleSize) { // Change another bundle to write
+						b.Save(new(ms.GetBuffer(), 0, (int)ms.Length));
+						b.Dispose();
+						ms.SetLength(0);
+						b = index.GetBundleToWrite(out originalSize);
+						ms.Write(b.ReadWithoutCache(0, originalSize));
+					}
+					if (funcGetData(fr, count, out var data)) {
+						fr.Redirect(b.Record!, (int)ms.Length, data.Length);
+						ms.Write(data);
+						++count;
+					}
+				}
+				b.Save(new(ms.GetBuffer(), 0, (int)ms.Length));
+			} finally {
+				b.Dispose();
+			}
+			if (saveIndex)
+				index.Save();
+			return count;
+		}
+
+		/// <summary>
+		/// Patch with a zip file.
+		/// Throw when a file in .zip couldn't be found in Index.
+		/// This call <see cref="Save"/> automatically.
+		/// </summary>
+		/// <returns>Number of files replaced</returns>
+		public static int Replace(Index index, IEnumerable<ZipArchiveEntry> zipEntries, bool saveIndex = true) {
+			index.EnsureNotDisposed();
+			var dict = new Dictionary<FileRecord, ZipArchiveEntry>();
+			foreach (var zip in zipEntries) {
+				if (zip.FullName.EndsWith('/')) // folder
+					continue;
+				if (!index._Files.TryGetValue(index.NameHash(zip.FullName), out var f))
+					throw new("Could not found file in Index: " + zip.FullName);
+				dict.Add(f, zip);
+			}
+			return Replace(dict.Keys, (FileRecord fr, int _, out ReadOnlySpan<byte> content) => {
+				var zip = dict[fr];
+				using var fs = zip.Open();
+				var b = GC.AllocateUninitializedArray<byte>((int)zip.Length);
+				fs.ReadExactly(b);
+				content = b;
+				return true;
+			}, saveIndex);
+		}
+
+		/// <summary>
+		/// Write files under a node in batch.
+		/// This call <see cref="Save"/> automatically.
+		/// </summary>
+		/// <param name="node">Node to replace (recursively) (DFS)</param>
+		/// <param name="funcGetData">Function to get the content to write for each file</param>
+		/// <returns>Number of files replaced</returns>
+		public static int Replace(ITreeNode node, GetDataHandler funcGetData, bool saveIndex = true) {
+			return Replace(Recursefiles(node).Select(n => n.Record), funcGetData, saveIndex);
+		}
+
+		/// <summary>
+		/// Write files under a node in batch.
+		/// Skip any file which isn't exist under <paramref name="node"/>.
+		/// This call <see cref="Save"/> automatically.
+		/// </summary>
+		/// <param name="node">Node to replace (recursively) (DFS)</param>
+		/// <param name="path">Path of a folder on disk to read files to replace</param>
+		/// <returns>Number of files replaced</returns>
+		public static int Replace(ITreeNode node, string path, bool saveIndex = true) {
+			path = Extensions.ExpandPath(path.TrimEnd('/', '\\')) + "/";
+			var trim = ITreeNode.GetPath(node).TrimEnd('/').Length;
+			if (trim > 0) ++trim;
+
+			byte[] b = null!;
+			IEnumerable<FileRecord> Enumerate() {
+				foreach (var fr in Recursefiles(node).Select(n => n.Record)) {
+					var p = path + fr.Path[trim..];
+					if (File.Exists(p)) {
+						b = File.ReadAllBytes(p);
+						yield return fr;
+					}
+				}
+			}
+
+			return Replace(Enumerate(), (FileRecord fr, int _, out ReadOnlySpan<byte> content) => {
+				content = b;
+				return true;
+			}, saveIndex);
+		}
+
+		/// <summary>
+		/// Write files under a directory in batch.
+		/// Skip any file which isn't exist on <paramref name="pathOnDisk"/>.
+		/// This call <see cref="Save"/> automatically.
+		/// </summary>
+		/// <param name="nodePath">Path of a DirectoryNode to replace</param>
+		/// <param name="pathOnDisk">Path of a folder on disk to read files to replace</param>
+		/// <returns>Number of files replaced</returns>
+		public static int Replace(Index index, string nodePath, string pathOnDisk, bool saveIndex = true) {
+			nodePath = nodePath.TrimEnd('/').Replace('\\', '/');
+			if (!index.TryFindNode(nodePath, out _))
+				throw new ArgumentException("Couldn't find node in Index with given path", nameof(nodePath));
+			pathOnDisk = Extensions.ExpandPath(pathOnDisk.TrimEnd('/', '\\'));
+			if (Path.DirectorySeparatorChar != '/')
+				pathOnDisk = pathOnDisk.Replace(Path.DirectorySeparatorChar, '/');
+			var trim = pathOnDisk.Length;
+
+			byte[] b = null!;
+			IEnumerable<FileRecord> Enumerate() {
+				foreach (var p in Directory.EnumerateFiles(pathOnDisk, "*", SearchOption.AllDirectories)) {
+					if (index.TryGetFile(nodePath + p[trim..], out var fr)) {
+						b = File.ReadAllBytes(p);
+						yield return fr;
+					}
+				}
+			}
+
+			return Replace(Enumerate(), (FileRecord fr, int _, out ReadOnlySpan<byte> content) => {
+				content = b;
+				return true;
+			}, saveIndex);
+		}
+		#endregion Extract/Replace
+		/// <summary>
+		/// Path to create bundle (Must end with slash)
+		/// </summary>
+		protected const string CUSTOM_BUNDLE_BASE_PATH = "LibGGPK3/";
+		/// <summary>
+		/// Get an available bundle with size &lt; <see cref="MaxBundleSize"/>) to write under "Bundles2" with name start with <see cref="CUSTOM_BUNDLE_BASE_PATH"/>.
+		/// Or create one if not found.
+		/// Note that the returned bundle may contain existing data (with size: <paramref name="originalSize"/>) that should not be overwritten.
+		/// </summary>
+		/// <param name="originalSize">Size of the existing data in the bundle</param>
+		/// <remarks>
+		/// Since LibBundle3_v2.0.0, all changes to files should be written to a new bundle from this function instead of the old behavior (write to the original bundle or the smallest in Bundles).
+		/// Remember to call <see cref="Bundle.Dispose"/> after use to prevent memory leak.
+		/// </remarks>
+		protected internal virtual Bundle GetBundleToWrite(out int originalSize) {
+			EnsureNotDisposed();
+			originalSize = 0;
+
+			static int GetSize(BundleRecord br) {
+				var f = br._Files.MaxBy(f => f.Offset);
+				if (f == null)
+					return 0;
+				return f.Offset + f.Size;
+			}
+
+			Bundle? b = null;
+			lock (CustomBundles) {
+				foreach (var cb in CustomBundles) {
+					if ((originalSize = GetSize(cb)) < MaxBundleSize && cb.TryGetBundle(out b))
+						break;
+				}
+
+				if (b == null) { // Create one
+					var path = CUSTOM_BUNDLE_BASE_PATH + CustomBundles.Count;
+					if (CustomBundles.Exists(br => br._Path == path)) {
+						for (var i = 0; i < CustomBundles.Count; i++) {
+							var exists = false;
+							for (var j = 0; j < CustomBundles.Count; j++)
+								if (CustomBundles[j]._Path == CUSTOM_BUNDLE_BASE_PATH + i) {
+									exists = true;
+									break;
+								}
+							if (!exists) {
+								path = CUSTOM_BUNDLE_BASE_PATH + i;
+								break;
+							}
+						}
+					}
+					b = CreateBundle(path);
+					var br = b.Record!;
+					CustomBundles.Add(br);
+					originalSize = GetSize(br);
+				}
+			}
+			return b;
+		}
+
+		/*/// <summary>
 		/// Get an available bundle with smallest uncompressed_size
 		/// </summary>
 		public virtual BundleRecord GetSmallestBundle() {
-			if (_Bundles == null || _Bundles.Length == 0)
-				throw new("Unable to find an available bundle");
-			var bundles = (BundleRecord[])_Bundles.Clone();
-			Array.Sort(bundles, (x, y) => x.UncompressedSize - y.UncompressedSize);
-			for (var i = 0; i < bundles.Length; ++i)
-				try {
-					_ = bundles[i].Bundle;
-					return bundles[i];
-				} catch { }
+			EnsureNotDisposed();
+			var br = _Bundles.MinBy(b => b.UncompressedSize) ?? throw new("Unable to find an available bundle");
+			if (br.TryBundle(out var b))
+				return b;
+
+			var list = _Bundles.OrderBy(b => b.UncompressedSize);
+			foreach (var b in list)
+				if (br.TryBundle(out var b))
+					return b;
 			throw new("Unable to find an available bundle");
-		}
-
-		public virtual void Dispose() {
-			GC.SuppressFinalize(this);
-			bundle.Dispose();
-		}
-
-		~Index() {
-			Dispose();
-		}
-
-		/// <param name="node">Node to start recursive</param>
-		/// <param name="path">Path on disk which don't end with a slash</param>
-		/// <param name="list">A collection to save the results</param>
-		/// <param name="createDirectory">Whether to create the directories of the files</param>
-		public static void RecursiveList(ITreeNode node, string path, ICollection<FileRecord> list, bool createDirectory = false) {
-			if (node is IFileNode fn)
-				list.Add(fn.Record);
-			else if (node is IDirectoryNode dn) {
-				if (createDirectory)
-					Directory.CreateDirectory(path);
-				foreach (var n in dn.Children)
-					RecursiveList(n, path + "/" + n.Name, list, createDirectory);
-			}
+		}*/
+		/// <summary>
+		/// Create a new bundle and add it to <see cref="Bundles"/> using <see cref="IBundleFileFactory.CreateBundle"/>
+		/// </summary>
+		/// <param name="bundlePath">Relative path of the bundle without ".bundle.bin"</param>
+		protected virtual Bundle CreateBundle(string bundlePath) {
+			EnsureNotDisposed();
+			var count = _Bundles.Length;
+			var br = new BundleRecord(bundlePath, 0, this, count);
+			var b = new Bundle(bundleFactory.CreateBundle(bundlePath + ".bundle.bin"), br);
+			Array.Resize(ref _Bundles, count + 1);
+			_Bundles[count] = br;
+			baseBundle.UncompressedSize += br.RecordLength; // Hack to prevent MemoryStream reallocating next line
+			Save();
+			return b;
 		}
 
 		/// <summary>
+		/// Remove all custom bundles created by <see cref="GetBundleToWrite"/>.
+		/// </summary>
+		/// <remarks>
+		/// You shouldn't call this function unless there are some errors caused by these bundles.
+		/// Make sure there is no file in these bundles (using <see cref="FileRecord.Redirect"/> on each of <see cref="BundleRecord.Files"/>, or just restore _.index.bin).
+		/// </remarks>
+		public virtual void RemoveCustomBundles() {
+			EnsureNotDisposed();
+			foreach (var b in CustomBundles) {
+				if (b._Files.Count > 0)
+					throw new InvalidOperationException($"Failed to remove bundle: {b.Path}\r\nThere are still some files point to the bundle");
+			}
+			_Bundles = _Bundles.Where(b => !b._Path.StartsWith(CUSTOM_BUNDLE_BASE_PATH)).ToArray();
+			CustomBundles.Clear();
+			bundleFactory.RemoveAllCreatedBundle(CUSTOM_BUNDLE_BASE_PATH);
+			Save();
+		}
+
+		#region NameHashing
+		/// <summary>
 		/// Get the hash of a file path
 		/// </summary>
+		[SkipLocalsInit]
 		public unsafe ulong NameHash(ReadOnlySpan<char> name) {
-			if (_Directories[0].PathHash == 0xF42A94E69CFF42FE || name[^1] != '/') {
-				var c = stackalloc char[name.Length];
-				var count = name.ToLowerInvariant(new(c, name.Length));
-				var b = stackalloc byte[count];
-				count = Encoding.UTF8.GetBytes(c, count, b, count);
-				return NameHash(new ReadOnlySpan<byte>(b, count));
+			var count = name.Length;
+			if (_Directories[0].PathHash == 0xF42A94E69CFF42FE) {
+				var p = stackalloc char[count];
+				count = name.ToLowerInvariant(new(p, count));
+				count = Encoding.UTF8.GetBytes(p, count, (byte*)p, count);
+				return NameHash(new ReadOnlySpan<byte>(p, count));
 			} else
-				fixed(char* p = name) {
-					var b = stackalloc byte[name.Length];
-					var count = Encoding.UTF8.GetBytes(p, name.Length, b, name.Length);
+				fixed (char* p = name) {
+					var b = stackalloc byte[count];
+					count = Encoding.UTF8.GetBytes(p, count, b, count);
 					return NameHash(new ReadOnlySpan<byte>(b, count));
 				}
 		}
@@ -619,10 +608,11 @@ namespace LibBundle3 {
 		/// <paramref name="utf8Str"/> must be lowercased unless it comes from ggpk before patch 3.21.2
 		/// </summary>
 		protected unsafe ulong NameHash(ReadOnlySpan<byte> utf8Str) {
+			EnsureNotDisposed();
 			return _Directories[0].PathHash switch {
 				0xF42A94E69CFF42FE => MurmurHash64A(utf8Str), // since poe 3.21.2 patch
 				0x07E47507B4A92E53 => FNV1a64Hash(utf8Str),
-				_ => throw new("Unable to detect namehash algorithm"),
+				_ => throw new("Unable to detect the namehash algorithm")
 			};
 		}
 
@@ -632,39 +622,35 @@ namespace LibBundle3 {
 		protected static unsafe ulong MurmurHash64A(ReadOnlySpan<byte> utf8Str, ulong seed = 0x1337B33F) {
 			if (utf8Str[^1] == '/') // TrimEnd('/')
 				utf8Str = utf8Str[..^1];
-			var length = utf8Str.Length;
+			int length = utf8Str.Length;
 
 			const ulong m = 0xC6A4A7935BD1E995UL;
 			const int r = 47;
 
-			ulong h = seed ^ ((ulong)length * m);
+			unchecked {
+				ulong h = seed ^ ((ulong)length * m);
 
-			fixed (byte* data = utf8Str) {
-				ulong* p = (ulong*)data;
-				int numberOfLoops = length >> 3; // div 8
-				while (numberOfLoops-- != 0) {
-					ulong k = *p++;
-					k *= m;
-					k ^= k >> r;
-					k *= m;
+				fixed (byte* data = utf8Str) {
+					ulong* p = (ulong*)data;
+					int numberOfLoops = length >> 3; // div 8
+					while (numberOfLoops-- != 0) {
+						ulong k = *p++;
+						k *= m;
+						k = (k ^ (k >> r)) * m;
+						h = (h ^ k) * m;
+					}
 
-					h ^= k;
-					h *= m;
+					int remainingBytes = length & 0b111; // mod 8
+					if (remainingBytes != 0) {
+						int offset = (8 - remainingBytes) << 3; // mul 8 (bit * 8 = byte)
+						h = (h ^ (*p & (0xFFFFFFFFFFFFFFFFUL >> offset))) * m;
+					}
 				}
 
-				int remainingBytes = length & 0b111; // mod 8
-				if (remainingBytes != 0) {
-					int offset = (8 - remainingBytes) << 3; // mul 8
-					h ^= *p & (0xFFFFFFFFFFFFFFFFUL >> offset);
-					h *= m;
-				}
+				h = (h ^ (h >> r)) * m;
+				h ^= h >> r;
+				return h;
 			}
-
-			h ^= h >> r;
-			h *= m;
-			h ^= h >> r;
-
-			return h;
 		}
 
 		/// <summary>
@@ -672,30 +658,113 @@ namespace LibBundle3 {
 		/// </summary>
 		protected static unsafe ulong FNV1a64Hash(ReadOnlySpan<byte> utf8Str) {
 			var hash = 0xCBF29CE484222325UL;
-			if (utf8Str[^1] == '/') {
-				utf8Str = utf8Str[..^1]; // TrimEnd('/')
-				foreach (ulong by in utf8Str)
-					hash = (hash ^ by) * 0x100000001B3UL;
-			} else
-				foreach (ulong by in utf8Str) {
-					if (by < 91 && by >= 65)
-						hash = (hash ^ (by + 32)) * 0x100000001B3UL; // ToLower
-					else
+			unchecked {
+				if (utf8Str[^1] == '/') {
+					utf8Str = utf8Str[..^1]; // TrimEnd('/')
+					foreach (ulong by in utf8Str)
 						hash = (hash ^ by) * 0x100000001B3UL;
-				}
-			return (((hash ^ 43) * 0x100000001B3UL) ^ 43) * 0x100000001B3UL; // "++" ('+'==43)
+				} else
+					foreach (ulong by in utf8Str) {
+						if (by < 91 && by >= 65)
+							hash = (hash ^ (by + 32)) * 0x100000001B3UL; // ToLower
+						else
+							hash = (hash ^ by) * 0x100000001B3UL;
+					}
+				return (((hash ^ 43) * 0x100000001B3UL) ^ 43) * 0x100000001B3UL; // "++" ('+'==43)
+			}
+		}
+		#endregion NameHashing
+
+		/// <summary>
+		/// Enumerate all files under a node (with DFS)
+		/// </summary>
+		/// <param name="node">Node to start recursive</param>
+		public static IEnumerable<IFileNode> Recursefiles(ITreeNode node) {
+			if (node is IFileNode fn)
+				yield return fn;
+			else if (node is IDirectoryNode dn)
+				foreach (var n in dn.Children)
+					foreach (var f in Recursefiles(n))
+						yield return f;
 		}
 
 		/// <summary>
-		/// For sorting FileRecords with their bundle
+		/// Enumerate all files under a node (with DFS), and call Directory.CreateDirectory for each folder
 		/// </summary>
-		public sealed class BundleComparer : IComparer<FileRecord> {
-			public static readonly BundleComparer Instance = new();
-			private BundleComparer() { }
-#pragma warning disable CS8767
-			public int Compare(FileRecord x, FileRecord y) {
-				return x.BundleRecord.BundleIndex - y.BundleRecord.BundleIndex;
+		/// <param name="node">Node to start recursive</param>
+		/// <param name="path">Path on disk</param>
+		protected static IEnumerable<IFileNode> Recursefiles(ITreeNode node, string path) {
+			Directory.CreateDirectory(path);
+			if (node is IFileNode fn)
+				yield return fn;
+			else if (node is IDirectoryNode dn)
+				foreach (var n in dn.Children)
+					foreach (var f in Recursefiles(n, $@"{path}/{dn.Name}"))
+						yield return f;
+		}
+
+		/// <summary>
+		/// Sort files with index of their bundle (<see cref="BundleRecord.BundleIndex"/>) with CountingSort (stable) to get better performance for reading.
+		/// </summary>
+		/// <remarks>
+		/// <code>using System.Linq;
+		/// IEnumerable&lt;FileRecord&gt;.GroupBy(f => f.BundleRecord);</code> can also achieve similar purposes in some case.
+		/// </remarks>
+		/// <seealso cref="Enumerable.GroupBy"/>
+		public static unsafe FileRecord[] SortWithBundle(IEnumerable<FileRecord> files) {
+			var list = files is IReadOnlyList<FileRecord> irl ? irl : files is IList<FileRecord> il ? il.AsReadOnly() : files.ToList();
+			if (list.Count <= 0)
+				return Array.Empty<FileRecord>();
+			var index = list[0].BundleRecord.Index;
+			var bundleCount = index._Bundles.Length;
+			var count = new int[bundleCount];
+			foreach (var br in list.Select(f => f.BundleRecord)) {
+				if (br.Index != index)
+					throw new InvalidOperationException("Attempt to mixedly use FileRecords come from different Index");
+				++count[br.BundleIndex];
 			}
+			for (var i = 1; i < bundleCount; ++i)
+				count[i] += count[i - 1];
+			var sorted = new FileRecord[list.Count];
+			for (var i = sorted.Length - 1; i >= 0; --i)
+				sorted[--count[list[i].BundleRecord.BundleIndex]] = list[i];
+			return sorted;
+		}
+
+		protected virtual void EnsureNotDisposed() {
+			if (_Bundles == null)
+				throw new ObjectDisposedException(nameof(Index));
+		}
+
+		public virtual void Dispose() {
+			GC.SuppressFinalize(this);
+			baseBundle?.Dispose();
+			_Bundles = null!;
+			_readonlyFiles = null;
+			_Root = null;
+		}
+
+		~Index() => Dispose();
+
+		/// <summary>
+		/// Currently unused
+		/// </summary>
+		[Serializable]
+		[StructLayout(LayoutKind.Sequential, Size = RecordLength, Pack = 4)]
+		protected internal struct DirectoryRecord {
+			public ulong PathHash;
+			public int Offset;
+			public int Size;
+			public int RecursiveSize;
+
+			public DirectoryRecord(ulong pathHash, int offset, int size, int recursiveSize) {
+				PathHash = pathHash;
+				Offset = offset;
+				Size = size;
+				RecursiveSize = recursiveSize;
+			}
+
+			public const int RecordLength = sizeof(ulong) + sizeof(int) * 3;
 		}
 	}
 }

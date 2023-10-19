@@ -33,13 +33,13 @@ namespace GGPKFastCompact3 {
 				Console.WriteLine("GGPK size: " + size);
 				Console.WriteLine("Reading ggpk file . . .");
 
-				var ggpk = new GGPK(args[0]);
+				using var ggpk = new GGPK(args[0]);
 				var max = -1;
 				var prog = -1;
 				Console.WriteLine("Start compaction . . .");
 				Console.WriteLine();
 				Console.CancelKeyPress += OnCancelKeyPress;
-				var tsk = ggpk.FastCompactAsync(cancel.Token, new Progress<int>(i => {
+				using var tsk = ggpk.FastCompactAsync(cancel.Token, new Progress<int>(i => {
 					prog = i;
 					if (prog > max)
 						max = prog;
@@ -56,7 +56,6 @@ namespace GGPKFastCompact3 {
 				Console.CancelKeyPress -= OnCancelKeyPress;
 				Console.WriteLine($"Remaining FreeRecords to be filled: {prog}/{max}");
 				Console.WriteLine();
-				ggpk.Dispose();
 				cancel.Dispose();
 				if (tsk.Exception != null)
 					throw tsk.Exception!;

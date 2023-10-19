@@ -1,6 +1,7 @@
 ﻿using LibGGPK3;
 using LibGGPK3.Records;
 using System;
+using System.Buffers;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
@@ -8,69 +9,75 @@ using System.Reflection;
 namespace PatchGGPK3 {
 	public class Program {
 		public static void Main(string[] args) {
-			var version = Assembly.GetExecutingAssembly().GetName().Version!;
-			Console.WriteLine($"PatchGGPK3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb"); // ©
-			Console.WriteLine();
-			if (args.Length == 0) {
-				args = new string[2];
-				Console.Write("Path to Content.ggpk: ");
-				args[0] = Console.ReadLine()!;
-				Console.Write("Path to zip file: ");
-				args[1] = Console.ReadLine()!;
-			} else if (args.Length != 2) {
-				Console.WriteLine("Usage: PatchGGPK3 <PathToGGPK> <ZipFile>");
+			try {
+				var version = Assembly.GetExecutingAssembly().GetName().Version!;
+				Console.WriteLine($"PatchGGPK3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb"); // ©
 				Console.WriteLine();
-				Console.WriteLine("Enter to exit . . .");
-				Console.ReadLine();
-				return;
-			}
-			if (!File.Exists(args[0])) {
-				Console.WriteLine("FileNotFound: " + args[0]);
-				Console.WriteLine();
-				Console.WriteLine("Enter to exit . . .");
-				Console.ReadLine();
-				return;
-			}
-			if (!File.Exists(args[1])) {
-				Console.WriteLine("FileNotFound: " + args[1]);
-				Console.WriteLine();
-				Console.WriteLine("Enter to exit . . .");
-				Console.ReadLine();
-				return;
-			}
-
-			Console.WriteLine("GGPK: " + args[0]);
-			Console.WriteLine("Patch file: " + args[1]);
-			Console.WriteLine("Reading ggpk file . . .");
-			var ggpk = new GGPK(args[0]);
-			Console.WriteLine("Replacing files . . .");
-			var zip = ZipFile.OpenRead(args[1]);
-
-			int successed = 0, failed = 0;
-			Console.WriteLine();
-			foreach (var e in zip.Entries) {
-				if (e.FullName.EndsWith('/'))
-					continue;
-				Console.Write("Replacing " + e.FullName + " . . . ");
-				if (ggpk.FindNode(e.FullName) is not FileRecord fr) {
-					++failed;
+				if (args.Length == 0) {
+					args = new string[2];
+					Console.Write("Path to Content.ggpk: ");
+					args[0] = Console.ReadLine()!;
+					Console.Write("Path to zip file: ");
+					args[1] = Console.ReadLine()!;
+				} else if (args.Length != 2) {
+					Console.WriteLine("Usage: PatchGGPK3 <PathToGGPK> <ZipFile>");
 					Console.WriteLine();
-					Console.WriteLine("Not found in GGPK!");
-					continue;
+					Console.WriteLine("Enter to exit . . .");
+					Console.ReadLine();
+					return;
 				}
-				var fs = e.Open();
-				var b = new byte[e.Length];
-				for (var l = 0; l < b.Length;)
-					l += fs.Read(b, l, b.Length - l);
-				fs.Close();
-				fr.ReplaceContent(b);
-				++successed;
-				Console.WriteLine("Done");
+				if (!File.Exists(args[0])) {
+					Console.WriteLine("FileNotFound: " + args[0]);
+					Console.WriteLine();
+					Console.WriteLine("Enter to exit . . .");
+					Console.ReadLine();
+					return;
+				}
+				if (!File.Exists(args[1])) {
+					Console.WriteLine("FileNotFound: " + args[1]);
+					Console.WriteLine();
+					Console.WriteLine("Enter to exit . . .");
+					Console.ReadLine();
+					return;
+				}
+
+				Console.WriteLine("GGPK: " + args[0]);
+				Console.WriteLine("Patch file: " + args[1]);
+				Console.WriteLine("Reading ggpk file . . .");
+				using var ggpk = new GGPK(args[0]);
+				Console.WriteLine("Replacing files . . .");
+				var zip = ZipFile.OpenRead(args[1]);
+
+				int successed = 0, failed = 0;
+				Console.WriteLine();
+				foreach (var entry in zip.Entries) {
+					if (entry.FullName.EndsWith('/'))
+						continue;
+					Console.Write("Replacing " + entry.FullName + " . . . ");
+					if (!ggpk.TryFindNode(entry.FullName, out var node) || node is not FileRecord fr) {
+						++failed;
+						Console.WriteLine();
+						Console.WriteLine("Not found in GGPK!");
+						continue;
+					}
+					using var fs = entry.Open();
+					var len = (int)entry.Length;
+					var b = ArrayPool<byte>.Shared.Rent(len);
+					try {
+						fs.ReadExactly(b, 0, len);
+						fr.Write(new(b, 0, len));
+					} finally {
+						ArrayPool<byte>.Shared.Return(b);
+					}
+					++successed;
+					Console.WriteLine("Done");
+				}
+				Console.WriteLine();
+				Console.WriteLine("All finished!");
+				Console.WriteLine($"Replaced {successed} files, {failed} files failed");
+			} catch (Exception e) {
+				Console.Error.WriteLine(e);
 			}
-			ggpk.Dispose();
-			Console.WriteLine();
-			Console.WriteLine("All finished!");
-			Console.WriteLine($"Replaced {successed} files, {failed} files failed");
 			Console.WriteLine();
 			Console.WriteLine("Enter to exit . . .");
 			Console.ReadLine();

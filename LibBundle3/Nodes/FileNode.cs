@@ -4,11 +4,9 @@ using System.IO;
 namespace LibBundle3.Nodes {
 	public class FileNode : IFileNode {
 		public virtual string Name { get; }
-
 		public virtual DirectoryNode Parent { get; }
-		ITreeNode? ITreeNode.Parent => Parent;
-
-		public FileRecord Record { get; }
+		IDirectoryNode ITreeNode.Parent => Parent;
+		public virtual FileRecord Record { get; }
 
 		protected FileNode(FileRecord record, DirectoryNode parent) {
 			Name = Path.GetFileName(record.Path);

@@ -18,3 +18,7 @@ Handle the *.bundle.bin files under Bundles2 folder
 # LibBundledGGPK3
 Combination of LibGGPK3 and LibBundle3  
 Handle both Content.ggpk and the bundle files in it
+
+# Examples
+Sample programs to realize some simple features of the libraries  
+***VisualGGPK3 is still under development***

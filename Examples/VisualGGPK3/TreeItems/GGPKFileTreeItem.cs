@@ -11,11 +11,11 @@ namespace VisualGGPK3.TreeItems {
 		}
 
 		public override ReadOnlyMemory<byte> Read() {
-			return Record.ReadFileContent();
+			return Record.Read();
 		}
 
 		public override void Write(ReadOnlySpan<byte> content) {
-			Record.ReplaceContent(content);
+			Record.Write(content);
 		}
 	}
 }

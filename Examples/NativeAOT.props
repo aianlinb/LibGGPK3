@@ -5,15 +5,27 @@
 	</Target>
 	
 	<PropertyGroup>
-		<TargetFramework>net7.0</TargetFramework>
-		<PublishAOT>true</PublishAOT>
 		<Optimize>true</Optimize>
+		<PublishAOT>true</PublishAOT>
+		<PublishTrimmed>true</PublishTrimmed>
+		<TrimMode>full</TrimMode>
+		
 		<StripSymbols>true</StripSymbols>
-		<TrimMode>Link</TrimMode>
-		<IlcInvariantGlobalization>true</IlcInvariantGlobalization>
-		<IlcOptimizationPreference>Speed</IlcOptimizationPreference>
 		<IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
 		<IlcTrimMetadata>true</IlcTrimMetadata>
+
+		<IlcOptimizationPreference>Speed</IlcOptimizationPreference>
+		<DebuggerSupport>false</DebuggerSupport>
+		<EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+		<EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+		<EventSourceSupport>false</EventSourceSupport>
+		<HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+		<IlcInvariantGlobalization>true</IlcInvariantGlobalization>
+		<MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+		<StackTraceSupport>false</StackTraceSupport>
+		<UseNativeHttpHandler>true</UseNativeHttpHandler>
+		<UseNativeHttpHandler>true</UseNativeHttpHandler>
+		<UseSystemResourceKeys>true</UseSystemResourceKeys>
 	</PropertyGroup>
 	
 	<ItemGroup>

@@ -4,7 +4,7 @@
 Contains LibGGPK3 and LibBundle3</Description>
 	</PropertyGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\LibBundle3\LibBundle3.csproj" />
-		<ProjectReference Include="..\LibGGPK3\LibGGPK3.csproj" />
+		<ProjectReference Include="../LibBundle3/LibBundle3.csproj" />
+		<ProjectReference Include="../LibGGPK3/LibGGPK3.csproj" />
 	</ItemGroup>
 </Project>

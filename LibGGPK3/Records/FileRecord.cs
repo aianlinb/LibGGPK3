@@ -9,8 +9,8 @@ namespace LibGGPK3.Records {
 	/// </summary>
 	public class FileRecord : TreeNode {
 		/// <summary>FILE</summary>
-		public const uint Tag = 0x454C4946;
-		public static readonly SHA256 Hash256 = SHA256.Create();
+		public const int Tag = 0x454C4946;
+		protected internal static readonly SHA256 Hash256 = SHA256.Create();
 
 		/// <summary>
 		/// Offset in pack file where the raw data begins
@@ -22,17 +22,18 @@ namespace LibGGPK3.Records {
 		public int DataLength { get; protected internal set; }
 
 		protected unsafe internal FileRecord(int length, GGPK ggpk) : base(length, ggpk) {
-			var s = ggpk.GGPKStream;
+			var s = ggpk.baseStream;
 			Offset = s.Position - 8;
-			var nameLength = s.ReadInt32() - 1;
-			s.Read(_Hash, 0, 32);
+			var nameLength = s.Read<int>() - 1;
+			s.ReadExactly(_Hash, 0, 32);
 			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
-				var b = new byte[nameLength * 4];
-				s.Read(b, 0, b.Length);
-				Name = Encoding.UTF32.GetString(b);
+				nameLength *= sizeof(int);
+				var b = stackalloc byte[nameLength];
+				s.ReadExactly(new(b, nameLength));
+				Name = Encoding.UTF32.GetString(b, nameLength);
 				s.Seek(4, SeekOrigin.Current); // Null terminator
 			} else {
-				Name = s.ReadUnicodeString(nameLength);
+				Name = s.ReadUTF16String(nameLength);
 				s.Seek(2, SeekOrigin.Current); // Null terminator
 			}
 			DataOffset = s.Position;
@@ -50,53 +51,75 @@ namespace LibGGPK3.Records {
 		}
 
 		protected internal unsafe override void WriteRecordData() {
-			var s = Ggpk.GGPKStream;
+			var s = Ggpk.baseStream;
 			Offset = s.Position;
 			s.Write(Length);
 			s.Write(Tag);
 			s.Write(Name.Length + 1);
-			s.Write(Hash);
+			s.Write(_Hash, 0, /*_Hash.Length*/32);
 			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
-				s.Write(Encoding.UTF32.GetBytes(Name));
+				var b = Encoding.UTF32.GetBytes(Name);
+				s.Write(b, 0, b.Length);
 				s.Write(0); // Null terminator
 			} else {
 				fixed (char* p = Name)
-					s.Write(new(p, Name.Length * 2));
+					s.Write(new(p, Name.Length * sizeof(char)));
 				s.Write((short)0); // Null terminator
 			}
 			DataOffset = s.Position;
-			// Actual file content writing of FileRecord isn't here
+			// Actual file content writing of FileRecord isn't here (see Write())
 		}
 
 		/// <summary>
 		/// Get the file content of this record
 		/// </summary>
-		public virtual byte[] ReadFileContent() {
-			var buffer = new byte[DataLength];
-			var s = Ggpk.GGPKStream;
-			s.Flush();
-			s.Seek(DataOffset, SeekOrigin.Begin);
-			for (var l = 0; l < DataLength;)
-				l += s.Read(buffer, l, DataLength - l);
-			return buffer;
+		public virtual byte[] Read() {
+			lock (Ggpk.baseStream) {
+				var s = Ggpk.baseStream;
+				s.Flush();
+				s.Position = DataOffset;
+				var buffer = GC.AllocateUninitializedArray<byte>(DataLength);
+				s.ReadExactly(buffer, 0, DataLength);
+				return buffer;
+			}
+		}
+
+		/// <summary>
+		/// Get a part of the file content of this record
+		/// </summary>
+		public virtual byte[] Read(Range range) {
+			var (offset, length) = range.GetOffsetAndLength(DataLength);
+			lock (Ggpk.baseStream) {
+				var s = Ggpk.baseStream;
+				s.Flush();
+				s.Position = DataOffset + offset;
+				var buffer = GC.AllocateUninitializedArray<byte>(length);
+				s.ReadExactly(buffer, 0, length);
+				return buffer;
+			}
 		}
 
 		/// <summary>
 		/// Replace the file content with a new content,
-		/// and move the record to the FreeRecord with most suitable size.
+		/// and move the record to a FreeRecord with most suitable size, or end of file if not found.
 		/// </summary>
-		public virtual void ReplaceContent(ReadOnlySpan<byte> NewContent) {
-			var s = Ggpk.GGPKStream;
-			if (!Hash256.TryComputeHash(NewContent, _Hash, out _))
+		public virtual void Write(ReadOnlySpan<byte> newContent) {
+			if (!Hash256.TryComputeHash(newContent, _Hash, out _))
 				throw new("Unable to compute hash of the content");
-			if (NewContent.Length != DataLength) { // Replace a FreeRecord
-				DataLength = NewContent.Length;
-				MoveWithNewLength(CaculateRecordLength());
-				// Offset and DataOffset will be set from Write() in above method
+			lock (Ggpk.baseStream) {
+				var s = Ggpk.baseStream;
+				if (newContent.Length != DataLength) { // Replace a FreeRecord
+					DataLength = newContent.Length;
+					WriteWithNewLength(CaculateRecordLength());
+					// Offset and DataOffset will be set from WriteRecordData() in above method
+				} else {
+					s.Position = Offset + sizeof(int) * 3;
+					s.Write(_Hash, 0, /*_Hash.Length*/32);
+				}
+				s.Position = DataOffset;
+				s.Write(newContent);
+				s.Flush();
 			}
-			s.Seek(DataOffset, SeekOrigin.Begin);
-			s.Write(NewContent);
-			s.Flush();
 		}
 	}
 }
