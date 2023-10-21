@@ -45,21 +45,25 @@ namespace LibBundle3 {
 		/// Root node of the tree (This will call <see cref="BuildTree"/> with default implementation when first calling).
 		/// You can also implement your custom class and use <see cref="BuildTree"/>.
 		/// </summary>
+		/// <exception cref="InvalidOperationException">Thrown when <see cref="ParsePaths"/> haven't been called</exception>
 		public virtual DirectoryNode Root => _Root ??= (DirectoryNode)BuildTree(DirectoryNode.CreateInstance, FileNode.CreateInstance);
 
 		public delegate IDirectoryNode CreateDirectoryInstance(string name, IDirectoryNode? parent);
 		public delegate IFileNode CreateFileInstance(FileRecord record, IDirectoryNode parent);
 		/// <summary>
-		/// Build a tree to represent the file and directory structure in bundles.
-		/// You can implement your custom class or just use the default implement by calling <see cref="Root"/>
+		/// Build a tree to represent the file and directory structure in bundles
 		/// </summary>
 		/// <param name="createDirectory">Function to create a instance of <see cref="IDirectoryNode"/></param>
 		/// <param name="createFile">Function to create a instance of <see cref="IFileNode"/></param>
-		/// <returns>The root node of the tree</returns>
+		/// <returns>The root node of the built tree</returns>
+		/// <remarks>
+		/// You can implement your custom class and call this, or just use the default implementation by calling <see cref="Root"/>.
+		/// </remarks>
+		/// <exception cref="InvalidOperationException">Thrown when <see cref="ParsePaths"/> haven't been called</exception>
 		public virtual IDirectoryNode BuildTree(CreateDirectoryInstance createDirectory, CreateFileInstance createFile) {
 			EnsureNotDisposed();
 			var root = createDirectory("", null);
-			foreach (var f in _Files.Values.OrderBy(f => f.Path)) {
+			foreach (var f in _Files.Values.OrderBy(f => f.Path ?? throw new InvalidOperationException("The Path of a FileRecord is null. You may have passed false for the parsePaths parameter in the constructor of Index and then not called Index.ParsePaths after that."))) {
 				var nodeNames = f.Path.Split('/');
 				var parent = root;
 				var lastDirectory = nodeNames.Length - 1;
@@ -74,8 +78,12 @@ namespace LibBundle3 {
 			return root;
 		}
 
-		/// <param name="filePath">Path to _.index.bin</param>
-		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> in each of <see cref="_Files"/> will be <see langword="null"/></param>
+		/// <param name="filePath">Path to _.index.bin on disk</param>
+		/// <param name="parsePaths">
+		/// Whether to call <see cref="ParsePaths"/> automatically.
+		/// <see langword="false"/> to speed up reading, but all <see cref="FileRecord.Path"/> in each of <see cref="Files"/> will be <see langword="null"/>,
+		/// and <see cref="Root"/> and <see cref="BuildTree"/> will be unable to use until you call <see cref="ParsePaths"/> manually.
+		/// </param>
 		/// <param name="bundleFactory">Factory to handle .bin files of <see cref="Bundle"/></param>
 		/// <exception cref="FileNotFoundException" />
 		public Index(string filePath, bool parsePaths = true, IBundleFileFactory? bundleFactory = null) : this(
@@ -85,9 +93,13 @@ namespace LibBundle3 {
 				  bundleFactory ?? new DriveBundleFactory(Path.GetDirectoryName(Path.GetFullPath(filePath))!)
 			) { }
 
-		/// <param name="stream">Stream of _.index.bin</param>
-		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> after this instance has been disposed</param>
-		/// <param name="parsePaths">Whether to parse the file paths in index. <see langword="false"/> to speed up reading but all <see cref="FileRecord.Path"/> in each of <see cref="_Files"/> will be <see langword="null"/></param>
+		/// <param name="stream">Stream of the _.index.bin file</param>
+		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> when this instance is disposed</param>
+		/// <param name="parsePaths">
+		/// Whether to call <see cref="ParsePaths"/> automatically.
+		/// <see langword="false"/> to speed up reading, but all <see cref="FileRecord.Path"/> in each of <see cref="Files"/> will be <see langword="null"/>,
+		/// and <see cref="Root"/> and <see cref="BuildTree"/> will be unable to use until you call <see cref="ParsePaths"/> manually.
+		/// </param>
 		/// <param name="bundleFactory">Factory to handle .bin files of <see cref="Bundle"/></param>
 		public unsafe Index(Stream stream, bool leaveOpen = true, bool parsePaths = true, IBundleFileFactory? bundleFactory = null) {
 			baseBundle = new(stream ?? throw new ArgumentNullException(nameof(stream)), leaveOpen);
@@ -140,11 +152,17 @@ namespace LibBundle3 {
 		}
 
 		/// <summary>
-		/// Parse the <see cref="FileRecord.Path"/> of files in <see cref="Files"/>.
-		/// Automatically called by constructor if <see langword="true"/> passed to the last parameter (default to <see langword="true"/>).
+		/// Whether <see cref="ParsePaths"/> has been called
 		/// </summary>
+		protected bool pathsParsed;
+		/// <summary>
+		/// Parse all the <see cref="FileRecord.Path"/> of each <see cref="Files"/>.
+		/// </summary>
+		/// <remarks>This will automatically be called by constructor if <see langword="true"/> passed to the parsePaths parameter (default to <see langword="true"/>).</remarks>
 		public virtual unsafe void ParsePaths() {
 			EnsureNotDisposed();
+			if (pathsParsed)
+				return;
 			ReadOnlySpan<byte> directory;
 			using (var directoryBundle = new Bundle(new MemoryStream(directoryBundleData), false))
 				directory = directoryBundle.ReadWithoutCache();
@@ -194,6 +212,7 @@ namespace LibBundle3 {
 					}
 				}
 			}
+			pathsParsed = true;
 		}
 
 		/// <summary>
@@ -764,6 +783,9 @@ namespace LibBundle3 {
 				RecursiveSize = recursiveSize;
 			}
 
+			/// <summary>
+			/// Size of the content when serializing to <see cref="Index"/>
+			/// </summary>
 			public const int RecordLength = sizeof(ulong) + sizeof(int) * 3;
 		}
 	}

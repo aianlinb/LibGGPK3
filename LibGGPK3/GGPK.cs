@@ -35,7 +35,7 @@ namespace LibGGPK3 {
 			}
 		}
 
-		/// <param name="filePath">Path to Content.ggpk</param>
+		/// <param name="filePath">Path to Content.ggpk on disk</param>
 		/// <exception cref="FileNotFoundException" />
 		public GGPK(string filePath) : this(File.Open(Extensions.ExpandPath(filePath), new FileStreamOptions() {
 			Mode = FileMode.Open,
@@ -44,8 +44,8 @@ namespace LibGGPK3 {
 			Options = FileOptions.RandomAccess
 		})) { }
 
-		/// <param name="stream">Stream of Content.ggpk</param>
-		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> after this instance has been disposed</param>
+		/// <param name="stream">Stream of the Content.ggpk file</param>
+		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> when this instance is disposed</param>
 		public GGPK(Stream stream, bool leaveOpen = false) {
 			this.leaveOpen = leaveOpen;
 			baseStream = stream ?? throw new ArgumentNullException(nameof(stream));

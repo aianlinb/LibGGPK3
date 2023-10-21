@@ -8,12 +8,12 @@ using System.Text;
 using Index = LibBundle3.Index;
 
 namespace PoeChinese3 {
-	public class Program {
+	public static class Program {
 		public static void Main(string[] args) {
 #if !DEBUG
 			try {
 #endif
-			Console.OutputEncoding = Encoding.UTF8;
+				Console.OutputEncoding = Encoding.UTF8;
 				var assembly = Assembly.GetExecutingAssembly();
 				var version = assembly.GetName().Version!;
 				if (version.Revision != 0)
@@ -26,27 +26,30 @@ namespace PoeChinese3 {
 				using (var definitions = assembly.GetManifestResourceStream("PoeChinese3.DatDefinitions.json")!)
 					DatContainer.ReloadDefinitions(definitions);
 
+				string? path;
 				if (args.Length == 0) {
-					args = new string[1];
 					Console.WriteLine($"請輸入檔案路徑 (原版 / Steam版)");
 					Console.Write("Path to (Content.ggpk / _.index.bin): ");
-					args[0] = Console.ReadLine()?.Trim('\'', '"', ' ', '\r', '\n', '\t')!;
+					path = Console.ReadLine()?.Trim();
+					if (path?.Length > 1 && path[0] == '"' && path[^1] == '"')
+						path = path[1..^1].Trim();
 					Console.WriteLine();
-				}
-				if (!File.Exists(args[0])) {
-					Console.WriteLine("檔案不存在 (File not found): " + args[0]);
+				} else
+					path = args[0].Trim();
+				if (!File.Exists(path)) {
+					Console.WriteLine("檔案不存在 (File not found): " + path);
 					Console.WriteLine();
 					Console.WriteLine("Enter to exit . . .");
 					Console.ReadLine();
 					return;
 				}
-				args[0] = Path.GetFullPath(args[0].Trim('"', ' ', '\r', '\n', '\t'));
+				path = Path.GetFullPath(path);
 
-				switch (Path.GetExtension(args[0]).ToLower()) {
+				switch (Path.GetExtension(path).ToLower()) {
 					case ".ggpk":
-						Console.WriteLine("GGPK path: " + args[0]);
+						Console.WriteLine("GGPK path: " + path);
 						Console.WriteLine("Reading ggpk file . . .");
-						using (var ggpk = new BundledGGPK(args[0], false)) {
+						using (var ggpk = new BundledGGPK(path, false)) {
 							Console.WriteLine("正在套用 (Modifying) . . .");
 							Modify(ggpk.Index);
 						}
@@ -54,9 +57,9 @@ namespace PoeChinese3 {
 						Console.WriteLine("中文化完成！ 再次執行以還原");
 						break;
 					case ".bin":
-						Console.WriteLine("Index path: " + args[0]);
+						Console.WriteLine("Index path: " + path);
 						Console.WriteLine("Reading index file . . .");
-						using (var index = new Index(args[0], false)) {
+						using (var index = new Index(path, false)) {
 							Console.WriteLine("正在套用 (Modifying) . . .");
 							Modify(index);
 						}
@@ -64,7 +67,7 @@ namespace PoeChinese3 {
 						Console.WriteLine("中文化完成！ 再次執行以還原");
 						break;
 					default:
-						Console.WriteLine("Unknown file extension: " + Path.GetFileName(args[0]));
+						Console.WriteLine("Unknown file extension: " + Path.GetFileName(path));
 						break;
 				}
 #if !DEBUG

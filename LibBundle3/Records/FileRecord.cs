@@ -5,11 +5,27 @@ using System.IO;
 
 namespace LibBundle3.Records {
 	public class FileRecord {
+		/// <summary>
+		/// Hash of <see cref="Path"/> which can be caculated from <see cref="Index.NameHash(ReadOnlySpan{char})"/>
+		/// </summary>
 		public virtual ulong PathHash { get; }
+		/// <summary>
+		/// Bundle which contains this file
+		/// </summary>
 		public virtual BundleRecord BundleRecord { get; protected set; }
+		/// <summary>
+		/// Offset of the file content in data of <see cref="BundleRecord"/>
+		/// </summary>
 		public virtual int Offset { get; protected set; }
+		/// <summary>
+		/// Size of the file content in bytes
+		/// </summary>
 		public virtual int Size { get; protected set; }
 
+		/// <summary>
+		/// Full path of the file in <see cref="Index"/>
+		/// </summary>
+		/// <remarks>This will be null if the constructor caller of the <see cref="Index"/> instance pass <see langword="false"/> to the parsePaths parameter.</remarks>
 		public virtual string Path { get; protected internal set; }
 
 #pragma warning disable CS8618
@@ -62,7 +78,7 @@ namespace LibBundle3.Records {
 		/// </summary>
 		/// <remarks>
 		/// Do not use this function when writing multiple files in batches,
-		/// use <see cref="Index.Replace(IEnumerable{FileRecord}, Index.GetDataHandler)"/> instead.
+		/// use <see cref="Index.Replace(IEnumerable{FileRecord}, Index.GetDataHandler, bool)"/> instead.
 		/// </remarks>
 		public virtual void Write(ReadOnlySpan<byte> newContent) {
 			using var bundle = BundleRecord.Index.GetBundleToWrite(out var size);
@@ -97,7 +113,13 @@ namespace LibBundle3.Records {
 			Size = size;
 		}
 
+		/// <summary>
+		/// Size of the content when <see cref="Serialize"/> to <see cref="Index"/>
+		/// </summary>
 		protected internal const int RecordLength = sizeof(ulong) + sizeof(int) * 3;
+		/// <summary>
+		/// Function to serialize the record to <see cref="Index"/>
+		/// </summary>
 		protected internal virtual void Serialize(Stream stream) {
 			stream.Write(PathHash);
 			stream.Write(BundleRecord.BundleIndex);

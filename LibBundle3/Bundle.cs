@@ -1,15 +1,15 @@
 ﻿using LibBundle3.Records;
 using System;
 using System.Buffers;
-using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics.Metrics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace LibBundle3 {
 	public class Bundle : IDisposable {
+		/// <summary>
+		/// Metadata of a bundle file which is stored at the beginning of the file in 60 bytes
+		/// </summary>
 		[Serializable]
 		[StructLayout(LayoutKind.Sequential, Size = 60, Pack = 4)]
 		protected struct Header {
@@ -27,27 +27,52 @@ namespace LibBundle3 {
 			public int unknown5 = 0; // 0
 			public int unknown6 = 0; // 0
 
+			/// <summary>
+			/// Initialize a <see cref="Header"/> instance with default values of a empty bundle (Not same as <see langword="default"/>)
+			/// </summary>
 			public Header() { }
 
+			/// <returns>Size of decompressed Chunks[Chunks.Length - 1] in bytes</returns>
 			public readonly int GetLastChunkSize() {
 				return uncompressed_size - (chunk_size * (chunk_count - 1));
 			}
 		}
 
+		/// <summary>
+		/// Record of the <see cref="Bundle"/> instance, not <see langword="null"/> when this instance is created by the <see cref="Index"/> instance
+		/// </summary>
 		public virtual BundleRecord? Record { get; }
 
+		/// <summary>
+		/// Size of the uncompressed content in bytes, synced with <see cref="BundleRecord.UncompressedSize"/> of <see cref="Record"/>
+		/// </summary>
 		public virtual int UncompressedSize {
 			get => metadata.uncompressed_size;
 			/// <see cref="Index.CreateBundle"/>
 			internal set => metadata.uncompressed_size = value;
 		}
+		/// <summary>
+		/// Size of the compressed content in bytes
+		/// </summary>
 		public virtual int CompressedSize => metadata.compressed_size;
 
 		protected readonly Stream baseStream;
-		protected readonly bool leaveOpen; // If false, close the baseStream when dispose
+		/// <summary>
+		/// If false, close the <see cref="baseStream"/> when <see cref="Dispose"/>
+		/// </summary>
+		protected readonly bool leaveOpen;
 		protected Header metadata;
+		/// <summary>
+		/// Sizes of each compressed chunk in bytes
+		/// </summary>
 		protected int[] compressed_chunk_sizes;
+		/// <summary>
+		/// Cached data of the full decompressed content, use <see cref="cacheTable"/> to determine the initialization of each chunk
+		/// </summary>
 		protected byte[]? cachedContent;
+		/// <summary>
+		/// Indicate whether the corresponding chunk of <see cref="cachedContent"/> is initialized
+		/// </summary>
 		protected bool[]? cacheTable;
 
 		/// <param name="filePath">Path of the bundle file on disk</param>
@@ -55,8 +80,8 @@ namespace LibBundle3 {
 		/// <exception cref="FileNotFoundException" />
 		public Bundle(string filePath, BundleRecord? record = null) : this(File.Open(Extensions.ExpandPath(filePath), FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false, record) { }
 
-		/// <param name="stream">Stream of the bundle</param>
-		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> after this instance has been disposed</param>
+		/// <param name="stream">Stream of the bundle file</param>
+		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> when this instance is disposed</param>
 		/// <param name="record">Record of this bundle file</param>
 		public unsafe Bundle(Stream stream, bool leaveOpen = false, BundleRecord? record = null) {
 			baseStream = stream ?? throw new ArgumentNullException(nameof(stream));
@@ -73,7 +98,7 @@ namespace LibBundle3 {
 		}
 
 		/// <summary>
-		/// Used by <see cref="Index.CreateBundle"/>
+		/// Internal used by <see cref="Index.CreateBundle"/>
 		/// </summary>
 		/// <param name="stream">Stream of the bundle to write (which will be cleared)</param>
 		/// <param name="record">Record of the bundle</param>
@@ -279,7 +304,7 @@ namespace LibBundle3 {
 						}
 						l = (int)Oodle.OodleLZ_Compress(metadata.compressor, p, metadata.GetLastChunkSize(), tmp, compressionLevel);
 						metadata.compressed_size += compressed_chunk_sizes[last] = l;
-						//p += metadata.GetLastChunkSize();
+						//p += metadata.GetLastChunkSize();  // Unneeded
 						baseStream.Write(new(tmp, l));
 					}
 				} finally {

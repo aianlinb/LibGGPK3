@@ -1,22 +1,38 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 
 namespace LibBundle3.Records {
 	public class BundleRecord {
-		protected internal string _Path; // without extension
+		/// <summary>
+		/// <see cref="Path"/> without extension (which actually recorded in <see cref="Index"/>)
+		/// </summary>
+		protected internal string _Path;
+		/// <summary>
+		/// Path of the bundle file (which ends with ".bundle.bin") under "Bundles2" directory
+		/// </summary>
 		public virtual string Path => _Path + ".bundle.bin";
+		/// <summary>
+		/// Size of the uncompressed content in bytes, synced with <see cref="Bundle.UncompressedSize"/>
+		/// </summary>
 		public virtual int UncompressedSize { get; protected internal set; }
-
+		/// <summary>
+		/// Index of the <see cref="BundleRecord"/> in <see cref="Index.Bundles"/>
+		/// </summary>
 		public virtual int BundleIndex { get; }
+		/// <summary>
+		/// <see cref="Index"/> instance which contains this bundle
+		/// </summary>
 		public virtual Index Index { get; }
 
 		protected internal readonly List<FileRecord> _Files = new();
 		protected ReadOnlyCollection<FileRecord>? _readonlyFiles;
+		/// <summary>
+		/// Files contained in this bundle, may be changed after <see cref="FileRecord.Redirect"/>
+		/// </summary>
 		public virtual ReadOnlyCollection<FileRecord> Files => _readonlyFiles ??= new(_Files);
 
 		protected internal BundleRecord(string path, int uncompressedSize, Index index, int bundleIndex) {
@@ -27,13 +43,19 @@ namespace LibBundle3.Records {
 		}
 
 		/// <summary>
-		/// Try to get the bundle instance with <see cref="Index.FuncReadBundle"/>
+		/// Try to get the bundle instance with <see cref="IBundleFileFactory.GetBundle"/>
 		/// </summary>
-		/// <remarks>Remember to dispose the bundle after use.</remarks>
+		/// <remarks>Must dispose the bundle after use</remarks>
 		/// <returns>Whether successfully get the instance</returns>
 		public virtual bool TryGetBundle([NotNullWhen(true)] out Bundle? bundle) {
 			return TryGetBundle(out bundle, out _);
 		}
+		/// <summary>
+		/// Try to get the bundle instance with <see cref="IBundleFileFactory.GetBundle"/>
+		/// </summary>
+		/// <param name="exception">Exception thrown by <see cref="IBundleFileFactory.GetBundle"/> if failed to get</param>
+		/// <remarks>Must dispose the bundle after use</remarks>
+		/// <returns>Whether successfully get the instance</returns>
 		public virtual bool TryGetBundle([NotNullWhen(true)] out Bundle? bundle, out Exception? exception) {
 			exception = null;
 			try {
@@ -45,11 +67,13 @@ namespace LibBundle3.Records {
 			}
 		}
 
+		/// <summary>
+		/// Size of the content when <see cref="Serialize"/> to <see cref="Index"/>
+		/// </summary>
 		protected internal int RecordLength => Encoding.UTF8.GetByteCount(_Path) + (sizeof(int) + sizeof(int));
 		/// <summary>
-		/// Write the instance to _.index.bin
+		/// Function to serialize the record to <see cref="Index"/>
 		/// </summary>
-		/// <param name="stream">Stream of _.index.bin</param>
 		protected internal virtual void Serialize(Stream stream) {
 			var path = Encoding.UTF8.GetBytes(_Path);
 			stream.Write(path.Length);
