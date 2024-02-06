@@ -1,10 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
+	
 	<PropertyGroup>
-		<Description>Library for Content.ggpk of game PathOfExile
-Contains LibGGPK3 and LibBundle3</Description>
+		<Description>Library for Content.ggpk of game PathOfExile with LibGGPK3 and LibBundle3</Description>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 	</PropertyGroup>
+	
 	<ItemGroup>
 		<ProjectReference Include="../LibBundle3/LibBundle3.csproj" />
 		<ProjectReference Include="../LibGGPK3/LibGGPK3.csproj" />
 	</ItemGroup>
+	
 </Project>

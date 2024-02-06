@@ -2,13 +2,14 @@
 using System.Runtime.InteropServices;
 
 namespace LibBundle3 {
-	public static partial class Oodle {
-#pragma warning disable CA1401
-		[LibraryImport("oo2core")]
-		public static unsafe partial nint OodleLZ_Decompress(byte* buffer, nint bufferSize, byte* output, nint decompressedSize, int fuzzSafe = 1, int checkCRC = 0, int verbose = 0, byte* v_decBufBase = null, nint decBufSize = 0, void* fpCallback = null, void* callbackUserData = null, void* decoderMemory = null, nint decoderMemorySize = 0, int threadPhase = 3);
+	public static class Oodle {
+#pragma warning disable SYSLIB1054 // All parameters are unmanaged types.
+		[DllImport("oo2core")]
+		internal static extern unsafe nint OodleLZ_Decompress(byte* buffer, nint bufferSize, byte* output, nint decompressedSize, int fuzzSafe = 1, int checkCRC = 0, int verbose = 0, byte* v_decBufBase = null, nint decBufSize = 0, void* fpCallback = null, void* callbackUserData = null, void* decoderMemory = null, nint decoderMemorySize = 0, int threadPhase = 3);
 
-		[LibraryImport("oo2core")]
-		public static unsafe partial nint OodleLZ_Compress(Compressor compressor, byte* buffer, nint bufferSize, byte* outputBuffer, CompressionLevel level, void* pOptions = null, void* dictionaryBase = null, void* longRangeMatcher = null, void* scratchMem = null, nint scratchSize = 0);
+		[DllImport("oo2core")]
+		internal static extern unsafe nint OodleLZ_Compress(Compressor compressor, byte* buffer, nint bufferSize, byte* outputBuffer, CompressionLevel level, void* pOptions = null, void* dictionaryBase = null, void* longRangeMatcher = null, void* scratchMem = null, nint scratchSize = 0);
+#pragma warning restore SYSLIB1054
 
 		public enum Compressor {
 			Invalid = -1,
@@ -40,14 +41,14 @@ namespace LibBundle3 {
 			Hydra = 12,
 
 			// DEPRECATED :
-			[Obsolete("no longer supported as of Oodle 2.9.0")] BitKnit = 10,
+			[Obsolete("No longer supported as of Oodle 2.9.0")] BitKnit = 10,
 			[Obsolete("DEPRECATED but still supported")] LZB16 = 4,
-			[Obsolete("no longer supported as of Oodle 2.9.0")] LZNA = 7,
-			[Obsolete("no longer supported as of Oodle 2.9.0")] LZH = 0,
-			[Obsolete("no longer supported as of Oodle 2.9.0")] LZHLW = 1,
-			[Obsolete("no longer supported as of Oodle 2.9.0")] LZNIB = 2,
-			[Obsolete("no longer supported as of Oodle 2.9.0")] LZBLW = 5,
-			[Obsolete("no longer supported as of Oodle 2.9.0")] LZA = 6,
+			[Obsolete("No longer supported as of Oodle 2.9.0")] LZNA = 7,
+			[Obsolete("No longer supported as of Oodle 2.9.0")] LZH = 0,
+			[Obsolete("No longer supported as of Oodle 2.9.0")] LZHLW = 1,
+			[Obsolete("No longer supported as of Oodle 2.9.0")] LZNIB = 2,
+			[Obsolete("No longer supported as of Oodle 2.9.0")] LZBLW = 5,
+			[Obsolete("No longer supported as of Oodle 2.9.0")] LZA = 6,
 
 			Count = 14,
 			Force32 = 0x40000000

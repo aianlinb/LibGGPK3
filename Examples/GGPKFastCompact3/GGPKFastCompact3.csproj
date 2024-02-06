@@ -1,8 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
+	
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
 	</PropertyGroup>
+	
 	<ItemGroup>
 		<ProjectReference Include="../../LibGGPK3/LibGGPK3.csproj" />
 	</ItemGroup>
+	
 </Project>

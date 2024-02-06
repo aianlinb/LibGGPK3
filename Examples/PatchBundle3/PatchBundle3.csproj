@@ -1,8 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
+	
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
 	</PropertyGroup>
+	
 	<ItemGroup>
 		<ProjectReference Include="../../LibBundle3/LibBundle3.csproj" />
 	</ItemGroup>
+	
 </Project>

@@ -5,7 +5,7 @@ using System.IO.Compression;
 using System.Reflection;
 
 namespace PatchBundledGGPK3 {
-	public class Program {
+	public static class Program {
 		public static void Main(string[] args) {
 			try {
 				var version = Assembly.GetExecutingAssembly().GetName().Version!;

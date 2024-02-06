@@ -1,17 +1,19 @@
-﻿using Eto.Drawing;
-using Eto.Forms;
-using LibGGPK3;
-using LibGGPK3.Records;
-using System;
+﻿using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Reflection;
-using System.Security.Authentication;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Eto.Drawing;
+using Eto.Forms;
+using LibGGPK3;
+using LibGGPK3.Records;
 
 namespace VPatchGGPK3 {
 	public class MainWindow : Form {
@@ -30,7 +32,6 @@ namespace VPatchGGPK3 {
 			var handler = new SocketsHttpHandler() { UseCookies = false };
 			handler.SslOptions.CertificateRevocationCheckMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
 			handler.SslOptions.RemoteCertificateValidationCallback = delegate { return true; };
-			handler.SslOptions.EnabledSslProtocols |= SslProtocols.Tls12 | SslProtocols.Tls13;
 			http = new(handler) { DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher };
 
 			var version = Assembly.GetExecutingAssembly().GetName().Version!;
@@ -58,7 +59,7 @@ namespace VPatchGGPK3 {
 					ggpkPath.Text = ofd.FileName;
 			}) { Text = "瀏覽", Height = 35 });
 			layout.BeginCentered();
-			layout.AddSeparateRow(new Padding(7, 0, 0, 0), controls: new Control[] {
+			layout.AddSeparateRow(new Padding(7, 0, 0, 0), controls: [
 				tw = new RadioButton() {
 					Text = "tw",
 					Size = new Size(40, 30),
@@ -67,11 +68,14 @@ namespace VPatchGGPK3 {
 					Text = "cn",
 					Size = new Size(40, 30)
 				}
-			});
-			layout.AddSeparateRow(new Padding(0, 5), controls: new Control[] { new Label() {
-				Text = "PIN: ",
-				VerticalAlignment = VerticalAlignment.Center
-			}, pin = new TextBox() { Width = 50 } });
+			]);
+			layout.AddSeparateRow(new Padding(0, 5), controls: [
+				new Label() {
+					Text = "PIN: ",
+					VerticalAlignment = VerticalAlignment.Center
+				},
+				pin = new TextBox() { Width = 50 }
+			]);
 			pin.KeyDown += (_, e) => {
 				if (e.Key == Keys.Enter)
 					OnButtonClick(pin, EventArgs.Empty);
@@ -91,7 +95,7 @@ namespace VPatchGGPK3 {
 				ReadOnly = true
 			}, null, true);
 			layout.Add(new Label() {
-				Text = "Copyright © 2022-2023 aianlinb",
+				Text = "Copyright © 2022-2024 aianlinb",
 				TextAlignment = TextAlignment.Right,
 				VerticalAlignment = VerticalAlignment.Bottom,
 				Size = new Size(100, 20)
@@ -137,7 +141,7 @@ namespace VPatchGGPK3 {
 				output.Append("Getting patch information . . .\r\n", true);
 				using var jd = await JsonDocument.ParseAsync(await http.GetStreamAsync(tw.Checked ? "https://poedb.tw/fg/pin_tw.json" : "https://poedb.tw/fg/pin_cn.json"));
 				var json = jd.RootElement;
-				var url = await Task.Run(() => Extensions.GetPatchServer());
+				var url = await Task.Run(() => GetPatchServer());
 				var officialVersion = url[(url.LastIndexOf('/', url.Length - 2) + 1)..^1];
 				if (json.GetProperty("version").GetString()! != officialVersion) {
 					MessageBox.Show(this, "Server Version not match Patch Version\r\n編年史中文化更新中，請稍後再嘗試", "Error", MessageBoxType.Error);
@@ -186,6 +190,25 @@ namespace VPatchGGPK3 {
 			} catch (Exception ex) {
 				MessageBox.Show(this, ex.ToString(), "Error", MessageBoxType.Error);
 			}
+		}
+
+		/// <summary>
+		/// Get POE patch server url (Requires internet connection)
+		/// </summary>
+		/// <exception cref="SocketException" />
+		[SkipLocalsInit]
+		public static unsafe string GetPatchServer(bool garena = false) {
+			using var tcp = new Socket(SocketType.Stream, ProtocolType.Tcp);
+			if (garena)
+				tcp.Connect(Dns.GetHostAddresses("login.tw.pathofexile.com"), 12999);
+			else
+				tcp.Connect(Dns.GetHostAddresses("patch.pathofexile.com"), 12995); // us.login.pathofexile.com
+			var b = stackalloc byte[256];
+			*(short*)b = 0x0601; // b[0] = 1, b[1] = 6
+			tcp.Send(new ReadOnlySpan<byte>(b, 2));
+			if (tcp.Receive(new Span<byte>(b, 256)) < 36)
+				throw new EndOfStreamException("Unable to get POE patch server url");
+			return new string((char*)(b + 35), 0, b[34]);
 		}
 	}
 }

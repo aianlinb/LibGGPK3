@@ -1,11 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using SystemExtensions;
+using SystemExtensions.Collections;
+using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records {
 	public abstract class TreeNode : BaseRecord {
-		private static readonly byte[] HashOfEmpty = Convert.FromHexString("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855");
+		protected static readonly SHA256 Hash256 = SHA256.Create();
+		private static readonly byte[] HashOfEmpty = Hash256.ComputeHash([]);
 		/// <summary>
 		/// File/Directory name
 		/// </summary>
@@ -17,7 +24,7 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// SHA256 hash of the file content
 		/// </summary>
-		protected internal byte[] _Hash = (byte[])HashOfEmpty.Clone();
+		protected internal readonly byte[] _Hash = (byte[])HashOfEmpty.Clone();
 		/// <summary>
 		/// Parent node
 		/// </summary>
@@ -25,25 +32,29 @@ namespace LibGGPK3.Records {
 
 		protected TreeNode(int length, GGPK ggpk) : base(length, ggpk) { }
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		protected LinkedListNode<FreeRecord>? WriteWithNewLength(LinkedListNode<FreeRecord>? specify = null) {
+			return WriteWithNewLength(CaculateRecordLength(), specify);
+		}
 		/// <summary>
 		/// Write the modified record data to ggpk file.
 		/// </summary>
 		/// <param name="newLength">New length of the record after modification</param>
 		/// <param name="specify">The specified <see cref="FreeRecord"/> to be written, <see langword="null"/> for finding a best one automatically</param>
 		/// <returns>The <see cref="FreeRecord"/> created at the original position if the record is moved, or <see langword="null"/> if replaced in place</returns>
-		/// <remarks>Don't set <see cref="BaseRecord.Length"/> before calling this method</remarks>
-		public virtual LinkedListNode<FreeRecord>? WriteWithNewLength(int newLength, LinkedListNode<FreeRecord>? specify = null) {
-			if (Offset != 0 && newLength == Length && specify == null) {
+		/// <remarks>Don't set <see cref="BaseRecord.Length"/> before calling this method, the method will update it</remarks>
+		protected internal virtual LinkedListNode<FreeRecord>? WriteWithNewLength(int newLength, LinkedListNode<FreeRecord>? specify = null) {
+			if (Offset != 0 && newLength == Length && specify is null) {
 				Ggpk.baseStream.Position = Offset;
 				WriteRecordData();
 				return null;
 			}
-			var original = Offset == 0 ? null : MarkAsFreeRecord();
+			var original = Offset == 0 ? null : MarkAsFree();
 
 			Length = newLength;
 			var s = Ggpk.baseStream;
 			specify ??= Ggpk.FindBestFreeRecord(Length);
-			if (specify == null) {
+			if (specify is null) {
 				s.Seek(0, SeekOrigin.End); // Write to the end of GGPK
 				WriteRecordData();
 			} else {
@@ -68,42 +79,47 @@ namespace LibGGPK3.Records {
 		}
 
 		/// <summary>
-		/// Set the record to a FreeRecord
+		/// Set this record to a <see cref="FreeRecord"/>
 		/// </summary>
-		protected virtual LinkedListNode<FreeRecord>? MarkAsFreeRecord() {
+		protected virtual LinkedListNode<FreeRecord>? MarkAsFree() {
 			var s = Ggpk.baseStream;
 			s.Position = Offset;
-			LinkedListNode<FreeRecord>? rtn = null;
-			var length = Length;
 
+			LinkedListNode<FreeRecord>? previous = null;
+			var length = Length;
+			var right = false;
 			// Combine with FreeRecords nearby
-			for (var fn = Ggpk.FreeRecords.First; fn != null; fn = fn.Next) {
+			for (var fn = Ggpk.FreeRecordList.First; fn is not null; fn = fn.Next) {
 				var f = fn.Value;
 				if (f.Offset == Offset + length) {
 					length += f.Length;
-					if (rtn != null)
-						rtn.Value.Length += f.Length;
+					if (previous is not null)
+						previous.Value.Length += f.Length;
 					f.RemoveFromList(fn);
-				} else if (f.Offset + f.Length == Offset) {
+					right = true;
+				} else if (previous is null && f.Offset + f.Length == Offset) {
 					f.Length += length;
-					rtn = fn;
+					previous = fn;
 				}
+				if (right && previous is not null) // In most cases, there won't be contiguous FreeRecords in GGPK
+					break;
 			}
 
-			// Trim if the record is at the end of the ggpk file
-			if (rtn != null) {
-				var rtnv = rtn.Value;
-				if (rtnv.Offset + rtnv.Length >= s.Length) {
-					rtnv.RemoveFromList(rtn);
+			if (previous is not null) {
+				var fPrevious = previous.Value;
+				if (fPrevious.Offset + fPrevious.Length >= s.Length) {
+					// Trim if the record is at the end of the ggpk file
+					fPrevious.RemoveFromList(previous);
 					s.Flush();
-					s.SetLength(rtnv.Offset);
+					s.SetLength(fPrevious.Offset);
 					return null;
 				}
-				s.Position = rtnv.Offset;
-				s.Write(rtnv.Length);
-				return rtn;
-			}
-			if (Offset + length >= s.Length) {
+				// Update record length
+				s.Position = fPrevious.Offset;
+				s.Write(fPrevious.Length);
+				return previous;
+			} else if (Offset + length >= s.Length) {
+				// Trim if the record is at the end of the ggpk file
 				s.Flush();
 				s.SetLength(Offset);
 				return null;
@@ -119,17 +135,18 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Update the offset of this record in <see cref="Parent"/>.<see cref="DirectoryRecord.Entries"/>
 		/// </summary>
+		[MemberNotNull(nameof(Parent))]
 		protected virtual unsafe void UpdateOffset() {
 			if (Parent is DirectoryRecord dr) {
-				var i = DirectoryRecord.Entry.BinarySearch(dr.Entries, NameHash);
+				var i = dr.Entries.AsSpan().BinarySearch((DirectoryRecord.Entry.NameHashWrapper)NameHash);
 				if (i < 0)
-					throw new($"{GetPath()} update offset failed: NameHash={NameHash}, Offset={Offset}");
+					throw new KeyNotFoundException($"{GetPath()} update offset failed: NameHash={NameHash}, Offset={Offset}");
 				dr.Entries[i].Offset = Offset;
 				Ggpk.baseStream.Position = dr.EntriesBegin + sizeof(DirectoryRecord.Entry) * i + sizeof(uint);
 				Ggpk.baseStream.Write(Offset);
 			} else if (this == Ggpk.Root) {
-				Ggpk.GgpkRecord.RootDirectoryOffset = Offset;
-				Ggpk.baseStream.Position = Ggpk.GgpkRecord.Offset + (sizeof(int) + sizeof(long));
+				Ggpk.Record.RootDirectoryOffset = Offset;
+				Ggpk.baseStream.Position = Ggpk.Record.Offset + (sizeof(int) + sizeof(long));
 				Ggpk.baseStream.Write(Offset);
 			} else
 				throw new NullReferenceException(nameof(Parent));
@@ -142,8 +159,15 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Get the full path in GGPK of this File/Directory
 		/// </summary>
-		public virtual string GetPath() {
-			return this is FileRecord ? (Parent?.GetPath() ?? "") + Name : (Parent?.GetPath() ?? "") + Name + "/";
+		public string GetPath() {
+			var builder = new ValueList<char>(stackalloc char[256]);
+			GetPath(ref builder);
+			using (builder)
+				return builder.AsSpan().ToString();
+		}
+		protected virtual void GetPath(scoped ref ValueList<char> builder) {
+			Parent?.GetPath(ref builder);
+			builder.AddRange(Name.AsSpan());
 		}
 
 		protected internal uint? _NameHash;
@@ -156,17 +180,18 @@ namespace LibGGPK3.Records {
 		/// Move the node from <see cref="Parent"/> to <paramref name="directory"/> (which can't be <see cref="GGPK.Root"/>)
 		/// </summary>
 		/// <param name="directory">The new parent node to move to (which can't be <see cref="GGPK.Root"/>)</param>
-		/// <exception cref="InvalidOperationException">Thrown when this instance or <see cref="Parent"/> is <see cref="GGPK.Root"/></exception>
+		/// <exception cref="InvalidOperationException">Thrown when <see langword="this"/> instance or <see cref="Parent"/> or <paramref name="directory"/> is <see cref="GGPK.Root"/></exception>
+		[MemberNotNull(nameof(Parent))]
 		public virtual void MoveTo(DirectoryRecord directory) {
-			if (Parent == Ggpk.Root || this == Ggpk.Root /*|| directory == Ggpk.Root (Will be checked in next "if")*/)
-				throw new InvalidOperationException("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
+			if (Parent == Ggpk.Root || this == Ggpk.Root /*|| directory == Ggpk.Root (will be checked in next "if")*/)
+				ThrowHelper.Throw<InvalidOperationException>("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
 			if (directory.InsertEntry(new(NameHash, Offset)) < 0)
-				throw new InvalidOperationException($"A file/directory with name: {Name} is already exist in: {directory.GetPath()}");
+				ThrowHelper.Throw<InvalidOperationException>($"A file/directory with name: {Name} is already exist in: {directory.GetPath()}");
 			Parent!.RemoveEntry(NameHash);
 			Parent = directory;
 			directory._Children ??= new(directory.Entries.Length);
 			directory._Children.Add(NameHash, this);
-			directory.WriteWithNewLength(CaculateRecordLength());
+			directory.WriteWithNewLength();
 		}
 
 		/// <summary>
@@ -176,9 +201,10 @@ namespace LibGGPK3.Records {
 		/// Do not use any record instance of removed node (This node and all children of it) after calling this.
 		/// Otherwise it may break ggpk.
 		/// </remarks>
+		[MemberNotNull(nameof(Parent))]
 		public virtual void Remove() {
-			if (Parent == null || Parent == Ggpk.Root || this == Ggpk.Root)
-				throw new InvalidOperationException("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
+			if (Parent is null /*(this == Ggpk.Root)*/ || Parent == Ggpk.Root)
+				ThrowHelper.Throw<InvalidOperationException>("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
 			RemoveRecursively();
 			Parent.RemoveEntry(NameHash);
 		}
@@ -189,46 +215,38 @@ namespace LibGGPK3.Records {
 			if (this is DirectoryRecord dr)
 				foreach (var c in dr.Children)
 					c.RemoveRecursively();
-			MarkAsFreeRecord();
+			MarkAsFree();
 		}
 
 		[SkipLocalsInit]
 		public static unsafe uint GetNameHash(ReadOnlySpan<char> name) {
-			var count = name.Length;
-			var p = stackalloc char[count];
-			count = name.ToLowerInvariant(new(p, count));
-			return MurmurHash2(new(p, count * sizeof(char)), 0);
+			var p = stackalloc char[name.Length];
+			return MurmurHash2(new(p, name.ToLowerInvariant(new(p, name.Length)) * sizeof(char)), 0);
 		}
 
-		protected static unsafe uint MurmurHash2(ReadOnlySpan<byte> data, uint seed = 0xC58F1A7B) {
-			const uint m = 0x5BD1E995;
+		protected static unsafe uint MurmurHash2(ReadOnlySpan<byte> data, uint seed = 0xC58F1A7Bu) {
+			const uint m = 0x5BD1E995u;
 			const int r = 24;
 
 			unchecked {
-				int length = data.Length;
-				uint h = seed ^ (uint)length;
-				int numberOfLoops = length >> 2; // div 4
+				seed ^= (uint)data.Length;
 
-				fixed (byte* pd = data) {
-					uint* p = (uint*)pd;
-					while (numberOfLoops-- != 0) {
-						uint k = *p++;
-						k *= m;
-						k = (k ^ (k >> r)) * m;
-						h = (h * m) ^ k;
-					}
-
-					int remainingBytes = length & 0b11; // mod 4
-					if (remainingBytes != 0) {
-						int offset = (4 - remainingBytes) << 3; // mul 8 (bit * 8 = byte)
-						h ^= *p & (0xFFFFFFFFU >> offset);
-						h *= m;
-					}
+				ref uint p = ref Unsafe.As<byte, uint>(ref MemoryMarshal.GetReference(data));
+				if (data.Length >= sizeof(uint)) {
+					ref uint pEnd = ref Unsafe.Add(ref p, data.Length / sizeof(uint));
+					do {
+						uint k = p * m;
+						seed = (seed * m) ^ ((k ^ (k >> r)) * m);
+						p = ref Unsafe.Add(ref p, 1);
+					} while (Unsafe.IsAddressLessThan(ref p, ref pEnd));
 				}
 
-				h = (h ^ (h >> 13)) * m;
-				h ^= h >> 15;
-				return h;
+				int remainingBytes = data.Length % sizeof(uint);
+				if (remainingBytes != 0)
+					seed = (seed ^ (p & (uint.MaxValue >> ((sizeof(uint) - remainingBytes) * 8)))) * m;
+
+				seed = (seed ^ (seed >> 13)) * m;
+				return seed ^ (seed >> 15);
 			}
 		}
 

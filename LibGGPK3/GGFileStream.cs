@@ -1,10 +1,11 @@
-﻿using LibGGPK3.Records;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using LibGGPK3.Records;
+using SystemExtensions;
 
 namespace LibGGPK3 {
 	/// <summary>
@@ -15,7 +16,7 @@ namespace LibGGPK3 {
 	/// otherwise use <see cref="FileRecord.Read"/> and <see cref="FileRecord.Write"/> instead for better performance.
 	/// </remarks>
 	public class GGFileStream : Stream {
-		private static readonly Dictionary<FileRecord, GGFileStream> instances = new();
+		private static readonly Dictionary<FileRecord, GGFileStream> instances = [];
 
 		/// <summary>
 		/// The <see cref="FileRecord"/> this stream created with
@@ -27,7 +28,7 @@ namespace LibGGPK3 {
 		[MemberNotNull(nameof(_Buffer))]
 		protected virtual MemoryStream Buffer {
 			get {
-				if (_Buffer == null) {
+				if (_Buffer is null) {
 					_Buffer = new(Record.DataLength);
 					_Buffer.Write(Record.Read(), 0, Record.DataLength);
 					_Buffer.Position = _Position;
@@ -44,10 +45,11 @@ namespace LibGGPK3 {
 		/// <remarks>Each <see cref="FileRecord"/> can only have one instance of <see cref="GGFileStream"/> at the same time</remarks>
 		/// <exception cref="InvalidOperationException">Thrown when an instance of <see cref="GGFileStream"/> is exist with the <paramref name="record"/></exception>
 		public GGFileStream(FileRecord record) {
-			Record = record ?? throw new ArgumentNullException(nameof(record));
+			ArgumentNullException.ThrowIfNull(record);
+			Record = record;
 			lock (instances)
-				if (!instances.TryAdd(record, this))
-					throw new InvalidOperationException("An instance of GGFileStream is already created for this FileRecord");
+				if(!instances.TryAdd(record, this))
+					ThrowHelper.Throw<InvalidOperationException>("An instance of GGFileStream is already created for this FileRecord");
 		}
 
 		/// <summary>
@@ -55,14 +57,14 @@ namespace LibGGPK3 {
 		/// Don't call this function before completing all modifications to avoid unnecessary repeated writing and waste of space.
 		/// </summary>
 		public override void Flush() {
-			if (_Buffer == null || !Modified)
+			if (!Modified || _Buffer is null)
 				return;
 			Record.Write(new(_Buffer.GetBuffer(), 0, (int)_Buffer.Length));
 			Modified = false;
 		}
 
 		public override int Read(byte[] buffer, int offset, int count) {
-			if (_Buffer != null)
+			if (_Buffer is not null)
 				return _Buffer.Read(buffer, offset, count);
 			lock (Record.Ggpk.baseStream) {
 				Record.Ggpk.baseStream.Position = Record.DataOffset + _Position;
@@ -73,7 +75,7 @@ namespace LibGGPK3 {
 		}
 
 		public override int Read(Span<byte> buffer) {
-			if (_Buffer != null)
+			if (_Buffer is not null)
 				return _Buffer.Read(buffer);
 			lock (Record.Ggpk.baseStream) {
 				Record.Ggpk.baseStream.Position = Record.DataOffset + _Position;
@@ -84,7 +86,7 @@ namespace LibGGPK3 {
 		}
 
 		public override int ReadByte() {
-			if (_Buffer != null)
+			if (_Buffer is not null)
 				return _Buffer.ReadByte();
 			lock (Record.Ggpk.baseStream) {
 				Record.Ggpk.baseStream.Position = Record.DataOffset + _Position;
@@ -99,11 +101,11 @@ namespace LibGGPK3 {
 				SeekOrigin.Begin => offset,
 				SeekOrigin.Current => _Position + offset,
 				SeekOrigin.End => Length + offset,
-				_ => throw new ArgumentOutOfRangeException(nameof(origin), origin, null),
+				_ => throw ThrowHelper.ArgumentOutOfRange(origin),
 			};
 			if (pos < 0)
-				throw new IOException("Attempted to seek before the beginning of the stream");
-			if (_Buffer != null)
+				ThrowHelper.Throw<IOException>("Attempted to seek before the beginning of the stream");
+			else if (_Buffer is not null)
 				_Buffer.Position = pos;
 			return _Position = pos;
 		}
@@ -151,7 +153,7 @@ namespace LibGGPK3 {
 		}
 
 		public override void CopyTo(Stream destination, int bufferSize) {
-			if (_Buffer != null) {
+			if (_Buffer is not null) {
 				_Buffer.CopyTo(destination, bufferSize);
 				_Position = _Buffer.Position;
 			} else {
@@ -164,7 +166,7 @@ namespace LibGGPK3 {
 		}
 
 		public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken) {
-			if (_Buffer != null)
+			if (_Buffer is not null)
 				return _Buffer.CopyToAsync(destination, bufferSize, cancellationToken).ContinueWith(_ => _Position = _Buffer.Position);
 			lock (Record.Ggpk.baseStream) {
 				Record.Ggpk.baseStream.Position = Record.DataOffset + _Position;
@@ -186,10 +188,10 @@ namespace LibGGPK3 {
 		public override long Position {
 			get => _Buffer?.Position ?? _Position;
 			set {
-				if (_Buffer != null)
+				if (_Buffer is not null)
 					_Buffer.Position = value;
 				else if (value < 0)
-					throw new ArgumentOutOfRangeException(nameof(Position), value, "Non-negative number required");
+					ThrowHelper.ThrowArgumentOutOfRange(value, "Non-negative number required");
 				_Position = value;
 			}
 		}

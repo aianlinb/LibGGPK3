@@ -23,7 +23,7 @@ namespace VisualGGPK3.TreeItems {
 		protected ListWrapper<ITreeItem, ITreeNode>? _ChildItems;
 		public override IReadOnlyList<ITreeItem> ChildItems {
 			get {
-				if (_ChildItems == null) {
+				if (_ChildItems is null) {
 					var tmp = new ITreeNode[_Children.Count];
 					int j = 0, k = 0;
 					for (var i = 0; i < _Children.Count; ++i) {

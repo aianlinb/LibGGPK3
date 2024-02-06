@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
+using SystemExtensions.Streams;
 
 namespace LibBundle3.Records {
 	public class BundleRecord {
 		/// <summary>
-		/// <see cref="Path"/> without extension (which actually recorded in <see cref="Index"/>)
+		/// <see cref="Path"/> without extension (which actually recorded in <see cref="Index"/> file)
 		/// </summary>
 		protected internal string _Path;
 		/// <summary>
@@ -28,12 +30,11 @@ namespace LibBundle3.Records {
 		/// </summary>
 		public virtual Index Index { get; }
 
-		protected internal readonly List<FileRecord> _Files = new();
-		protected ReadOnlyCollection<FileRecord>? _readonlyFiles;
+		protected internal readonly List<FileRecord> _Files = [];
 		/// <summary>
 		/// Files contained in this bundle, may be changed after <see cref="FileRecord.Redirect"/>
 		/// </summary>
-		public virtual ReadOnlyCollection<FileRecord> Files => _readonlyFiles ??= new(_Files);
+		public virtual ReadOnlyCollection<FileRecord> Files => new(_Files);
 
 		protected internal BundleRecord(string path, int uncompressedSize, Index index, int bundleIndex) {
 			_Path = path;
@@ -56,10 +57,10 @@ namespace LibBundle3.Records {
 		/// <param name="exception">Exception thrown by <see cref="IBundleFileFactory.GetBundle"/> if failed to get</param>
 		/// <remarks>Must dispose the bundle after use</remarks>
 		/// <returns>Whether successfully get the instance</returns>
-		public virtual bool TryGetBundle([NotNullWhen(true)] out Bundle? bundle, out Exception? exception) {
+		public virtual bool TryGetBundle([NotNullWhen(true)] out Bundle? bundle, [MaybeNullWhen(true)] out Exception? exception) {
 			exception = null;
 			try {
-				return (bundle = Index.bundleFactory.GetBundle(this)) != null;
+				return (bundle = Index.bundleFactory.GetBundle(this)) is not null;
 			} catch (Exception ex) {
 				exception = ex;
 				bundle = null;
@@ -74,10 +75,12 @@ namespace LibBundle3.Records {
 		/// <summary>
 		/// Function to serialize the record to <see cref="Index"/>
 		/// </summary>
+		[SkipLocalsInit]
 		protected internal virtual void Serialize(Stream stream) {
-			var path = Encoding.UTF8.GetBytes(_Path);
-			stream.Write(path.Length);
-			stream.Write(path, 0, path.Length);
+			Span<byte> span = stackalloc byte[_Path.Length]; // Since _Path contains only ASCII characters
+			var count = Encoding.UTF8.GetBytes(_Path, span);
+			stream.Write(count);
+			stream.Write(span[..count]);
 			stream.Write(UncompressedSize);
 		}
 	}

@@ -1,52 +1,50 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using SystemExtensions;
+using SystemExtensions.Collections;
+using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records {
 	public class DirectoryRecord : TreeNode {
 		/// <summary>PDIR</summary>
 		public const int Tag = 0x52494450;
 
-		[StructLayout(LayoutKind.Sequential, Size = 12, Pack = 4)]
-		protected internal struct Entry : IComparable<Entry> {
+		/// <summary>
+		/// Container of <paramref name="nameHash"/> and <paramref name="offset"/> of each entry in children
+		/// </summary>
+		/// <remarks>
+		/// There shouldn't be any duplicate namehash in the same directory
+		/// </remarks>
+		/// <param name="nameHash">Murmur2 hash of lowercase entry name (can be calculated by <see cref="TreeNode.GetNameHash"/>)</param>
+		/// <param name="offset">Offset in pack file where the record begins</param>
+		[DebuggerDisplay($"{{{{{nameof(NameHash)}={{{nameof(NameHash)}}}, {nameof(Offset)}={{{nameof(Offset)}}}}}}}")]
+		[StructLayout(LayoutKind.Sequential, Size = sizeof(uint) + sizeof(long), Pack = sizeof(uint))]
+		protected internal struct Entry(uint nameHash, long offset) : IComparable<uint> {
 			/// <summary>
-			/// Murmur2 hash of lowercase entry name
+			/// Murmur2 hash of lowercase entry name (can be calculated by <see cref="TreeNode.GetNameHash"/>)
 			/// </summary>
-			public uint NameHash;
+			public uint NameHash = nameHash;
 			/// <summary>
 			/// Offset in pack file where the record begins
 			/// </summary>
-			public long Offset;
+			public long Offset = offset;
 
-			public Entry(uint nameHash, long offset) {
-				NameHash = nameHash;
-				Offset = offset;
-			}
+			public readonly int CompareTo(uint nameHash) => NameHash.CompareTo(nameHash);
+			public override readonly int GetHashCode() => unchecked((int)NameHash);
 
-			public readonly int CompareTo(Entry other) => NameHash.CompareTo(other.NameHash);
-
-			/// <summary>
-			/// Find the index of the entry with the given <paramref name="nameHash"/> in the given <paramref name="array"/>.
-			/// </summary>
-			/// <returns>The index of the entry found, or the ~index of the first entry with a larger namehash if not found.</returns>
-			public static int BinarySearch(in Entry[] array, uint nameHash) { // From ArraySortHelper{T}.InternalBinarySearch
-				var lo = 0;
-				var hi = array.Length - 1;
-				while (lo <= hi) {
-					var i = lo + ((hi - lo) >> 1);
-					var order = array[i].NameHash.CompareTo(nameHash);
-
-					if (order == 0)
-						return i;
-					if (order < 0)
-						lo = i + 1;
-					else
-						hi = i - 1;
-				}
-				return ~lo;
+			[StructLayout(LayoutKind.Sequential, Size = sizeof(uint), Pack = sizeof(uint))]
+			public readonly struct NameHashWrapper(uint nameHash) : IComparable<Entry> {
+				public readonly uint NameHash = nameHash;
+				public readonly int CompareTo(Entry other) => NameHash.CompareTo(other.NameHash);
+				public override readonly int GetHashCode() => unchecked((int)NameHash);
+				public static implicit operator NameHashWrapper(uint nameHash) => new(nameHash);
+				public static implicit operator uint(NameHashWrapper nameHash) => nameHash;
 			}
 		}
 
@@ -63,31 +61,29 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Read a DirectoryRecord from GGPK
 		/// </summary>
+		[SkipLocalsInit]
 		protected unsafe internal DirectoryRecord(int length, GGPK ggpk) : base(length, ggpk) {
 			var s = ggpk.baseStream;
 			Offset = s.Position - 8;
 			var nameLength = s.Read<int>() - 1; // '\0'
 			var totalEntries = s.Read<int>();
 			s.ReadExactly(_Hash, 0, /*_Hash.Length*/32);
-			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
-				nameLength *= sizeof(int); // UTF32
-				Span<byte> b = stackalloc byte[nameLength];
+			if (Ggpk.Record.GGPKVersion == 4) {
+				Span<byte> b = stackalloc byte[nameLength * sizeof(int)]; // UTF32
 				s.ReadExactly(b);
 				Name = Encoding.UTF32.GetString(b);
 				s.Seek(sizeof(int), SeekOrigin.Current); // Null terminator
 			} else {
-				Name = s.ReadUTF16String(nameLength);
+				Name = s.ReadString(nameLength);
 				s.Seek(sizeof(char), SeekOrigin.Current); // Null terminator
 			}
 			EntriesBegin = s.Position;
-			Entries = new Entry[totalEntries];
-			fixed (Entry* p = Entries)
-				s.ReadExactly(new(p, totalEntries * sizeof(Entry)));
+			s.Read(Entries = new Entry[totalEntries]);
 		}
 
 		protected internal DirectoryRecord(string name, GGPK ggpk) : base(default, ggpk) {
 			Name = name;
-			Entries = Array.Empty<Entry>();
+			Entries = [];
 			Length = CaculateRecordLength();
 		}
 
@@ -98,9 +94,9 @@ namespace LibGGPK3.Records {
 				if (_Children?.Count == Entries.Length)
 					return _Children.Values;
 
-				// [MemberNotNull(nameof(_Children))] Not working here
+				[MemberNotNull(nameof(_Children))] // Not working here...
 				IEnumerable<TreeNode> GetChildren() {
-					if (_Children == null) {
+					if (_Children is null) {
 						_Children = new(Entries.Length);
 						foreach (var e in Entries) {
 							var node = (TreeNode)Ggpk.ReadRecord(e.Offset);
@@ -135,7 +131,7 @@ namespace LibGGPK3.Records {
 			get {
 				_Children ??= new(Entries.Length);
 				if (!_Children.TryGetValue(nameHash, out var node)) {
-					var i = Entry.BinarySearch(Entries, nameHash);
+					var i = Entries.AsSpan().BinarySearch((Entry.NameHashWrapper)nameHash);
 					if (i < 0)
 						return null;
 					node = (TreeNode)Ggpk.ReadRecord(Entries[i].Offset);
@@ -147,7 +143,7 @@ namespace LibGGPK3.Records {
 		}
 		[MemberNotNull(nameof(_Children))]
 #pragma warning disable CS8774 // _Children was set in this[uint nameHash]
-		public TreeNode? this[string name] => this[GetNameHash(name)];
+		public TreeNode? this[ReadOnlySpan<char> name] => this[GetNameHash(name)];
 #pragma warning restore CS8774
 
 		/// <summary>
@@ -155,6 +151,7 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		/// <param name="name">Name of the directory</param>
 		/// <remarks>Experimental function, may produce unexpected errors</remarks>
+		[MemberNotNull(nameof(Parent))]
 		public virtual DirectoryRecord AddDirectory(string name) {
 			var dir = new DirectoryRecord(name, Ggpk) { Parent = this };
 			AddNode(dir);
@@ -167,12 +164,13 @@ namespace LibGGPK3.Records {
 		/// <param name="name">Name of the file</param>
 		/// <param name="content">Content of the file</param>
 		/// <remarks>Experimental function, may produce unexpected errors</remarks>
+		[MemberNotNull(nameof(Parent))]
 		public virtual FileRecord AddFile(string name, ReadOnlySpan<byte> content = default) {
 			var file = new FileRecord(name, Ggpk) { Parent = this };
 			if (!content.IsEmpty) {
 				file.Length += file.DataLength = content.Length;
-				if (!FileRecord.Hash256.TryComputeHash(content, file._Hash, out _))
-					throw new("Unable to compute hash of the content");
+				if (!Hash256.TryComputeHash(content, file._Hash, out _))
+					ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < 32
 				AddNode(file);
 				Ggpk.baseStream.Position = file.DataOffset;
 				Ggpk.baseStream.Write(content);
@@ -184,25 +182,27 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Internal implementation of <see cref="AddDirectory"/> and <see cref="AddFile"/>
 		/// </summary>
+		[MemberNotNull(nameof(Parent))]
 		protected virtual void AddNode(TreeNode node) {
 			if (InsertEntry(new(node.NameHash, default)) < 0) // Entry.Offset will be set in node.WriteWithNewLength(int) which calls TreeNode.UpdateOffset()
-				throw new InvalidOperationException("A file/directory with the same is already exist: " + node.GetPath());
+				ThrowHelper.Throw<InvalidOperationException>("A file/directory with the same name already exists: " + node.GetPath());
 			(_Children ??= new(Entries.Length)).Add(node.NameHash, node);
-			WriteWithNewLength(CaculateRecordLength());
+			WriteWithNewLength();
 			node.WriteWithNewLength(node.Length);
 		}
 
 		/// <returns>
 		/// The index of the entry is inserted, or ~index of the existing entry with the same namehash if failed to insert.
 		/// </returns>
+		[MemberNotNull(nameof(Parent))]
 		protected internal virtual int InsertEntry(in Entry entry) {
 			if (this == Ggpk.Root)
-				throw new InvalidOperationException("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
-			var i = ~Entry.BinarySearch(Entries, entry.NameHash);
+				ThrowHelper.Throw<InvalidOperationException>("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
+			var i = ~Entries.AsSpan().BinarySearch((Entry.NameHashWrapper)entry.NameHash);
 			if (i < 0) // Exist
 				return i;
 
-			// Array.Insert(ref Entries, i, entry);
+			// Array.Insert(ref Entries, i, entry)
 			var tmp = Entries;
 			Entries = new Entry[tmp.Length + 1];
 			Entries[i] = entry;
@@ -210,7 +210,7 @@ namespace LibGGPK3.Records {
 				Array.Copy(tmp, 0, Entries, 0, i);
 			if (i < Entries.Length)
 				Array.Copy(tmp, i, Entries, i + 1, Entries.Length - i - 1);
-			WriteWithNewLength(CaculateRecordLength());
+			WriteWithNewLength();
 			return i;
 		}
 
@@ -219,22 +219,23 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		/// <param name="nameHash"><see cref="TreeNode.NameHash"/> or namehash calculated from <see cref="TreeNode.GetNameHash"/></param>
 		/// <returns>The index of the entry is removed, or ~index of the first entry with a larger namehash if not found</returns>
+		[MemberNotNull(nameof(Parent))]
 		protected internal virtual int RemoveEntry(uint nameHash) {
 			if (this == Ggpk.Root)
-				throw new InvalidOperationException("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
-			var i = Entry.BinarySearch(Entries, nameHash);
+				ThrowHelper.Throw<InvalidOperationException>("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
+			var i = Entries.AsSpan().BinarySearch((Entry.NameHashWrapper)nameHash);
 			if (i < 0) // Not found
 				return i;
 			_Children?.Remove(nameHash);
 
-			// Array.RemoveAt(ref Entries, i);
+			// Array.RemoveAt(ref Entries, i)
 			var tmp = Entries;
 			Entries = new Entry[tmp.Length - 1];
 			if (i > 0)
 				Array.Copy(tmp, 0, Entries, 0, i);
 			if (i < Entries.Length)
 				Array.Copy(tmp, i + 1, Entries, i, Entries.Length - i);
-			WriteWithNewLength(CaculateRecordLength());
+			WriteWithNewLength();
 			return i;
 		}
 
@@ -242,12 +243,19 @@ namespace LibGGPK3.Records {
 		/// Caculate the length of the record should be in ggpk file
 		/// </summary>
 		protected unsafe override int CaculateRecordLength() {
-			return Entries.Length * sizeof(Entry) + (Name.Length + 1) * (Ggpk.GgpkRecord.GGPKVersion == 4 ? 4 : 2) + 48; // 4 + 4 + 4 + 4 + Hash.Length + (Name + "\0").Length * 2 + Entries.Length * 12
+			return Entries.Length * sizeof(Entry) + (Name.Length + 1) * (Ggpk.Record.GGPKVersion == 4 ? 4 : 2) + (sizeof(int) * 4 + 32/*_Hash.Length*/);
+		}
+
+		protected override void GetPath(scoped ref ValueList<char> builder) {
+			Parent?.GetPath(ref builder);
+			builder.AddRange(Name.AsSpan());
+			builder.Add('/');
 		}
 
 		/// <summary>
 		/// Write the record to ggpk file to its current position
 		/// </summary>
+		[SkipLocalsInit]
 		protected internal unsafe override void WriteRecordData() {
 			var s = Ggpk.baseStream;
 			Offset = s.Position;
@@ -255,19 +263,17 @@ namespace LibGGPK3.Records {
 			s.Write(Tag);
 			s.Write(Name.Length + 1);
 			s.Write(Entries.Length);
-			s.Write(_Hash, 0, /*_Hash.Length*/32); // Keep the hash original to prevent the game start patching
-			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
-				var b = Encoding.UTF32.GetBytes(Name);
-				s.Write(b, 0, b.Length);
-				s.Write(0); // 4 bytes null terminator
+			s.Write(_Hash, 0, /*_Hash.Length*/32); // Keep the hash original to prevent the game from starting patching
+			if (Ggpk.Record.GGPKVersion == 4) {
+				Span<byte> span = stackalloc byte[Name.Length * sizeof(int)];
+				s.Write(span[..Encoding.UTF32.GetBytes(Name, span)]);
+				s.Write(0); // Null terminator
 			} else {
-				fixed (char* p = Name)
-					s.Write(new(p, Name.Length * 2));
-				s.Write((short)0); // 2 bytes null terminator
+				s.Write(Name);
+				s.Write<short>(0); // Null terminator
 			}
 			EntriesBegin = s.Position;
-			fixed (Entry* p = Entries)
-				s.Write(new(p, sizeof(Entry) * Entries.Length));
+			s.Write(Entries);
 		}
 	}
 }

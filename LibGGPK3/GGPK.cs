@@ -1,5 +1,4 @@
-﻿using LibGGPK3.Records;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -7,24 +6,44 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using SystemExtensions;
+using SystemExtensions.Spans;
+using SystemExtensions.Streams;
+using LibGGPK3.Records;
+
+[module: SkipLocalsInit]
 
 namespace LibGGPK3 {
+	/// <summary>
+	/// Container of Content.ggpk
+	/// </summary>
 	public class GGPK : IDisposable {
 		protected internal readonly Stream baseStream;
-		protected bool leaveOpen;
-		public GGPKRecord GgpkRecord { get; }
+		protected readonly bool leaveOpen;
+		/// <summary>
+		/// Contains information about the ggpk file
+		/// </summary>
+		public GGPKRecord Record { get; }
+		/// <summary>
+		/// Root directory of the tree structure in ggpk
+		/// </summary>
 		public DirectoryRecord Root { get; }
+
+		/// <summary>
+		/// Free spaces in ggpk (don't modify)
+		/// </summary>
+		public IReadOnlyCollection<FreeRecord> FreeRecords => FreeRecordList;
 		protected LinkedList<FreeRecord>? _FreeRecords;
-		public LinkedList<FreeRecord> FreeRecords {
+		protected internal LinkedList<FreeRecord> FreeRecordList {
 			get {
 				EnsureNotDisposed();
-				if (_FreeRecords == null) {
+				if (_FreeRecords is null) {
 					var list = new LinkedList<FreeRecord>();
-					var offsets = new HashSet<long>();
-					var NextFreeOffset = GgpkRecord.FirstFreeRecordOffset;
+					var offsets = new HashSet<long>(); // Check for infinite loops
+					var NextFreeOffset = Record.FirstFreeRecordOffset;
 					while (NextFreeOffset > 0) {
 						if (!offsets.Add(NextFreeOffset))
-							throw new("FreeRecordList causes an infinite loops, the GGPK file is broken!");
+							ThrowHelper.Throw<GGPKBrokenException>(this, "FreeRecordList causes an infinite loops");
 						var current = (FreeRecord)ReadRecord(NextFreeOffset);
 						list.AddLast(current);
 						NextFreeOffset = current.NextFreeOffset;
@@ -37,7 +56,7 @@ namespace LibGGPK3 {
 
 		/// <param name="filePath">Path to Content.ggpk on disk</param>
 		/// <exception cref="FileNotFoundException" />
-		public GGPK(string filePath) : this(File.Open(Extensions.ExpandPath(filePath), new FileStreamOptions() {
+		public GGPK(string filePath) : this(File.Open(Utils.ExpandPath(filePath), new FileStreamOptions() {
 			Mode = FileMode.Open,
 			Access = FileAccess.ReadWrite,
 			Share = FileShare.Read,
@@ -47,10 +66,11 @@ namespace LibGGPK3 {
 		/// <param name="stream">Stream of the Content.ggpk file</param>
 		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> when this instance is disposed</param>
 		public GGPK(Stream stream, bool leaveOpen = false) {
+			ArgumentNullException.ThrowIfNull(stream);
+			baseStream = stream;
 			this.leaveOpen = leaveOpen;
-			baseStream = stream ?? throw new ArgumentNullException(nameof(stream));
-			GgpkRecord = (GGPKRecord)ReadRecord(0);
-			Root = (DirectoryRecord)ReadRecord(GgpkRecord.RootDirectoryOffset);
+			Record = (GGPKRecord)ReadRecord(0);
+			Root = (DirectoryRecord)ReadRecord(Record.RootDirectoryOffset);
 		}
 
 		/// <summary>
@@ -58,26 +78,31 @@ namespace LibGGPK3 {
 		/// </summary>
 		[SkipLocalsInit]
 		public unsafe virtual BaseRecord ReadRecord() {
-			EnsureNotDisposed();
-			var buffer = stackalloc int[2];
-			baseStream.Read(new(buffer, sizeof(int) + sizeof(int)));
-			var length = *buffer;
-			return buffer[1] switch {
-				FileRecord.Tag => new FileRecord(length, this),
-				DirectoryRecord.Tag => new DirectoryRecord(length, this),
-				FreeRecord.Tag => new FreeRecord(length, this),
-				GGPKRecord.Tag => new GGPKRecord(length, this),
-				_ => throw new Exception($"Invalid record tag at offset: {baseStream.Position - sizeof(int)}\r\nThe Content.ggpk may be broken")
-			};
+			lock (baseStream) {
+				EnsureNotDisposed();
+				var buffer = stackalloc int[2];
+				baseStream.ReadExactly(new(buffer, sizeof(int) + sizeof(int)));
+				var length = *buffer;
+				return buffer[1] switch {
+					FileRecord.Tag => new FileRecord(length, this),
+					DirectoryRecord.Tag => new DirectoryRecord(length, this),
+					FreeRecord.Tag => new FreeRecord(length, this),
+					GGPKRecord.Tag => new GGPKRecord(length, this),
+					_ => throw new GGPKBrokenException(this, $"Invalid record tag at offset: {baseStream.Position - sizeof(int)}")
+				};
+			}
 		}
 
 		/// <summary>
 		/// Read a record from GGPK with <paramref name="offset"/> in bytes
 		/// </summary>
 		/// <param name="offset">Record offset, null for current stream position</param>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public virtual BaseRecord ReadRecord(long offset) {
-			baseStream.Position = offset;
-			return ReadRecord();
+			lock (baseStream) {
+				baseStream.Position = offset;
+				return ReadRecord();
+			}
 		}
 
 		/// <summary>
@@ -87,18 +112,17 @@ namespace LibGGPK3 {
 		/// <param name="node">The node found, or null when not found, or <paramref name="root"/> if <paramref name="path"/> is empty</param>
 		/// <param name="root">Node to start searching, or null for <see cref="Root"/></param>
 		/// <returns>Whether found a node</returns>
-		public virtual bool TryFindNode(string path, [NotNullWhen(true)] out TreeNode? node, DirectoryRecord? root = null) {
+		public virtual unsafe bool TryFindNode(scoped ReadOnlySpan<char> path, [NotNullWhen(true)] out TreeNode? node, DirectoryRecord? root = null) {
 			EnsureNotDisposed();
 			root ??= Root;
-			if (path == string.Empty) {
+			if (path.IsEmpty) {
 				node = root;
 				return true;
 			}
-			var splittedPath = path.Split('/'); // TODO: .Net 8 ReadOnlySpan<char>.Split()
-			foreach (var name in splittedPath) {
+			foreach (var name in path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) {
 				var next = root[name];
 				if (next is not DirectoryRecord dr)
-					return (node = next) != null;
+					return (node = next) is not null;
 				root = dr;
 			}
 			node = root;
@@ -111,37 +135,36 @@ namespace LibGGPK3 {
 		/// <param name="path">Relative path (with forward slash) in GGPK (which not start or end with slash) under <paramref name="root"/></param>
 		/// <param name="root">Node to start searching, or null for <see cref="Root"/></param>
 		/// <returns>The node found</returns>
-		public virtual DirectoryRecord FindOrCreateDirectory(string path, DirectoryRecord? root = null) {
+		public virtual DirectoryRecord FindOrCreateDirectory(scoped ReadOnlySpan<char> path, DirectoryRecord? root = null) {
 			EnsureNotDisposed();
 			root ??= Root;
-			if (path == string.Empty)
+			if (path.IsEmpty)
 				return root;
-			var splittedPath = path.Split('/'); // TODO: .Net 8 ReadOnlySpan<char>.Split()
-			foreach (var name in splittedPath) {
+			foreach (var name in path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) {
 				var next = root[name];
 				if (next is DirectoryRecord dr)
 					root = dr;
-				else if (next == null)
-					root = root.AddDirectory(name);
+				else if (next is null)
+					root = root.AddDirectory(new string(name));
 				else if (next is FileRecord fr)
-					throw new("Cannot create directory \"" + fr.GetPath() + "\" because there is a file with the same name");
+					ThrowHelper.Throw<Exception>("Cannot create directory \"" + fr.GetPath() + "\" because there is a file with the same name exists");
 				else
-					throw new("Unknown TreeNode type:" + next.ToString());
+					ThrowHelper.Throw<InvalidCastException>("Unknown TreeNode type:" + next.ToString());
 			}
 			return root;
 		}
 
 		/// <summary>
-		/// Find the best FreeRecord from <see cref="FreeRecords"/> to write a Record with length of <paramref name="length"/>
+		/// Find the best FreeRecord from <see cref="FreeRecordList"/> to write a Record with length of <paramref name="length"/>
 		/// </summary>
 		protected internal virtual LinkedListNode<FreeRecord>? FindBestFreeRecord(int length) {
 			LinkedListNode<FreeRecord>? bestNode = null; // Find the FreeRecord with most suitable size
-			var currentNode = FreeRecords.First!;
+			var currentNode = FreeRecordList.First!;
 			var remainingSpace = int.MaxValue;
 			do {
 				if (currentNode.Value.Length == length) {
 					bestNode = currentNode;
-					//remainingSpace = 0;
+					//remainingSpace = 0
 					break;
 				}
 				var tmpSpace = currentNode.Value.Length - length;
@@ -149,7 +172,8 @@ namespace LibGGPK3 {
 					bestNode = currentNode;
 					remainingSpace = tmpSpace;
 				}
-			} while ((currentNode = currentNode.Next) != null);
+				currentNode = currentNode.Next;
+			} while (currentNode is not null);
 			return bestNode;
 		}
 
@@ -162,9 +186,8 @@ namespace LibGGPK3 {
 			return Task.Run(() => {
 				cancellation?.ThrowIfCancellationRequested();
 				FreeRecordConcat();
-				cancellation?.ThrowIfCancellationRequested();
 
-				var freeList = new PriorityQueue<FreeRecord, long>(FreeRecords.Select(f => (f, f.Offset)));
+				var freeList = new PriorityQueue<FreeRecord, long>(FreeRecordList.Select(f => (f, f.Offset)));
 				progress?.Report(freeList.Count);
 				if (freeList.Count == 0)
 					return;
@@ -175,7 +198,7 @@ namespace LibGGPK3 {
 
 				while (freeList.TryDequeue(out var free, out _)) {
 					progress?.Report(freeList.Count);
-					var freeNode = FreeRecords.Find(free);
+					var freeNode = FreeRecordList.Find(free);
 					for (var i = treeNodes.Count - 1; i >= 0; --i) {
 						cancellation?.ThrowIfCancellationRequested();
 						var treeNode = treeNodes[i];
@@ -192,11 +215,11 @@ namespace LibGGPK3 {
 							var newFree = file.WriteWithNewLength(file.Length, freeNode)?.Value;
 							baseStream.Position = file.DataOffset;
 							baseStream.Write(fileContent, 0, fileContent.Length);
-							if (newFree != null && newFree != free)
+							if (newFree is not null && newFree != free)
 								freeList.Enqueue(newFree, newFree.Offset);
 						} else {
 							var newFree = treeNode.WriteWithNewLength(treeNode.Length, freeNode)?.Value;
-							if (newFree != null && newFree != free)
+							if (newFree is not null && newFree != free)
 								freeList.Enqueue(newFree, newFree.Offset);
 						}
 					}
@@ -212,24 +235,24 @@ namespace LibGGPK3 {
 			EnsureNotDisposed();
 			var s = baseStream;
 			baseStream.Position = 0;
-			GgpkRecord.FirstFreeRecordOffset = 0;
+			Record.FirstFreeRecordOffset = 0;
 			var list = new LinkedList<FreeRecord>();
 			FreeRecord? last = null;
 			while (s.Position < s.Length) {
 				var record = ReadRecord();
 				if (record is FreeRecord fr) {
-					if (last != null)
+					if (last is not null)
 						last.NextFreeOffset = fr.Offset;
 					else
-						GgpkRecord.FirstFreeRecordOffset = fr.Offset;
+						Record.FirstFreeRecordOffset = fr.Offset;
 					last = fr;
 					list.AddLast(last);
 				}
 			}
-			if (last != null)
+			if (last is not null)
 				last.NextFreeOffset = 0;
-			baseStream.Position = GgpkRecord.Offset + 20;
-			s.Write(GgpkRecord.FirstFreeRecordOffset);
+			baseStream.Position = Record.Offset + 20;
+			s.Write(Record.FirstFreeRecordOffset);
 			foreach (var fr in list) {
 				baseStream.Position = fr.Offset + 8;
 				s.Write(fr.NextFreeOffset);
@@ -242,16 +265,16 @@ namespace LibGGPK3 {
 		/// </summary>
 		protected virtual void FreeRecordConcat() {
 			EnsureNotDisposed();
-			if (FreeRecords.Count == 0)
+			if (FreeRecordList.Count == 0)
 				return;
-			var list = FreeRecords.ToList();
+			var list = FreeRecordList.ToList();
 			list.Sort(Comparer<FreeRecord>.Create((x, y) => x.Offset.CompareTo(y.Offset)));
-			var continu = true;
+			var @continue = true;
 			FreeRecord? current = default;
-			for (var i = 0; continu;) {
+			for (var i = 0; @continue;) {
 				var changed = false;
 				current = list[i];
-				while ((continu = ++i < list.Count) && current.Offset + current.Length == list[i].Offset) {
+				while ((@continue = ++i < list.Count) && current.Offset + current.Length == list[i].Offset) {
 					current.Length += list[i].Length;
 					list[i].RemoveFromList();
 					changed = true;
@@ -261,7 +284,7 @@ namespace LibGGPK3 {
 					baseStream.Write(current.Length);
 				}
 			}
-			if (current != null && current.Offset + current.Length >= baseStream.Length) {
+			if (current is not null && current.Offset + current.Length >= baseStream.Length) {
 				baseStream.Flush();
 				baseStream.SetLength(current.Offset);
 				current.RemoveFromList();
@@ -307,10 +330,7 @@ namespace LibGGPK3 {
 			}
 		}
 
-		protected virtual void EnsureNotDisposed() {
-			if (!baseStream.CanRead)
-				throw new ObjectDisposedException(nameof(GGPK));
-		}
+		protected virtual void EnsureNotDisposed() => ObjectDisposedException.ThrowIf(!baseStream.CanRead, this);
 
 		public virtual void Dispose() {
 			GC.SuppressFinalize(this);

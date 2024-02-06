@@ -1,5 +1,6 @@
 ﻿using Eto;
 using Eto.Forms;
+using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -18,7 +19,7 @@ namespace VisualGGPK3.TreeItems {
 		protected ReadOnlyCollection<ITreeItem>? _ChildItems;
 		public override ReadOnlyCollection<ITreeItem> ChildItems {
 			get {
-				if (_ChildItems == null) {
+				if (_ChildItems is null) {			// Already sorted
 					var list = Directory.EnumerateDirectories(Path)/*.OrderBy(p => p)*/.Select(p => (ITreeItem)new DriveDirectoryTreeItem(p, this, Tree)).ToList();
 					list.AddRange(Directory.EnumerateFiles(Path)/*.OrderBy(p => p)*/.Select(p => (ITreeItem)new DriveFileTreeItem(p, this)));
 					list.TrimExcess();
@@ -38,7 +39,7 @@ namespace VisualGGPK3.TreeItems {
 					File.Copy(fi.Path, $"{path}/{fi.Name}");
 					++count;
 				} else
-					throw new("Unexpected type: " + f.GetType().ToString());
+					throw new InvalidCastException("Unexpected type: " + f.GetType().ToString());
 			}
 			return count;
 		}
@@ -55,7 +56,7 @@ namespace VisualGGPK3.TreeItems {
 						++count;
 					}
 				} else
-					throw new("Unexpected type: " + f.GetType().ToString());
+					throw new InvalidCastException("Unexpected type: " + f.GetType().ToString());
 			}
 			return count;
 		}

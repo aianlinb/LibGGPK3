@@ -1,10 +1,11 @@
-﻿using LibBundledGGPK3;
+﻿using LibBundle3.Nodes;
+using LibBundledGGPK3;
 using System;
 using System.IO;
 using System.Reflection;
 
 namespace ExtractBundledGGPK3 {
-	public class Program {
+	public static class Program {
 		public static void Main(string[] args) {
 			try {
 				var version = Assembly.GetExecutingAssembly().GetName().Version!;
@@ -49,7 +50,7 @@ namespace ExtractBundledGGPK3 {
 					return;
 				}
 				Console.WriteLine("Extracting files . . .");
-				LibBundle3.Index.Extract(node, path);
+				LibBundle3.Index.ExtractParallel(node, path);
 				Console.WriteLine("Done!");
 			} catch (Exception e) {
 				Console.Error.WriteLine(e);

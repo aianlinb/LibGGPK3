@@ -14,9 +14,8 @@ namespace GGPKFastCompact3 {
 				Console.WriteLine($"GGPKFastCompact3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb");
 				Console.WriteLine();
 				if (args.Length == 0) {
-					args = new string[1];
 					Console.Write("Path to Content.ggpk: ");
-					args[0] = Console.ReadLine()!;
+					args = [Console.ReadLine()!];
 					Console.WriteLine();
 				}
 				if (!File.Exists(args[0])) {
@@ -46,7 +45,7 @@ namespace GGPKFastCompact3 {
 				}));
 				while (prog < 0) {
 					Thread.Sleep(200);
-					if (tsk.Exception != null)
+					if (tsk.Exception is not null)
 						throw tsk.Exception;
 				}
 				while (!tsk.IsCompleted) {
@@ -57,7 +56,7 @@ namespace GGPKFastCompact3 {
 				Console.WriteLine($"Remaining FreeRecords to be filled: {prog}/{max}");
 				Console.WriteLine();
 				cancel.Dispose();
-				if (tsk.Exception != null)
+				if (tsk.Exception is not null)
 					throw tsk.Exception!;
 				if (tsk.IsCanceled)
 					Console.WriteLine("Cancelled!");

@@ -1,30 +1,31 @@
-﻿using Eto.Drawing;
-using Eto.Forms;
-using LibBundledGGPK3;
-using LibGGPK3;
-using LibGGPK3.Records;
-using System;
+﻿using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using Eto.Drawing;
+using Eto.Forms;
+using ImageMagick;
+using LibBundledGGPK3;
 using VisualGGPK3.TreeItems;
 
 namespace VisualGGPK3 {
-	public class MainWindow : Form {
-		public BundledGGPK? Ggpk { get; protected set; }
-		public LibBundle3.Index Index { get; protected set; }
+	public sealed class MainWindow : Form {
+		private BundledGGPK? Ggpk;
+		private LibBundle3.Index? Index;
 #pragma warning disable CS0618
-		protected readonly TreeView GGPKTree = new();
-		protected readonly TreeView BundleTree = new();
-		protected readonly TextArea TextPanel = new() { ReadOnly = true };
-		protected readonly ImageView ImagePanel = new();
-		protected readonly GridView DatPanel = new();
+		private readonly TreeView GGPKTree = new();
+		private readonly TreeView BundleTree = new();
+#pragma warning restore CS0618
+		private readonly TextArea TextPanel = new() { ReadOnly = true };
+		private readonly ImageView ImagePanel = new();
+		private readonly GridView DatPanel = new();
 
-		protected string? imageName;
-		protected ITreeItem? clickedItem;
+		private string? imageName;
+		private ITreeItem? clickedItem;
 
-#pragma warning disable CS8618
 		public MainWindow(string? path = null) {
 #if Mac
 			static void closed(object? sender, EventArgs e) => Application.Instance.Quit();
@@ -36,20 +37,18 @@ namespace VisualGGPK3 {
 				Title = $"VisualGGPK3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})";
 			else
 				Title = $"VisualGGPK3 (v{version.Major}.{version.Minor}.{version.Build})";
-			try {
-				var bounds = Screen.Bounds;
-				if (bounds.Width <= 1280 || bounds.Height <= 720)
-					Size = new(960, 540);
-				else
-					Size = new(1280, 720);
-			} catch {
+
+			var bounds = Screen.Bounds;
+			if (bounds.Width <= 1280 || bounds.Height <= 720)
+				Size = new(960, 540);
+			else
 				Size = new(1280, 720);
-			}
 #if Windows
-			var h = Handler;
+#pragma warning disable CS0618 // Obsolete
 			static void WindowsFix(TreeView tree) {
 				var etree = ((Eto.Wpf.Forms.Controls.TreeViewHandler)tree.Handler).Control; // EtoTreeView
-																							// Virtualizing
+#pragma warning restore CS0618
+				// Virtualizing
 				etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.IsVirtualizingProperty, true);
 				etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.VirtualizationModeProperty, System.Windows.Controls.VirtualizationMode.Recycling);
 				// Fix expand binding
@@ -68,7 +67,8 @@ namespace VisualGGPK3 {
 
 			var menu = new ContextMenu(
 				new ButtonMenuItem(OnExtractClicked) { Text = "Extract" },
-				new ButtonMenuItem(OnReplaceClicked) { Text = "Replace" }
+				new ButtonMenuItem(OnReplaceClicked) { Text = "Replace" },
+				new ButtonMenuItem(OnCopyPathClicked) { Text = "Copy Path" }
 			);
 			GGPKTree.MouseUp += (s, e) => {
 				if (e.Buttons == MouseButtons.Alternate && GGPKTree.GetNodeAt(e.Location) is ITreeItem item) {
@@ -94,14 +94,14 @@ namespace VisualGGPK3 {
 				Panel2 = new Splitter() {
 					Panel1 = BundleTree,
 					Panel1MinimumSize = 10,
-					Panel2 = ImagePanel,
+					Panel2 = new Label() { Text = "This program is still in development" },
 					Panel2MinimumSize = 10,
 					SplitterWidth = 4,
 					Position = 240
 				},
 				Panel2MinimumSize = 20,
 				SplitterWidth = 4,
-				Position = 120
+				Position = 160
 			};
 
 			var loading = new TreeItemCollection() {
@@ -113,15 +113,15 @@ namespace VisualGGPK3 {
 			Content = layout;
 			LoadComplete += OnLoadComplete;
 
-			async void OnLoadComplete(object? sender, EventArgs e) {
+			async void OnLoadComplete(object? sender, EventArgs _) {
 				LoadComplete -= OnLoadComplete;
 				await Task.Yield();
-				if (path == null || !File.Exists(path)) {
+				if (path is null || !File.Exists(path)) {
 					var ofd = new OpenFileDialog() {
 						FileName = "Content.ggpk",
 						Filters = {
-							new() { Name = "GGPK/Index File", Extensions = new string[] { ".ggpk", ".index.bin" } },
-							new() { Extensions = new string[] { "" } }
+							new("GGPK/Index File", ".ggpk", ".index.bin"),
+							allFilesFilters
 						}
 					};
 					if (ofd.ShowDialog(this) != DialogResult.Ok) {
@@ -149,9 +149,11 @@ namespace VisualGGPK3 {
 			}
 		}
 
-		protected virtual void OnSelectionChanged(object? sender, EventArgs e) {
+		private void OnSelectionChanged(object? sender, EventArgs _) {
+#pragma warning disable CS0618 // Obsolete
 			var item = (sender as TreeView)?.SelectedItem;
-			if (item == null)
+#pragma warning restore CS0618 // Obsolete
+			if (item is null)
 				return;
 #if Windows
 			if (item.Expandable)
@@ -161,21 +163,30 @@ namespace VisualGGPK3 {
 				var panel = (Splitter)((Splitter)Content).Panel2;
 				var format = fileItem.Format;
 				try {
+					if (ImagePanel.Image is not null) {
+						ImagePanel.Image.Dispose();
+						ImagePanel.Image = null;
+					}
 					switch (format) {
 						case FileTreeItem.DataFormat.Text:
 							var span = fileItem.Read().Span;
 #if Windows
 							if (span.Length > 204800) {
-								MessageBox.Show(this, "This text file is too large, only first 200KB will be shown", "Warning", MessageBoxButtons.OK, MessageBoxType.Warning);
+								MessageBox.Show(this, "This text file is too large, only the first 200KB will be shown", "Warning", MessageBoxButtons.OK, MessageBoxType.Warning);
 								span = span[..204800];
 							}
 #endif
-							if (span[0] == 0xFF)
-								TextPanel.Text = span[2..].GetUTF16String();
-							else if (Path.GetExtension(fileItem.Name).Equals(".amd", StringComparison.OrdinalIgnoreCase))
-								TextPanel.Text = span.GetUTF16String();
+							if (span.IsEmpty)
+								TextPanel.Text = "";
+							else if (MemoryMarshal.GetReference(span) == 0xFF)
+								TextPanel.Text = new string(MemoryMarshal.Cast<byte, char>(span[2..]));
+							else if (fileItem.Name.EndsWith(".amd", StringComparison.OrdinalIgnoreCase))
+								TextPanel.Text = new string(MemoryMarshal.Cast<byte, char>(span));
 							else
-								TextPanel.Text = Encoding.UTF8.GetString(span);
+								unsafe {
+									fixed (byte* p = span)
+										TextPanel.Text = new string((sbyte*)p, 0, span.Length);
+								}
 							panel.Panel2 = TextPanel;
 							break;
 						case FileTreeItem.DataFormat.Image:
@@ -191,18 +202,39 @@ namespace VisualGGPK3 {
 							break;
 						case FileTreeItem.DataFormat.Dds:
 							imageName = Path.GetFileNameWithoutExtension(fileItem.Name);
-							// TODO
-							//panel.Panel2 = ImagePanel;
+
+							ReadOnlySpan<byte> data;
+							if (fileItem is GGPKFileTreeItem g2)
+								data = g2.Record.Read();
+							else if (fileItem is DriveFileTreeItem d)
+								data = File.ReadAllBytes(d.Path);
+							else
+								data = fileItem.Read().Span;
+
+							if (fileItem.Name.EndsWith(".header")) {
+								data = data[0] == 3 ? data[28..] : data[16..];
+								while (data[0] == '*') {
+									data = data[1..];
+									Span<char> path = stackalloc char[data.Length * 2];
+									if (!Index!.TryGetFile(path[Encoding.UTF8.GetChars(data, path)..], out var file))
+										goto default;
+									if (path.EndsWith(".header"))
+										data = data[0] == 3 ? data[28..] : data[16..];
+								}
+							}
+
+							using (var image = new MagickImage(data))
+								ImagePanel.Image = new Bitmap(image.ToByteArray(MagickFormat.Bmp));
+							panel.Panel2 = ImagePanel;
 							break;
 						case FileTreeItem.DataFormat.Dat:
-						// TODO
-						//panel.Panel2 = DatPanel;
-						//break;
+							// TODO
+							//panel.Panel2 = DatPanel;
+							//break;
 						default:
 							TextPanel.Text = "";
 							panel.Panel2 = TextPanel;
-							ImagePanel.Image = null;
-							DatPanel.DataStore = null;
+							//DatPanel.DataStore = null;
 							break;
 					}
 				} catch (Exception ex) {
@@ -212,12 +244,14 @@ namespace VisualGGPK3 {
 			}
 		}
 
-		protected virtual void OnExtractClicked(object? sender, EventArgs e) {
+		private void OnExtractClicked(object? sender, EventArgs _) {
 			if (clickedItem is FileTreeItem fi) {
+				var ext = "*" + Path.GetExtension(fi.Name);
 				var sfd = new SaveFileDialog() {
 					FileName = fi.Name,
 					Filters = {
-						new() { Name = "All Files", Extensions = new string[] { "*" } }
+						new(ext, ext),
+						allFilesFilters
 					}
 				};
 				if (sfd.ShowDialog(this) != DialogResult.Ok)
@@ -230,9 +264,7 @@ namespace VisualGGPK3 {
 				var sfd = new SaveFileDialog() {
 					CheckFileExists = false,
 					FileName = di.Name + ".dir",
-					Filters = {
-						new() { Name = "All Files", Extensions = new string[] { "*" } }
-					}
+					Filters = { allFilesFilters }
 				};
 				if (sfd.ShowDialog(this) != DialogResult.Ok)
 					return;
@@ -241,42 +273,69 @@ namespace VisualGGPK3 {
 			}
 		}
 
-		protected virtual void OnReplaceClicked(object? sender, EventArgs e) {
+		private void OnReplaceClicked(object? sender, EventArgs _) {
 			if (clickedItem is FileTreeItem fi) {
+				var ext = "*" + Path.GetExtension(fi.Name);
 				var ofd = new OpenFileDialog() {
 					FileName = fi.Name,
 					Filters = {
-						new() { Name = "All Files", Extensions = new string[] { "*" } }
+						new(ext, ext),
+						allFilesFilters
 					}
 				};
-				if (ofd.ShowDialog(this) == DialogResult.Ok) {
-					var b = File.ReadAllBytes(ofd.FileName);
-					fi.Write(b);
-					MessageBox.Show(this, $"Replaced {b.Length} bytes from\r\n{ofd.FileName}", "Done", MessageBoxType.Information);
-				}
+				if (ofd.ShowDialog(this) != DialogResult.Ok)
+					return;
+				var b = File.ReadAllBytes(ofd.FileName);
+				fi.Write(b);
+				MessageBox.Show(this, $"Replaced {b.Length} bytes from\r\n{ofd.FileName}", "Done", MessageBoxType.Information);
 			} else if (clickedItem is DirectoryTreeItem di) {
 				var ofd = new OpenFileDialog() {
 					CheckFileExists = false,
 					FileName = "{OPEN IN A FOLDER}",
-					Filters = {
-						new() { Name = "All Files", Extensions = new string[] { "*" } }
-					}
+					Filters = { allFilesFilters }
 				};
 				if (ofd.ShowDialog(this) != DialogResult.Ok)
 					return;
 				var dir = Path.GetDirectoryName(ofd.FileName)!;
 				MessageBox.Show(this, $"Replaced {di.Replace(dir)} files from\r\n{dir}", "Done", MessageBoxType.Information);
 			}
+
+			var bd2 = (GGPKTree.DataStore as GGPKDirectoryTreeItem)?.ChildItems.FirstOrDefault(t => t.Text == "Bundles2");
+			if (bd2 is GGPKDirectoryTreeItem g) {
+				g._ChildItems = null; // Update tree
+				GGPKTree.RefreshItem(g);
+			}
+			OnSelectionChanged(BundleTree, EventArgs.Empty);
 		}
 
-		protected virtual void OnSaveAsPngClicked(object? sender, EventArgs e) {
+		private void OnCopyPathClicked(object? sender, EventArgs _) {
+			if (clickedItem is null)
+				return;
+			var builder = new StringBuilder(64);
+			GetPath(clickedItem, builder);
+			Clipboard.Instance.Text = builder.ToString().TrimStart('/');
+		}
+		private static void GetPath(ITreeItem node, StringBuilder builder) {
+			if (node.Parent is not null) {
+				GetPath(node.Parent, builder);
+				builder.Append('/');
+			}
+			builder.Append(node.Text);
+		}
+
+		private void OnSaveAsPngClicked(object? sender, EventArgs _) {
 			var sfd = new SaveFileDialog {
 				FileName = (imageName ?? "unnamed") + ".png",
-				Filters = { new() { Name = "Png File", Extensions = new string[] { "*.png" } } }
+				Filters = {
+					new("Png File", "*.png"),
+					allFilesFilters
+				}
 			};
 			if (sfd.ShowDialog(this) != DialogResult.Ok)
 				return;
-			((Bitmap)ImagePanel.Image).Save(sfd.FileName, ImageFormat.Png);
+			(ImagePanel.Image as Bitmap)!.Save(sfd.FileName, ImageFormat.Png);
 		}
+
+		private static readonly FileFilter allFilesFilters = new("All Files", "*");
 	}
 }

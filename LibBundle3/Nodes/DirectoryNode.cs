@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace LibBundle3.Nodes {
@@ -10,23 +9,23 @@ namespace LibBundle3.Nodes {
 		public virtual DirectoryNode? Parent { get; }
 		IDirectoryNode? ITreeNode.Parent => Parent;
 		protected List<ITreeNode>? _Children;
-		public virtual IList<ITreeNode> Children => _Children ??= new();
+		public virtual IList<ITreeNode> Children => _Children ??= [];
 
 		protected DirectoryNode(string name, DirectoryNode? parent) {
 			Name = name;
 			Parent = parent;
 		}
 
-		/// <summary>
-		/// Call <see cref="this[string]"/>
-		/// </summary>
-		public virtual bool TryGetChild(string name, [NotNullWhen(true)] out ITreeNode? child) {
-			return (child = this[name]) != null;
-		}
-
 		public virtual int Count => Children.Count;
 		public virtual ITreeNode this[int index] => Children[index];
-		public virtual ITreeNode? this[string name] => Children.FirstOrDefault(n => n.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+		public virtual ITreeNode? this[ReadOnlySpan<char> name] {
+			get {
+				foreach (var child in Children)
+					if (child.Name.AsSpan().SequenceEqual(name))
+						return child;
+				return null;
+			}
+		}
 		public virtual IEnumerator<ITreeNode> GetEnumerator() {
 			return Children.GetEnumerator();
 		}

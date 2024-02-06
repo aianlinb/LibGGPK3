@@ -9,7 +9,8 @@ namespace VisualGGPK3.TreeItems {
 		protected internal static readonly Bitmap DirectoryIcon;
 		static DirectoryTreeItem() {
 			try {
-				DirectoryIcon = new(Assembly.GetExecutingAssembly().GetManifestResourceStream("VisualGGPK3.Resources.dir.ico"));
+				using var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("VisualGGPK3.Resources.dir.ico");
+				DirectoryIcon = new(s);
 			} catch {
 				DirectoryIcon = null!;
 			}

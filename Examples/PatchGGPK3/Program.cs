@@ -7,7 +7,7 @@ using System.IO.Compression;
 using System.Reflection;
 
 namespace PatchGGPK3 {
-	public class Program {
+	public static class Program {
 		public static void Main(string[] args) {
 			try {
 				var version = Assembly.GetExecutingAssembly().GetName().Version!;
@@ -60,11 +60,11 @@ namespace PatchGGPK3 {
 						Console.WriteLine("Not found in GGPK!");
 						continue;
 					}
-					using var fs = entry.Open();
 					var len = (int)entry.Length;
 					var b = ArrayPool<byte>.Shared.Rent(len);
 					try {
-						fs.ReadExactly(b, 0, len);
+						using (var fs = entry.Open())
+							fs.ReadExactly(b, 0, len);
 						fr.Write(new(b, 0, len));
 					} finally {
 						ArrayPool<byte>.Shared.Return(b);

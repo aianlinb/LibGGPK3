@@ -9,7 +9,8 @@ namespace VisualGGPK3.TreeItems {
 		protected internal static readonly Bitmap FileIcon;
 		static FileTreeItem() {
 			try {
-				FileIcon = new(Assembly.GetExecutingAssembly().GetManifestResourceStream("VisualGGPK3.Resources.file.ico"));
+				using var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("VisualGGPK3.Resources.file.ico");
+				FileIcon = new(s);
 			} catch {
 				FileIcon = null!;
 			}
@@ -44,7 +45,7 @@ namespace VisualGGPK3.TreeItems {
 			Dds,
 			OGG
 		}
-		public DataFormat Format => Path.GetExtension(Name).ToLower() switch {
+		public DataFormat Format => Path.GetExtension(Name).ToLowerInvariant() switch {
 			".act" or ".ais" or ".amd" or ".ao" or ".aoc" or ".arl" or ".arm" or ".atlas" or ".cht" or ".clt" or ".dct" or ".ddt" or ".dgr" or ".dlp" or ".ecf" or ".edp" or ".env" or ".epk" or ".et" or ".ffx" or ".fxgraph" or ".gft" or ".gt" or ".idl" or ".idt" or ".json" or ".mat" or ".mtd" or ".ot" or ".otc" or ".pet" or ".red" or ".rs" or ".sm" or ".tgr" or ".tgt" or ".trl" or ".tsi" or ".tst" or ".ui" or ".xml" // Unicode
 			or ".txt" or ".csv" or ".filter" or ".fx" or ".hlsl" or ".mel" or ".properties" or ".slt" => DataFormat.Text, // UTF8
 			".dat" or ".dat64" or ".datl" or ".datl64" => DataFormat.Dat,

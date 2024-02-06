@@ -17,7 +17,7 @@ namespace VisualGGPK3.TreeItems {
 			Parent = parent;
 		}
 
-		protected ReadOnlyCollection<ITreeItem>? _ChildItems;
+		protected internal ReadOnlyCollection<ITreeItem>? _ChildItems;
 		public override ReadOnlyCollection<ITreeItem> ChildItems =>
 			_ChildItems ??= new(Record.Children.OrderBy(tn => tn, NodeComparer.Instance).Select(
 					t => t is FileRecord f ?

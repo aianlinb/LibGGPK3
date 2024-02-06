@@ -1,7 +1,10 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
-using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 using System.Text;
+using SystemExtensions;
+using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records {
 	/// <summary>
@@ -10,7 +13,6 @@ namespace LibGGPK3.Records {
 	public class FileRecord : TreeNode {
 		/// <summary>FILE</summary>
 		public const int Tag = 0x454C4946;
-		protected internal static readonly SHA256 Hash256 = SHA256.Create();
 
 		/// <summary>
 		/// Offset in pack file where the raw data begins
@@ -21,23 +23,23 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		public int DataLength { get; protected internal set; }
 
+		[SkipLocalsInit]
 		protected unsafe internal FileRecord(int length, GGPK ggpk) : base(length, ggpk) {
 			var s = ggpk.baseStream;
 			Offset = s.Position - 8;
 			var nameLength = s.Read<int>() - 1;
 			s.ReadExactly(_Hash, 0, 32);
-			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
-				nameLength *= sizeof(int);
-				var b = stackalloc byte[nameLength];
-				s.ReadExactly(new(b, nameLength));
-				Name = Encoding.UTF32.GetString(b, nameLength);
+			if (Ggpk.Record.GGPKVersion == 4) {
+				Span<byte> b = stackalloc byte[nameLength * sizeof(int)];
+				s.ReadExactly(b);
+				Name = Encoding.UTF32.GetString(b);
 				s.Seek(4, SeekOrigin.Current); // Null terminator
 			} else {
-				Name = s.ReadUTF16String(nameLength);
+				Name = s.ReadString(nameLength); // UTF16
 				s.Seek(2, SeekOrigin.Current); // Null terminator
 			}
 			DataOffset = s.Position;
-			DataLength = Length - (int)(s.Position - Offset);
+			DataLength = Length - (int)(DataOffset - Offset);
 			s.Seek(DataLength, SeekOrigin.Current);
 		}
 
@@ -47,9 +49,10 @@ namespace LibGGPK3.Records {
 		}
 
 		protected override int CaculateRecordLength() {
-			return (Name.Length + 1) * (Ggpk.GgpkRecord.GGPKVersion == 4 ? 4 : 2) + 44 + DataLength; // (4 + 4 + 4 + Hash.Length + (Name + "\0").Length * 2) + DataLength
+			return (Name.Length + 1) * (Ggpk.Record.GGPKVersion == 4 ? 4 : 2) + 44 + DataLength; // (4 + 4 + 4 + Hash.Length + (Name + "\0").Length * 2) + DataLength
 		}
 
+		[SkipLocalsInit]
 		protected internal unsafe override void WriteRecordData() {
 			var s = Ggpk.baseStream;
 			Offset = s.Position;
@@ -57,14 +60,13 @@ namespace LibGGPK3.Records {
 			s.Write(Tag);
 			s.Write(Name.Length + 1);
 			s.Write(_Hash, 0, /*_Hash.Length*/32);
-			if (Ggpk.GgpkRecord.GGPKVersion == 4) {
-				var b = Encoding.UTF32.GetBytes(Name);
-				s.Write(b, 0, b.Length);
+			if (Ggpk.Record.GGPKVersion == 4) {
+				Span<byte> span = stackalloc byte[Name.Length * sizeof(int)];
+				s.Write(span[..Encoding.UTF32.GetBytes(Name, span)]);
 				s.Write(0); // Null terminator
 			} else {
-				fixed (char* p = Name)
-					s.Write(new(p, Name.Length * sizeof(char)));
-				s.Write((short)0); // Null terminator
+				s.Write(Name);
+				s.Write<short>(0); // Null terminator
 			}
 			DataOffset = s.Position;
 			// Actual file content writing of FileRecord isn't here (see Write())
@@ -100,18 +102,18 @@ namespace LibGGPK3.Records {
 		}
 
 		/// <summary>
-		/// Replace the file content with a new content,
-		/// and move the record to a FreeRecord with most suitable size, or end of file if not found.
+		/// Replace the file content with <paramref name="newContent"/>,
+		/// and move this record to a <see cref="FreeRecord"/> with most suitable size, or end of file if not found.
 		/// </summary>
 		public virtual void Write(ReadOnlySpan<byte> newContent) {
 			if (!Hash256.TryComputeHash(newContent, _Hash, out _))
-				throw new("Unable to compute hash of the content");
+				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < 32
 			lock (Ggpk.baseStream) {
 				var s = Ggpk.baseStream;
 				if (newContent.Length != DataLength) { // Replace a FreeRecord
 					DataLength = newContent.Length;
-					WriteWithNewLength(CaculateRecordLength());
-					// Offset and DataOffset will be set from WriteRecordData() in above method
+					WriteWithNewLength();
+					// Offset and DataOffset will be set by WriteRecordData() in above method
 				} else {
 					s.Position = Offset + sizeof(int) * 3;
 					s.Write(_Hash, 0, /*_Hash.Length*/32);

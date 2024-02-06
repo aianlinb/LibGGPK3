@@ -1,15 +1,17 @@
 <Project>
 	<PropertyGroup>
-		<TargetFramework>net7.0</TargetFramework>
-		<Version>2.0.0-preview.1</Version>
+		<TargetFramework>net8.0</TargetFramework>
+		<Version>2.0.0</Version>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<NoWin32Manifest>true</NoWin32Manifest>
-		<ProduceReferenceAssembly>False</ProduceReferenceAssembly>
+		<ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<PredefinedCulturesOnly>false</PredefinedCulturesOnly>
+		<DebugType Condition="'$(Configuration)' == 'Debug'">full</DebugType>
 		<BaseOutputPath>$(SolutionDir)bin/</BaseOutputPath>
 		<OutDir>$(BaseOutputPath)$(Configuration)/</OutDir>
 		<NoWarn>1573;1591</NoWarn>
-		<LangVersion>latest</LangVersion>
 		<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
 	</PropertyGroup>
 </Project>

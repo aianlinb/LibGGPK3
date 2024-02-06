@@ -1,13 +1,13 @@
-﻿using LibBundle3.Records;
-using System;
+﻿using System;
 using System.IO;
+using LibBundle3.Records;
 
 namespace LibBundle3 {
 	public interface IBundleFileFactory {
 		/// <summary>
 		/// Create a <see cref="Bundle"/> instance of a <see cref="BundleRecord"/>
 		/// </summary>
-		/// <exception cref="Exception">When failed to create the bundle</exception>
+		/// <exception cref="FileNotFoundException">When failed to get the bundle</exception>
 		public Bundle GetBundle(BundleRecord record);
 
 		/// <summary>

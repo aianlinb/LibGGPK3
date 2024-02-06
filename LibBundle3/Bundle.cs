@@ -1,9 +1,11 @@
-﻿using LibBundle3.Records;
-using System;
+﻿using System;
 using System.Buffers;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using LibBundle3.Records;
+using SystemExtensions;
+using SystemExtensions.Streams;
 
 namespace LibBundle3 {
 	public class Bundle : IDisposable {
@@ -18,8 +20,8 @@ namespace LibBundle3 {
 			public int head_size = 48; // chunk_count * 4 + 48
 			public Oodle.Compressor compressor = Oodle.Compressor.Leviathan; // Leviathan == 13
 			public int unknown = 1; // 1
-			public long size_decompressed; // == uncompressed_size
-			public long size_compressed; // == compressed_size
+			public long uncompressed_size_long; // == uncompressed_size
+			public long compressed_size_long; // == compressed_size
 			public int chunk_count;
 			public int chunk_size = 262144; // 256KB == 262144
 			public int unknown3 = 0; // 0
@@ -48,8 +50,7 @@ namespace LibBundle3 {
 		/// </summary>
 		public virtual int UncompressedSize {
 			get => metadata.uncompressed_size;
-			/// <see cref="Index.CreateBundle"/>
-			internal set => metadata.uncompressed_size = value;
+			internal set => metadata.uncompressed_size = value; // See Index.CreateBundle
 		}
 		/// <summary>
 		/// Size of the compressed content in bytes
@@ -78,23 +79,22 @@ namespace LibBundle3 {
 		/// <param name="filePath">Path of the bundle file on disk</param>
 		/// <param name="record">Record of this bundle file</param>
 		/// <exception cref="FileNotFoundException" />
-		public Bundle(string filePath, BundleRecord? record = null) : this(File.Open(Extensions.ExpandPath(filePath), FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false, record) { }
+		public Bundle(string filePath, BundleRecord? record = null) : this(File.Open(Utils.ExpandPath(filePath), FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false, record) { }
 
 		/// <param name="stream">Stream of the bundle file</param>
 		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> when this instance is disposed</param>
 		/// <param name="record">Record of this bundle file</param>
 		public unsafe Bundle(Stream stream, bool leaveOpen = false, BundleRecord? record = null) {
-			baseStream = stream ?? throw new ArgumentNullException(nameof(stream));
+			ArgumentNullException.ThrowIfNull(stream);
+			baseStream = stream;
 			this.leaveOpen = leaveOpen;
 			Record = record;
 			stream.Position = 0;
-			fixed (Header *p = &metadata)
-				stream.ReadExactly(new(p, sizeof(Header)));
-			if (record != null)
+			stream.Read(out metadata);
+			if (record is not null)
 				record.UncompressedSize = metadata.uncompressed_size;
-			compressed_chunk_sizes = new int[metadata.chunk_count];
-			fixed (int* p2 = compressed_chunk_sizes)
-				stream.ReadExactly(new(p2, metadata.chunk_count * sizeof(int)));
+			compressed_chunk_sizes = GC.AllocateUninitializedArray<int>(metadata.chunk_count);
+			stream.Read(compressed_chunk_sizes);
 		}
 
 		/// <summary>
@@ -103,14 +103,14 @@ namespace LibBundle3 {
 		/// <param name="stream">Stream of the bundle to write (which will be cleared)</param>
 		/// <param name="record">Record of the bundle</param>
 		protected internal unsafe Bundle(Stream stream, BundleRecord? record) {
-			baseStream = stream ?? throw new ArgumentNullException(nameof(stream));
+			ArgumentNullException.ThrowIfNull(stream);
+			baseStream = stream;
 			Record = record;
-			compressed_chunk_sizes = Array.Empty<int>();
+			compressed_chunk_sizes = [];
 			stream.Position = 0;
 			metadata = new();
-			fixed (Header* h = &metadata)
-				stream.Write(new(h, sizeof(Header)));
-			stream.SetLength(sizeof(Header));
+			stream.Write(in metadata);
+			stream.SetLength(stream.Position);
 			stream.Flush();
 		}
 
@@ -132,14 +132,12 @@ namespace LibBundle3 {
 		/// </summary>
 		/// <exception cref="ArgumentOutOfRangeException"></exception>s
 		public ArraySegment<byte> ReadWithoutCache(int offset, int length) {
-			if (offset + length > metadata.uncompressed_size) // Negative offset and length are checked in ReadChunksUncached(int, int)
-				throw new ArgumentOutOfRangeException(nameof(length));
+			ArgumentOutOfRangeException.ThrowIfGreaterThan(offset + length, metadata.uncompressed_size);// Negative offset and length are checked in ReadChunks(int, int)
 			if (length == 0)
 				return ArraySegment<byte>.Empty;
 			var start = offset / metadata.chunk_size;
 			var count = (offset + length - 1) / metadata.chunk_size - start + 1;
-			var b = ReadChunksUncached(start, count);
-			return new(b, offset % metadata.chunk_size, length);
+			return new(ReadChunksUncached(start, count), offset % metadata.chunk_size, length);
 		}
 
 		/// <summary>
@@ -165,8 +163,7 @@ namespace LibBundle3 {
 		/// <remarks>Use <see cref="ReadWithoutCache(int, int)"/> instead if you'll read only once</remarks>
 		/// <exception cref="ArgumentOutOfRangeException"></exception>
 		public ReadOnlyMemory<byte> Read(int offset, int length) {
-			if (offset + length > metadata.uncompressed_size) // Negative offset and length are checked in ReadChunks(int, int)
-				throw new ArgumentOutOfRangeException(nameof(length));
+			ArgumentOutOfRangeException.ThrowIfGreaterThan(offset + length, metadata.uncompressed_size); // Negative offset and length are checked in ReadChunks(int, int)
 			if (length == 0)
 				return ReadOnlyMemory<byte>.Empty;
 			var start = offset / metadata.chunk_size;
@@ -191,12 +188,11 @@ namespace LibBundle3 {
 		/// <exception cref="ArgumentOutOfRangeException"></exception>
 		protected virtual unsafe byte[] ReadChunksUncached(int start, int count = 1) {
 			EnsureNotDisposed();
-			if (start < 0 || start > metadata.chunk_count)
-				throw new ArgumentOutOfRangeException(nameof(start));
-			if (count < 0 || start + count > metadata.chunk_count)
-				throw new ArgumentOutOfRangeException(nameof(count));
+			ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)start, (uint)metadata.chunk_count);
+			ArgumentOutOfRangeException.ThrowIfNegative(count);
 			if (count == 0)
-				return Array.Empty<byte>();
+				return [];
+			ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)(start + count), (uint)metadata.chunk_count);
 			var result = GC.AllocateUninitializedArray<byte>(metadata.chunk_size * count);
 			baseStream.Position = (sizeof(int) * 3) + metadata.head_size + compressed_chunk_sizes.Take(start).Sum();
 
@@ -235,12 +231,11 @@ namespace LibBundle3 {
 		/// <exception cref="ArgumentOutOfRangeException"></exception>
 		protected virtual unsafe void ReadChunks(int start, int count = 1) {
 			EnsureNotDisposed();
-			if (start < 0 || start > metadata.chunk_count)
-				throw new ArgumentOutOfRangeException(nameof(start));
-			if (count < 0 || start + count > metadata.chunk_count)
-				throw new ArgumentOutOfRangeException(nameof(count));
+			ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)start, (uint)metadata.chunk_count);
+			ArgumentOutOfRangeException.ThrowIfNegative(count);
 			if (count == 0)
 				return;
+			ArgumentOutOfRangeException.ThrowIfGreaterThan(start + count, metadata.chunk_count);
 			cachedContent ??= GC.AllocateUninitializedArray<byte>(metadata.uncompressed_size);
 			cacheTable ??= new bool[metadata.chunk_count];
 			baseStream.Position = (sizeof(int) * 3) + metadata.head_size + compressed_chunk_sizes.Take(start).Sum();
@@ -278,59 +273,52 @@ namespace LibBundle3 {
 		/// <summary>
 		/// Save the bundle with new contents
 		/// </summary>
-		public virtual unsafe void Save(ReadOnlySpan<byte> newContent, Oodle.CompressionLevel compressionLevel = Oodle.CompressionLevel.Normal) {
+		public virtual unsafe void Save(scoped ReadOnlySpan<byte> newContent, Oodle.CompressionLevel compressionLevel = Oodle.CompressionLevel.Normal) {
 			EnsureNotDisposed();
 			RemoveCache();
+
+			metadata.uncompressed_size_long = metadata.uncompressed_size = newContent.Length;
+			metadata.chunk_count = metadata.uncompressed_size / metadata.chunk_size;
+			if (metadata.uncompressed_size % metadata.chunk_size != 0)
+				++metadata.chunk_count;
+			metadata.head_size = metadata.chunk_count * sizeof(int) + (sizeof(Header) - sizeof(int) * 3);
+			baseStream.Position = (sizeof(int) * 3) + metadata.head_size;
+			compressed_chunk_sizes = GC.AllocateUninitializedArray<int>(metadata.chunk_count);
+			metadata.compressed_size = 0;
+			var compressed = ArrayPool<byte>.Shared.Rent(metadata.chunk_size + 64);
 			try {
-				metadata.size_decompressed = metadata.uncompressed_size = newContent.Length;
-				metadata.chunk_count = metadata.uncompressed_size / metadata.chunk_size;
-				if (metadata.uncompressed_size % metadata.chunk_size != 0)
-					++metadata.chunk_count;
-				metadata.head_size = metadata.chunk_count * sizeof(int) + (sizeof(Header) - sizeof(int) * 3);
-				baseStream.Position = (sizeof(int) * 3) + metadata.head_size;
-				compressed_chunk_sizes = new int[metadata.chunk_count];
-				metadata.compressed_size = 0;
-				var compressed = ArrayPool<byte>.Shared.Rent(metadata.chunk_size + 64);
-				try {
-					fixed (byte* ptr = newContent, tmp = compressed) {
-						var p = ptr;
-						var last = metadata.chunk_count - 1;
-						int l;
-						for (var i = 0; i < last; ++i) {
-							l = (int)Oodle.OodleLZ_Compress(metadata.compressor, p, metadata.chunk_size, tmp, compressionLevel);
-							p += metadata.chunk_size;
-							metadata.compressed_size += compressed_chunk_sizes[i] = l;
-							baseStream.Write(new(tmp, l));
-						}
-						l = (int)Oodle.OodleLZ_Compress(metadata.compressor, p, metadata.GetLastChunkSize(), tmp, compressionLevel);
-						metadata.compressed_size += compressed_chunk_sizes[last] = l;
-						//p += metadata.GetLastChunkSize();  // Unneeded
+				fixed (byte* ptr = newContent, tmp = compressed) {
+					var p = ptr;
+					var last = metadata.chunk_count - 1;
+					int l;
+					for (var i = 0; i < last; ++i) {
+						l = (int)Oodle.OodleLZ_Compress(metadata.compressor, p, metadata.chunk_size, tmp, compressionLevel);
+						p += metadata.chunk_size;
+						metadata.compressed_size += compressed_chunk_sizes[i] = l;
 						baseStream.Write(new(tmp, l));
 					}
-				} finally {
-					ArrayPool<byte>.Shared.Return(compressed);
+					l = (int)Oodle.OodleLZ_Compress(metadata.compressor, p, metadata.GetLastChunkSize(), tmp, compressionLevel);
+					metadata.compressed_size += compressed_chunk_sizes[last] = l;
+					//p += metadata.GetLastChunkSize();  // Unneeded
+					baseStream.Write(new(tmp, l));
 				}
-				metadata.size_compressed = metadata.compressed_size;
-
-				baseStream.Position = 0;
-				fixed (Header* h = &metadata)
-					baseStream.Write(new(h, sizeof(Header)));
-				fixed (int* p = compressed_chunk_sizes)
-					baseStream.Write(new(p, compressed_chunk_sizes.Length * sizeof(int)));
-
-				baseStream.SetLength((sizeof(int) * 3) + metadata.head_size + metadata.compressed_size);
-				baseStream.Flush();
-				if (Record != null)
-					Record.UncompressedSize = metadata.uncompressed_size;
-			} catch {
-				Dispose(); // metadata (maybe with baseStream) is broken here
-				throw;
+			} finally {
+				ArrayPool<byte>.Shared.Return(compressed);
 			}
+			metadata.compressed_size_long = metadata.compressed_size;
+
+			baseStream.Position = 0;
+			baseStream.Write(in metadata);
+			baseStream.Write(compressed_chunk_sizes);
+
+			baseStream.SetLength((sizeof(int) * 3) + metadata.head_size + metadata.compressed_size);
+			baseStream.Flush();
+			if (Record is not null)
+				Record.UncompressedSize = metadata.uncompressed_size;
 		}
 		
 		protected virtual void EnsureNotDisposed() {
-			if (compressed_chunk_sizes == null)
-				throw new ObjectDisposedException(nameof(Bundle));
+			ObjectDisposedException.ThrowIf(compressed_chunk_sizes is null, this);
 		}
 
 		public virtual void Dispose() {
@@ -342,7 +330,5 @@ namespace LibBundle3 {
 					baseStream?.Close();
 			} catch { /*Closing closed stream*/ }
 		}
-
-		~Bundle() => Dispose();
 	}
 }

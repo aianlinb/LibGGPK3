@@ -1,59 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+	
 	<PropertyGroup>
-		<Configurations>Debug;Release;AOT</Configurations>
-		<Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
 		<Description>Library for bundles in Content.ggpk of game PathOfExile (Rewrite of LibBundle)</Description>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 	</PropertyGroup>
-
-	<!-- Remove the following if you don't have the libraries (And you will need oo2core.dll/liboo2core.so/liboo2core.dylib at runtime) -->
-	<ItemGroup Condition="'$(Configuration)' == 'AOT'">
-		<DirectPInvoke Include="oo2core" Condition="'$(RuntimeIdentifier)' != ''" />
+	
+	<ItemGroup>
+		<None Update="oo2core\oo2core.dll" Condition="'$(RuntimeIdentifier)' == '' Or '$(RuntimeIdentifier.StartsWith(`win`))' == 'true'">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>oo2core.dll</TargetPath>
+		</None>
+		<PackageReference Include="aianlinb.SystemExtensions" Version="*" />
 	</ItemGroup>
 	
-	<Choose>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`win`))' == 'true'">
-			<ItemGroup>
-				<NativeLibrary Include="oo2core/oo2core_win64.lib" Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'" />
-				<NativeLibrary Include="oo2core/oo2core_win32.lib" Condition="'$(RuntimeIdentifier.Contains(`x86`))' == 'true'" />
-			</ItemGroup>
-		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`osx`))' == 'true'">
-			<ItemGroup>
-				<NativeLibrary Include="oo2core/liboo2coremac64.a" Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'" />
-			</ItemGroup>
-		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`linux`))' == 'true'">
-			<ItemGroup>
-				<NativeLibrary Include="oo2core/liboo2corelinux64.a" Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'" />
-				<NativeLibrary Include="oo2core/liboo2corelinuxarm64.a" Condition="'$(RuntimeIdentifier.Contains(`arm64`))' == 'true'" />
-			</ItemGroup>
-		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`ios`))' == 'true'">
-			<ItemGroup>
-				<NativeLibrary Include="oo2core/liboo2coreios.a" />
-			</ItemGroup>
-		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`tvos`))' == 'true'">
-			<ItemGroup>
-				<NativeLibrary Include="oo2core/liboo2coretvos.a" />
-			</ItemGroup>
-		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`android`))' == 'true'">
-			<Choose>
-				<When Condition="'$(RuntimeIdentifier.Contains(`64`))' == 'true'">
-					<ItemGroup>
-						<NativeLibrary Include="oo2core/liboo2coreandroid64.a" Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'" />
-						<NativeLibrary Include="oo2core/liboo2coreandroidarm64.a" Condition="'$(RuntimeIdentifier.Contains(`arm64`))' == 'true'" />
-					</ItemGroup>
-				</When>
-				<Otherwise>
-					<ItemGroup>
-						<NativeLibrary Include="oo2core/liboo2coreandroidarm.a" Condition="'$(RuntimeIdentifier.Contains(`arm`))' == 'true'" />
-						<NativeLibrary Include="oo2core/liboo2coreandroid.a" Condition="'$(RuntimeIdentifier.Contains(`arm`))' != 'true'" />
-					</ItemGroup>
-				</Otherwise>
-			</Choose>
-		</When>
-	</Choose>
 </Project>

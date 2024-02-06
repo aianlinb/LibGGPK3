@@ -2,6 +2,9 @@
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
+using SystemExtensions;
+using SystemExtensions.Streams;
 
 namespace LibBundle3.Records {
 	public class FileRecord {
@@ -25,8 +28,10 @@ namespace LibBundle3.Records {
 		/// <summary>
 		/// Full path of the file in <see cref="Index"/>
 		/// </summary>
-		/// <remarks>This will be null if the constructor caller of the <see cref="Index"/> instance pass <see langword="false"/> to the parsePaths parameter.</remarks>
-		public virtual string Path { get; protected internal set; }
+		/// <remarks>
+		/// This will be <see langword="null"/> if the <see cref="Index.ParsePaths"/> has never been called.
+		/// </remarks>
+		public virtual string Path { get; protected internal set; /* For Index.ParsePaths */ }
 
 #pragma warning disable CS8618
 		protected internal FileRecord(ulong pathHash, BundleRecord bundleRecord, int offset, int size) {
@@ -45,12 +50,13 @@ namespace LibBundle3.Records {
 		/// use <see cref="Index.Extract(IEnumerable{FileRecord})"/> instead.
 		/// </remarks>
 		public virtual ReadOnlyMemory<byte> Read(Bundle? bundle = null) {
-			if (bundle != null)
+			if (bundle is not null)
 				return bundle.Read(Offset, Size);
 			if (BundleRecord.TryGetBundle(out bundle, out var ex))
 				using (bundle) // TODO: BundlePool implementation
 					return bundle.ReadWithoutCache(Offset, Size);
-			throw ex ?? new("Failed to get bundle: " + BundleRecord.Path);
+			ex?.ThrowKeepStackTrace();
+			throw new FileNotFoundException("Failed to get bundle: " + BundleRecord.Path);
 		}
 
 		/// <summary>
@@ -64,12 +70,13 @@ namespace LibBundle3.Records {
 		/// </remarks>
 		public virtual ReadOnlyMemory<byte> Read(Range range, Bundle? bundle = null) {
 			var (offset, length) = range.GetOffsetAndLength(Size);
-			if (bundle != null)
+			if (bundle is not null)
 				return bundle.Read(Offset + offset, length);
 			if (BundleRecord.TryGetBundle(out bundle, out var ex))
 				using (bundle) // TODO: BundlePool implementation
 					return bundle.ReadWithoutCache(Offset + offset, length);
-			throw ex ?? new("Failed to get bundle: " + BundleRecord.Path);
+			ex?.ThrowKeepStackTrace();
+			throw new FileNotFoundException("Failed to get bundle: " + BundleRecord.Path);
 		}
 
 		/// <summary>
@@ -80,20 +87,22 @@ namespace LibBundle3.Records {
 		/// Do not use this function when writing multiple files in batches,
 		/// use <see cref="Index.Replace(IEnumerable{FileRecord}, Index.GetDataHandler, bool)"/> instead.
 		/// </remarks>
-		public virtual void Write(ReadOnlySpan<byte> newContent) {
-			using var bundle = BundleRecord.Index.GetBundleToWrite(out var size);
-			var len = size + newContent.Length;
-			byte[]? rented = null;
-			try {
-				Span<byte> b = len <= 4096 ? stackalloc byte[len] : (rented = ArrayPool<byte>.Shared.Rent(len)).AsSpan(..len);
-				bundle.ReadWithoutCache(0, size).AsSpan().CopyTo(b);
-				newContent.CopyTo(b[size..]);
-				bundle.Save(b);
-			} finally {
-				if (rented != null)
-					ArrayPool<byte>.Shared.Return(rented);
+		[SkipLocalsInit]
+		public virtual void Write(scoped ReadOnlySpan<byte> newContent) {
+			using (var bundle = BundleRecord.Index.GetBundleToWrite(out var size)) {
+				var len = size + newContent.Length;
+				byte[]? rented = null;
+				try {
+					Span<byte> b = len <= 4096 ? stackalloc byte[len] : (rented = ArrayPool<byte>.Shared.Rent(len)).AsSpan(0, len);
+					bundle.ReadWithoutCache(0, size).AsSpan().CopyTo(b);
+					newContent.CopyTo(b[size..]);
+					bundle.Save(b); // TODO: Save only the appended part of data
+				} finally {
+					if (rented is not null)
+						ArrayPool<byte>.Shared.Return(rented);
+				}
+				Redirect(bundle.Record!, size, newContent.Length);
 			}
-			Redirect(bundle.Record!, size, newContent.Length);
 			BundleRecord.Index.Save();
 		}
 
@@ -103,7 +112,7 @@ namespace LibBundle3.Records {
 		/// </summary>
 		public virtual void Redirect(BundleRecord bundle, int offset, int size) {
 			if (bundle.Index != BundleRecord.Index)
-				throw new InvalidOperationException("Attempt to redirect the file to a bundle in another index");
+				ThrowHelper.Throw<InvalidOperationException>("Attempt to redirect the file to a bundle in another index");
 			if (BundleRecord != bundle) {
 				BundleRecord._Files.Remove(this);
 				BundleRecord = bundle;

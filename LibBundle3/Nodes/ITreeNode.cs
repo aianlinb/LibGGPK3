@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using SystemExtensions.Collections;
 
 namespace LibBundle3.Nodes {
 	/// <summary>
@@ -13,17 +15,20 @@ namespace LibBundle3.Nodes {
 		public string Name { get; }
 
 		/// <summary>
-		/// Get the absolute path (which not starts with '/') of the node in the tree, and ends with '/' if this is a directory
+		/// Get the absolute path of the node in the tree, and ends with '/' if this is <see cref="IDirectoryNode"/>
 		/// </summary>
+		[SkipLocalsInit]
 		public static string GetPath(ITreeNode node) {
-			if (node is IDirectoryNode) {
-				if (node.Parent == null)
-					return string.IsNullOrEmpty(node.Name) ? string.Empty : "/";
-				return @$"{GetPath(node.Parent)}{node.Name}/";
-			}
-			if (node is IFileNode)
-				return GetPath(node.Parent!) + node.Name;
-			throw new InvalidCastException("The instance of ITreeNode is netiher IDirectoryNode nor IFileNode");
+			var builder = new ValueList<char>(stackalloc char[256]);
+			node.GetPath(ref builder);
+			using (builder)
+				return builder.AsSpan().ToString();
+		}
+		private void GetPath(scoped ref ValueList<char> builder) {
+			Parent?.GetPath(ref builder);
+			builder.AddRange(Name.AsSpan());
+			if (this is IDirectoryNode)
+				builder.Add('/');
 		}
 
 		/// <summary>

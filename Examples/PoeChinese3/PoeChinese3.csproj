@@ -1,15 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
-		<Configurations>Debug;Release;AOT</Configurations>
-		<NeutralLanguage>zh-TW</NeutralLanguage>
 	</PropertyGroup>
+	
 	<ItemGroup>
 		<ProjectReference Include="../../LibBundledGGPK3/LibBundledGGPK3.csproj" />
-		<Reference Include="LibDat2">
-			<HintPath>..\LibDat2.dll</HintPath>
-		</Reference>
+		<Reference Include="LibDat2" />
 		<EmbeddedResource Include="DatDefinitions.json" />
 	</ItemGroup>
-	<Import Condition="'$(Configuration)' == 'AOT'" Project="../NativeAOT.props" />
+	
 </Project>

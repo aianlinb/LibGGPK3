@@ -1,10 +1,11 @@
-﻿using LibBundle3.Records;
-using LibBundledGGPK3;
-using LibDat2;
-using System;
+﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using LibBundle3.Records;
+using LibBundledGGPK3;
+using LibDat2;
 using Index = LibBundle3.Index;
 
 namespace PoeChinese3 {
@@ -17,9 +18,9 @@ namespace PoeChinese3 {
 				var assembly = Assembly.GetExecutingAssembly();
 				var version = assembly.GetName().Version!;
 				if (version.Revision != 0)
-					Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})  Copyright (C) 2022-2023 aianlinb"); // ©
+					Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})  Copyright (C) 2022-2024 aianlinb"); // ©
 				else
-					Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022-2023 aianlinb"); // ©
+					Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022-2024 aianlinb"); // ©
 				Console.WriteLine($"流亡黯道 - 啟/禁用繁體中文語系  By aianlinb");
 				Console.WriteLine();
 
@@ -45,7 +46,7 @@ namespace PoeChinese3 {
 				}
 				path = Path.GetFullPath(path);
 
-				switch (Path.GetExtension(path).ToLower()) {
+				switch (Path.GetExtension(path).ToLowerInvariant()) {
 					case ".ggpk":
 						Console.WriteLine("GGPK path: " + path);
 						Console.WriteLine("Reading ggpk file . . .");
@@ -85,8 +86,12 @@ namespace PoeChinese3 {
 
 		public static unsafe void Modify(Index index) {
 			if (!index.TryGetFile("Data/Languages.dat", out var lang))
-				throw new("Cannot find file: Data/Languages.dat");
-			var dat = new DatContainer(lang.Read().ToArray(), "Languages.dat"); // TODO: LibDat3 rewrite
+				throw new FileNotFoundException("Cannot find file: \"Data/Languages.dat\" in ggpk/index");
+			var datMmemory = lang.Read();
+			DatContainer dat;
+			fixed (byte* p = datMmemory.Span)
+				using (var ms = new UnmanagedMemoryStream(p, datMmemory.Length))
+					dat = new DatContainer(ms, "Languages.dat"); // TODO: LibDat3 rewrite
 
 			// Traditional Chinese applying
 			int frn = 1, tch = 6;
@@ -146,13 +151,13 @@ namespace PoeChinese3 {
 			}
 
 			// Save
-			Index.Replace(new FileRecord[] { lang, uiImages }, (FileRecord fr, int _, out ReadOnlySpan<byte> content) => {
+			Index.Replace([lang, uiImages], (FileRecord fr, int _, out ReadOnlySpan<byte> content) => {
 				if (fr == lang)
 					content = data;
 				else if (fr == uiImages)
 					content = memory.Span;
 				else
-					throw new("Unexpected error in replacement");
+					throw new UnreachableException();
 				return true;
 			});
 		}
