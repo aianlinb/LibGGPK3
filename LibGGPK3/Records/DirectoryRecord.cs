@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+
 using SystemExtensions;
 using SystemExtensions.Streams;
 
@@ -61,7 +62,7 @@ namespace LibGGPK3.Records {
 		/// Read a DirectoryRecord from GGPK
 		/// </summary>
 		[SkipLocalsInit]
-		protected unsafe internal DirectoryRecord(int length, GGPK ggpk) : base(length, ggpk) {
+		protected internal unsafe DirectoryRecord(int length, GGPK ggpk) : base(length, ggpk) {
 			var s = ggpk.baseStream;
 			Offset = s.Position - 8;
 			var nameLength = s.Read<int>() - 1; // '\0'
@@ -150,7 +151,6 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		/// <param name="name">Name of the directory</param>
 		/// <remarks>Experimental function, may produce unexpected errors</remarks>
-		[MemberNotNull(nameof(Parent))]
 		public virtual DirectoryRecord AddDirectory(string name) {
 			var dir = new DirectoryRecord(name, Ggpk) { Parent = this };
 			AddNode(dir);
@@ -163,7 +163,6 @@ namespace LibGGPK3.Records {
 		/// <param name="name">Name of the file</param>
 		/// <param name="content">Content of the file</param>
 		/// <remarks>Experimental function, may produce unexpected errors</remarks>
-		[MemberNotNull(nameof(Parent))]
 		public virtual FileRecord AddFile(string name, ReadOnlySpan<byte> content = default) {
 			var file = new FileRecord(name, Ggpk) { Parent = this };
 			if (!content.IsEmpty) {
@@ -181,7 +180,6 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Internal implementation of <see cref="AddDirectory"/> and <see cref="AddFile"/>
 		/// </summary>
-		[MemberNotNull(nameof(Parent))]
 		protected virtual void AddNode(TreeNode node) {
 			if (InsertEntry(new(node.NameHash, default)) < 0) // Entry.Offset will be set in node.WriteWithNewLength(int) which calls TreeNode.UpdateOffset()
 				ThrowHelper.Throw<InvalidOperationException>("A file/directory with the same name already exists: " + node.GetPath());
@@ -193,7 +191,6 @@ namespace LibGGPK3.Records {
 		/// <returns>
 		/// The index of the entry is inserted, or ~index of the existing entry with the same namehash if failed to insert.
 		/// </returns>
-		[MemberNotNull(nameof(Parent))]
 		protected internal virtual int InsertEntry(in Entry entry) {
 			if (this == Ggpk.Root)
 				ThrowHelper.Throw<InvalidOperationException>("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
@@ -218,7 +215,6 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		/// <param name="nameHash"><see cref="TreeNode.NameHash"/> or namehash calculated from <see cref="TreeNode.GetNameHash"/></param>
 		/// <returns>The index of the entry is removed, or ~index of the first entry with a larger namehash if not found</returns>
-		[MemberNotNull(nameof(Parent))]
 		protected internal virtual int RemoveEntry(uint nameHash) {
 			if (this == Ggpk.Root)
 				ThrowHelper.Throw<InvalidOperationException>("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
@@ -241,7 +237,7 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Caculate the length of the record should be in ggpk file
 		/// </summary>
-		protected unsafe override int CaculateRecordLength() {
+		protected override unsafe int CaculateRecordLength() {
 			return Entries.Length * sizeof(Entry) + (Name.Length + 1) * (Ggpk.Record.GGPKVersion == 4 ? 4 : 2) + (sizeof(int) * 4 + 32/*_Hash.Length*/);
 		}
 
@@ -249,7 +245,7 @@ namespace LibGGPK3.Records {
 		/// Write the record to ggpk file to its current position
 		/// </summary>
 		[SkipLocalsInit]
-		protected internal unsafe override void WriteRecordData() {
+		protected internal override unsafe void WriteRecordData() {
 			var s = Ggpk.baseStream;
 			Offset = s.Position;
 			s.Write(Length);

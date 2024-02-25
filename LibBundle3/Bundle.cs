@@ -4,7 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+
 using LibBundle3.Records;
+
 using SystemExtensions;
 using SystemExtensions.Streams;
 
@@ -340,7 +342,7 @@ namespace LibBundle3 {
 			if (Record is not null)
 				Record.UncompressedSize = metadata.uncompressed_size;
 		}
-		
+
 		protected virtual void EnsureNotDisposed() {
 			ObjectDisposedException.ThrowIf(compressed_chunk_sizes is null, this);
 		}

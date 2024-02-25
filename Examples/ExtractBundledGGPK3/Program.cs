@@ -1,7 +1,8 @@
-﻿using LibBundledGGPK3;
-using System;
+﻿using System;
 using System.IO;
 using System.Reflection;
+
+using LibBundledGGPK3;
 
 namespace ExtractBundledGGPK3 {
 	public static class Program {

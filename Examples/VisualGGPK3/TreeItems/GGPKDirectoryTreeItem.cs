@@ -1,9 +1,12 @@
-﻿using Eto;
+﻿using System.Collections.ObjectModel;
+using System.Linq;
+
+using Eto;
 using Eto.Forms;
+
 using LibGGPK3;
 using LibGGPK3.Records;
-using System.Collections.ObjectModel;
-using System.Linq;
+
 using static LibGGPK3.Records.TreeNode;
 
 namespace VisualGGPK3.TreeItems {

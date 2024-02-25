@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
+
 using SystemExtensions.Streams;
 
 namespace LibBundle3.Records {

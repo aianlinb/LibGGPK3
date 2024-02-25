@@ -27,3 +27,14 @@ cp -f -T Examples/VPatchGGPK3/Info.plist publish/osx-x64/VPatchGGPK3.app/Content
 cp -f -T Examples/VisualGGPK3/Info.plist publish/osx-arm64/VisualGGPK3.app/Contents/Info.plist
 cp -f -T Examples/VPatchGGPK3/Info.plist publish/osx-arm64/VPatchGGPK3.app/Contents/Info.plist
 rm -r -f publish/*/*.deps.json
+rm -r -f publish/win*/Xceed.Wpf.AvalonDock.Themes.*
+rm -r -f publish/win*/de
+rm -r -f publish/win*/es
+rm -r -f publish/win*/fr
+rm -r -f publish/win*/hu
+rm -r -f publish/win*/it
+rm -r -f publish/win*/pt-BR
+rm -r -f publish/win*/ro
+rm -r -f publish/win*/ru
+rm -r -f publish/win*/sv
+rm -r -f publish/win*/zh-Hans

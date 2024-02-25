@@ -1,8 +1,9 @@
-﻿using Eto.Drawing;
-using Eto.Forms;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+
+using Eto.Drawing;
+using Eto.Forms;
 
 namespace VisualGGPK3.TreeItems {
 	public abstract class DirectoryTreeItem : ITreeItem {

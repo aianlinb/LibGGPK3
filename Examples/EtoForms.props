@@ -1,11 +1,12 @@
 <Project>
 	
 	<Target Name="OSVerification" BeforeTargets="BeforeBuild">
-		<Error Condition="'$(RuntimeIdentifier)' != '' And '$(RuntimeIdentifier.StartsWith(`win`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`osx`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`linux`))' != 'true'" Text="Unsupported RuntimeIdentifier: '$(RuntimeIdentifier)'" />
+		<Error Condition="'$(RuntimeIdentifier)' != '' And '$(RuntimeIdentifier.StartsWith(`win`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`linux`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`osx`))' != 'true'" Text="Unsupported operating system: '$(RuntimeIdentifier)'" />
 	</Target>
 	
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
+		<NoWarn>NU1701</NoWarn>
 	</PropertyGroup>
 	
 	<Choose>

@@ -5,10 +5,14 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+
 using Eto.Drawing;
 using Eto.Forms;
+
 using ImageMagick;
+
 using LibBundledGGPK3;
+
 using VisualGGPK3.TreeItems;
 
 namespace VisualGGPK3 {
@@ -232,9 +236,9 @@ namespace VisualGGPK3 {
 							panel.Panel2 = ImagePanel;
 							break;
 						case FileTreeItem.DataFormat.Dat:
-							// TODO
-							//panel.Panel2 = DatPanel;
-							//break;
+						// TODO
+						//panel.Panel2 = DatPanel;
+						//break;
 						default:
 							TextPanel.Text = "";
 							panel.Panel2 = TextPanel;

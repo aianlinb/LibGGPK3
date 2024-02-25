@@ -1,10 +1,11 @@
-﻿using LibGGPK3;
-using LibGGPK3.Records;
-using System;
+﻿using System;
 using System.Buffers;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+
+using LibGGPK3;
+using LibGGPK3.Records;
 
 namespace PatchGGPK3 {
 	public static class Program {

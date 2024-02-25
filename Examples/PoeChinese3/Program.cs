@@ -3,9 +3,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
+
 using LibBundle3.Records;
+
 using LibBundledGGPK3;
+
 using LibDat2;
+
 using Index = LibBundle3.Index;
 
 namespace PoeChinese3 {
@@ -14,63 +18,63 @@ namespace PoeChinese3 {
 #if !DEBUG
 			try {
 #endif
-				Console.OutputEncoding = Encoding.UTF8;
-				var assembly = Assembly.GetExecutingAssembly();
-				var version = assembly.GetName().Version!;
-				if (version.Revision != 0)
-					Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})  Copyright (C) 2022-2024 aianlinb"); // ©
-				else
-					Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022-2024 aianlinb"); // ©
-				Console.WriteLine($"流亡黯道 - 啟/禁用繁體中文語系  By aianlinb");
+			Console.OutputEncoding = Encoding.UTF8;
+			var assembly = Assembly.GetExecutingAssembly();
+			var version = assembly.GetName().Version!;
+			if (version.Revision != 0)
+				Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})  Copyright (C) 2022-2024 aianlinb"); // ©
+			else
+				Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022-2024 aianlinb"); // ©
+			Console.WriteLine($"流亡黯道 - 啟/禁用繁體中文語系  By aianlinb");
+			Console.WriteLine();
+
+			using (var definitions = assembly.GetManifestResourceStream("PoeChinese3.DatDefinitions.json")!)
+				DatContainer.ReloadDefinitions(definitions);
+
+			string? path;
+			if (args.Length == 0) {
+				Console.WriteLine($"請輸入檔案路徑");
+				Console.Write("Path to Content.ggpk (_.index.bin for Steam/Epic): ");
+				path = Console.ReadLine()?.Trim();
+				if (path?.Length > 1 && path[0] == '"' && path[^1] == '"')
+					path = path[1..^1].Trim();
 				Console.WriteLine();
+			} else
+				path = args[0].Trim();
+			if (!File.Exists(path)) {
+				Console.WriteLine("檔案不存在 (File not found): " + path);
+				Console.WriteLine();
+				Console.WriteLine("Enter to exit . . .");
+				Console.ReadLine();
+				return;
+			}
+			path = Path.GetFullPath(path);
 
-				using (var definitions = assembly.GetManifestResourceStream("PoeChinese3.DatDefinitions.json")!)
-					DatContainer.ReloadDefinitions(definitions);
-
-				string? path;
-				if (args.Length == 0) {
-					Console.WriteLine($"請輸入檔案路徑");
-					Console.Write("Path to Content.ggpk (_.index.bin for Steam/Epic): ");
-					path = Console.ReadLine()?.Trim();
-					if (path?.Length > 1 && path[0] == '"' && path[^1] == '"')
-						path = path[1..^1].Trim();
-					Console.WriteLine();
-				} else
-					path = args[0].Trim();
-				if (!File.Exists(path)) {
-					Console.WriteLine("檔案不存在 (File not found): " + path);
-					Console.WriteLine();
-					Console.WriteLine("Enter to exit . . .");
-					Console.ReadLine();
-					return;
-				}
-				path = Path.GetFullPath(path);
-
-				switch (Path.GetExtension(path).ToLowerInvariant()) {
-					case ".ggpk":
-						Console.WriteLine("GGPK path: " + path);
-						Console.WriteLine("Reading ggpk file . . .");
-						using (var ggpk = new BundledGGPK(path, false)) {
-							Console.WriteLine("正在套用 (Modifying) . . .");
-							Modify(ggpk.Index);
-						}
-						Console.WriteLine("Done!");
-						Console.WriteLine("中文化完成！ 再次執行以還原");
-						break;
-					case ".bin":
-						Console.WriteLine("Index path: " + path);
-						Console.WriteLine("Reading index file . . .");
-						using (var index = new Index(path, false)) {
-							Console.WriteLine("正在套用 (Modifying) . . .");
-							Modify(index);
-						}
-						Console.WriteLine("Done!");
-						Console.WriteLine("中文化完成！ 再次執行以還原");
-						break;
-					default:
-						Console.WriteLine("Unknown file extension: " + Path.GetFileName(path));
-						break;
-				}
+			switch (Path.GetExtension(path).ToLowerInvariant()) {
+				case ".ggpk":
+					Console.WriteLine("GGPK path: " + path);
+					Console.WriteLine("Reading ggpk file . . .");
+					using (var ggpk = new BundledGGPK(path, false)) {
+						Console.WriteLine("正在套用 (Modifying) . . .");
+						Modify(ggpk.Index);
+					}
+					Console.WriteLine("Done!");
+					Console.WriteLine("中文化完成！ 再次執行以還原");
+					break;
+				case ".bin":
+					Console.WriteLine("Index path: " + path);
+					Console.WriteLine("Reading index file . . .");
+					using (var index = new Index(path, false)) {
+						Console.WriteLine("正在套用 (Modifying) . . .");
+						Modify(index);
+					}
+					Console.WriteLine("Done!");
+					Console.WriteLine("中文化完成！ 再次執行以還原");
+					break;
+				default:
+					Console.WriteLine("Unknown file extension: " + Path.GetFileName(path));
+					break;
+			}
 #if !DEBUG
 			} catch (Exception e) {
 				var color = Console.ForegroundColor;

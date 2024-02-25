@@ -1,5 +1,6 @@
-﻿using LibGGPK3.Records;
-using System;
+﻿using System;
+
+using LibGGPK3.Records;
 
 namespace VisualGGPK3.TreeItems {
 	public class GGPKFileTreeItem : FileTreeItem {

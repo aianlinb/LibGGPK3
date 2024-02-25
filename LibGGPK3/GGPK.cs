@@ -6,10 +6,13 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+
+using LibGGPK3.Records;
+
 using SystemExtensions;
 using SystemExtensions.Spans;
 using SystemExtensions.Streams;
-using LibGGPK3.Records;
+
 using File = System.IO.File;
 
 [module: SkipLocalsInit]
@@ -78,7 +81,7 @@ namespace LibGGPK3 {
 		/// Read a record from GGPK at current stream position
 		/// </summary>
 		[SkipLocalsInit]
-		public unsafe virtual BaseRecord ReadRecord() {
+		public virtual unsafe BaseRecord ReadRecord() {
 			lock (baseStream) {
 				EnsureNotDisposed();
 				var buffer = stackalloc int[2];

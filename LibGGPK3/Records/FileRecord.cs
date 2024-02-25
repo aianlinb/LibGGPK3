@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
+
 using SystemExtensions;
 using SystemExtensions.Streams;
 
@@ -24,7 +25,7 @@ namespace LibGGPK3.Records {
 		public int DataLength { get; protected internal set; }
 
 		[SkipLocalsInit]
-		protected unsafe internal FileRecord(int length, GGPK ggpk) : base(length, ggpk) {
+		protected internal unsafe FileRecord(int length, GGPK ggpk) : base(length, ggpk) {
 			var s = ggpk.baseStream;
 			Offset = s.Position - 8;
 			var nameLength = s.Read<int>() - 1;
@@ -53,7 +54,7 @@ namespace LibGGPK3.Records {
 		}
 
 		[SkipLocalsInit]
-		protected internal unsafe override void WriteRecordData() {
+		protected internal override unsafe void WriteRecordData() {
 			var s = Ggpk.baseStream;
 			Offset = s.Position;
 			s.Write(Length);

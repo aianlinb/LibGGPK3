@@ -9,12 +9,15 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+
 using LibBundle3.Nodes;
 using LibBundle3.Records;
+
 using SystemExtensions;
 using SystemExtensions.Collections;
 using SystemExtensions.Spans;
 using SystemExtensions.Streams;
+
 using File = System.IO.File;
 
 [module: SkipLocalsInit]
@@ -221,7 +224,7 @@ namespace LibBundle3 {
 			var cap = (int)ms.Length + (sizeof(int) + sizeof(int)) + _Files.Count * FileRecord.RecordLength + _Directories.Length * DirectoryRecord.RecordLength + directoryBundleData.Length;
 			if (ms.Capacity < cap)
 				ms.Capacity = cap;
-			
+
 			ms.Write(_Files.Count);
 			foreach (var f in _Files.Values)
 				f.Serialize(ms);
@@ -281,7 +284,7 @@ namespace LibBundle3 {
 
 		/// <summary>
 		/// Extract files in batch.
-		/// Use <see cref="FileRecord.Read"/> instead if only single file (each bundle) is needed.
+		/// Use <see cref="FileRecord.Read(Bundle?)"/> instead if only single file (each bundle) is needed.
 		/// </summary>
 		/// <returns>KeyValuePair of each file and its content. The value can be null if the file failed to extract (bundle not found).</returns>
 		public static IEnumerable<(FileRecord, ReadOnlyMemory<byte>?)> Extract(IEnumerable<FileRecord> files) {
@@ -299,7 +302,7 @@ namespace LibBundle3 {
 
 		/// <summary>
 		/// Extract files under a node in batch. 
-		/// Use <see cref="FileRecord.Read"/> instead if only single file (each bundle) is needed.
+		/// Use <see cref="FileRecord.Read(Bundle?)"/> instead if only single file (each bundle) is needed.
 		/// </summary>
 		/// <param name="node">Node to extract (recursively)</param>
 		/// <returns>KeyValuePair of each file and its content. The value can be null if the file failed to extract (bundle not found).</returns>
@@ -307,7 +310,7 @@ namespace LibBundle3 {
 
 		/// <summary>
 		/// Extract files under a node to disk in batch. 
-		/// Use <see cref="FileRecord.Read"/> instead if only single file (each bundle) is needed.
+		/// Use <see cref="FileRecord.Read(Bundle?)"/> instead if only single file (each bundle) is needed.
 		/// </summary>
 		/// <param name="node">Node to extract (recursively)</param>
 		/// <param name="path">Path on disk to extract to</param>
@@ -347,7 +350,7 @@ namespace LibBundle3 {
 
 		/// <summary>
 		/// Extract files under a node in batch. 
-		/// Use <see cref="FileRecord.Read"/> instead if only single file (each bundle) is needed.
+		/// Use <see cref="FileRecord.Read(Bundle?)"/> instead if only single file (each bundle) is needed.
 		/// </summary>
 		/// <param name="node">Node to extract (recursively)</param>
 		/// <returns>KeyValuePair of each file and its content. The value can be null if the file failed to extract (bundle not found).</returns>
@@ -355,7 +358,7 @@ namespace LibBundle3 {
 
 		/// <summary>
 		/// Extract files under a node to disk in batch. 
-		/// Use <see cref="FileRecord.Read"/> instead if only single file (each bundle) is needed.
+		/// Use <see cref="FileRecord.Read(Bundle?)"/> instead if only single file (each bundle) is needed.
 		/// </summary>
 		/// <param name="node">Node to extract (recursively)</param>
 		/// <param name="path">Path on disk to extract to</param>
@@ -373,7 +376,7 @@ namespace LibBundle3 {
 				++count;
 				progress?.Invoke();
 			});
-			
+
 			return count;
 		}
 
@@ -721,7 +724,7 @@ namespace LibBundle3 {
 						hash = (hash ^ ch) * FNV_prime;
 				} else
 					foreach (ulong ch in utf8Str) {
-						if (ch < 91 && ch >= 65)
+						if (ch is < 91 and >= 65)
 							hash = (hash ^ (ch + 32)) * FNV_prime; // ToLower
 						else
 							hash = (hash ^ ch) * FNV_prime;
@@ -765,7 +768,7 @@ namespace LibBundle3 {
 		/// <remarks>
 		/// <code>IEnumerable&lt;FileRecord&gt;.GroupBy(f => f.BundleRecord);</code> can also achieve similar purposes in some case.
 		/// </remarks>
-		/// <seealso cref="Enumerable.GroupBy"/>
+		/// <seealso cref="Enumerable.GroupBy{TSource, TKey}(IEnumerable{TSource}, Func{TSource, TKey})"/>
 		public static unsafe FileRecord[] SortWithBundle(IEnumerable<FileRecord> files) {
 			var list = files is IReadOnlyList<FileRecord> irl ? irl : files is IList<FileRecord> il ? il.AsIReadOnly() : files.ToList();
 			if (list.Count <= 0)

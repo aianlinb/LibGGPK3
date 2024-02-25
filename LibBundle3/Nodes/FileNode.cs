@@ -1,5 +1,6 @@
-﻿using LibBundle3.Records;
-using System.IO;
+﻿using System.IO;
+
+using LibBundle3.Records;
 
 namespace LibBundle3.Nodes {
 	public class FileNode : IFileNode {

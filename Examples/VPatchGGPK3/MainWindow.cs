@@ -10,8 +10,10 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Tasks;
+
 using Eto.Drawing;
 using Eto.Forms;
+
 using LibGGPK3;
 using LibGGPK3.Records;
 

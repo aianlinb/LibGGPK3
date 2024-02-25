@@ -4,7 +4,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+
 using LibGGPK3.Records;
+
 using SystemExtensions;
 
 namespace LibGGPK3 {
@@ -13,7 +15,7 @@ namespace LibGGPK3 {
 	/// </summary>
 	/// <remarks>
 	/// Use this class only when you have to use a <see cref="Stream"/>,
-	/// otherwise use <see cref="FileRecord.Read"/> and <see cref="FileRecord.Write"/> instead for better performance.
+	/// otherwise use <see cref="FileRecord.Read()"/> and <see cref="FileRecord.Write"/> instead for better performance.
 	/// </remarks>
 	public class GGFileStream : Stream {
 		private static readonly Dictionary<FileRecord, GGFileStream> instances = [];
@@ -48,7 +50,7 @@ namespace LibGGPK3 {
 			ArgumentNullException.ThrowIfNull(record);
 			Record = record;
 			lock (instances)
-				if(!instances.TryAdd(record, this))
+				if (!instances.TryAdd(record, this))
 					ThrowHelper.Throw<InvalidOperationException>("An instance of GGFileStream is already created for this FileRecord");
 		}
 

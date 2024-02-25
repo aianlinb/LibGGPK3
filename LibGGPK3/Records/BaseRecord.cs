@@ -2,11 +2,11 @@
 	/// <summary>
 	/// Base type of all records in GGPK
 	/// </summary>
-	public abstract class BaseRecord {
+	public abstract class BaseRecord(int length, GGPK ggpk) {
 		/// <summary>
 		/// Length of the entire record in bytes
 		/// </summary>
-		public int Length { get; protected internal set; }
+		public int Length { get; protected internal set; } = length;
 
 		/// <summary>
 		/// Offset in pack file where record begins
@@ -16,12 +16,7 @@
 		/// <summary>
 		/// GGPK which contains this record
 		/// </summary>
-		public GGPK Ggpk { get; }
-
-		protected BaseRecord(int length, GGPK ggpk) {
-			Length = length;
-			Ggpk = ggpk;
-		}
+		public GGPK Ggpk { get; } = ggpk;
 
 		/// <summary>
 		/// Write the record data to the current position of GGPK stream, this method must set <see cref="Offset"/> to where the record begins

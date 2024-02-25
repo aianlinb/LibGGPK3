@@ -1,8 +1,9 @@
-﻿using LibBundledGGPK3;
-using System;
+﻿using System;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+
+using LibBundledGGPK3;
 
 namespace PatchBundledGGPK3 {
 	public static class Program {

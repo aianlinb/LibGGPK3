@@ -1,9 +1,10 @@
-﻿using LibGGPK3;
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+
+using LibGGPK3;
 
 namespace GGPKFastCompact3 {
 	public static class Program {

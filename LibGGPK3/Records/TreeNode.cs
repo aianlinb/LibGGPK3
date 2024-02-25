@@ -5,12 +5,13 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+
 using SystemExtensions;
 using SystemExtensions.Collections;
 using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records {
-	public abstract class TreeNode : BaseRecord {
+	public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk) {
 		protected static readonly SHA256 Hash256 = SHA256.Create();
 		private static readonly byte[] HashOfEmpty = Hash256.ComputeHash([]);
 		/// <summary>
@@ -29,8 +30,6 @@ namespace LibGGPK3.Records {
 		/// Parent node
 		/// </summary>
 		public virtual DirectoryRecord? Parent { get; protected internal set; }
-
-		protected TreeNode(int length, GGPK ggpk) : base(length, ggpk) { }
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		protected LinkedListNode<FreeRecord>? WriteWithNewLength(LinkedListNode<FreeRecord>? specify = null) {
@@ -135,7 +134,6 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Update the offset of this record in <see cref="Parent"/>.<see cref="DirectoryRecord.Entries"/>
 		/// </summary>
-		[MemberNotNull(nameof(Parent))]
 		protected virtual unsafe void UpdateOffset() {
 			if (Parent is DirectoryRecord dr) {
 				var i = dr.Entries.AsSpan().BinarySearch((DirectoryRecord.Entry.NameHashWrapper)NameHash);
@@ -264,7 +262,7 @@ namespace LibGGPK3.Records {
 					foreach (var tt in RecurseTree(t))
 						yield return tt;
 		}
-		
+
 		/// <summary>
 		/// Use to sort the children of directory.
 		/// </summary>

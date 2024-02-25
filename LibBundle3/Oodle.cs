@@ -2,6 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+
 using SystemExtensions;
 
 [assembly: DisableRuntimeMarshalling]
@@ -63,7 +64,7 @@ namespace LibBundle3 {
 			}
 			if (preAllocatedMemory is null || preAllocatedMemory.Length < l)
 				preAllocatedMemory = GC.AllocateUninitializedArray<byte>(l, true); // pinned
-		end:
+			end:
 			Oodle.settings = settings;
 #pragma warning disable CS8774 // preAllocatedMemory is not null if Initialize has been called before
 		}
@@ -80,7 +81,7 @@ namespace LibBundle3 {
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static int GetCompressedBufferSize() => checked((int)OodleLZ_GetCompressedBufferSizeNeeded(settings.Compressor, settings.ChunkSize));
 		/// <summary>
-		/// Get the minimum size needed for the output buffer of <see cref="Compress"/>, usually slightly larger than <paramref name="uncompressedSize"/>.
+		/// Get the minimum size needed for the output buffer of Compress(), usually slightly larger than <paramref name="uncompressedSize"/>.
 		/// </summary>
 		/// <param name="uncompressedSize">Size of original uncompressed data</param>
 		/// <remarks>
@@ -91,7 +92,7 @@ namespace LibBundle3 {
 		public static int GetCompressedBufferSize(nint uncompressedSize) => checked((int)OodleLZ_GetCompressedBufferSizeNeeded(settings.Compressor, uncompressedSize));
 
 		/// <param name="buffer">The uncompressed data to compress</param>
-		/// <param name="output">Buffer to save the compressed output, must be at least <see cref="GetCompressedBufferSize"/> bytes</param>
+		/// <param name="output">Buffer to save the compressed output, must be at least <see cref="GetCompressedBufferSize(nint)"/> bytes</param>
 		/// <remarks>
 		/// Call <see cref="Initialize"/> at least once before first time using this method <b>*on each thread*</b>
 		/// </remarks>
@@ -103,7 +104,7 @@ namespace LibBundle3 {
 				return (int)Compress(pBuffer, buffer.Length, pOutput);
 		}
 		/// <param name="buffer">Pointer of the uncompressed data with size <see cref="Settings.ChunkSize"/></param>
-		/// <param name="output">Buffer to save the compressed output, must be at least <see cref="GetCompressedBufferSize(nint)"/> bytes</param>
+		/// <param name="output">Buffer to save the compressed output, must be at least <see cref="GetCompressedBufferSize()"/> bytes</param>
 		/// <remarks>
 		/// Call <see cref="Initialize"/> at least once before first time using this method <b>*on each thread*</b>
 		/// </remarks>
@@ -332,7 +333,7 @@ namespace LibBundle3 {
 			public CompressionLevel CompressionLevel = CompressionLevel.Normal;
 			/// <summary>
 			/// Allocates necessary memory for compressing.
-			/// Pass <see langword="true"/> if you will use any overload of <see cref="Compress"/>.
+			/// Pass <see langword="true"/> if you will use any overload of Compress().
 			/// </summary>
 			public bool EnableCompressing = true;
 			/// <summary>
@@ -348,7 +349,7 @@ namespace LibBundle3 {
 				ArgumentOutOfRangeException.ThrowIfNegativeOrZero(ChunkSize);
 				if (unchecked((uint)Compressor > (uint)Compressor.Leviathan))
 					ThrowHelper.ThrowArgumentOutOfRange(Compressor, "Invalid compressor type");
-				if (CompressionLevel > CompressionLevel.Max || CompressionLevel < CompressionLevel.Min)
+				if (CompressionLevel is > CompressionLevel.Max or < CompressionLevel.Min)
 					ThrowHelper.ThrowArgumentOutOfRange(CompressionLevel, "CompressionLevel is not defined");
 			}
 		}

@@ -1,10 +1,13 @@
-﻿using Eto;
-using Eto.Forms;
-using LibBundle3.Nodes;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+
+using Eto;
+using Eto.Forms;
+
+using LibBundle3.Nodes;
+
 using Index = LibBundle3.Index;
 
 namespace VisualGGPK3.TreeItems {
@@ -17,7 +20,7 @@ namespace VisualGGPK3.TreeItems {
 			Parent = parent;
 		}
 
-		protected readonly List<ITreeNode> _Children = new();
+		protected readonly List<ITreeNode> _Children = [];
 		public virtual IList<ITreeNode> Children => _Children;
 
 		protected ListWrapper<ITreeItem, ITreeNode>? _ChildItems;

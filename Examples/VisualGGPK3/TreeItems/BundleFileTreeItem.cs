@@ -1,7 +1,8 @@
-﻿using LibBundle3.Nodes;
-using LibBundle3.Records;
-using System;
+﻿using System;
 using System.IO;
+
+using LibBundle3.Nodes;
+using LibBundle3.Records;
 
 namespace VisualGGPK3.TreeItems {
 	public class BundleFileTreeItem : FileTreeItem, IFileNode {
