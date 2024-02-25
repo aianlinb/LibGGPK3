@@ -165,9 +165,13 @@ namespace LibGGPK3.Records {
 			using (builder)
 				return builder.AsSpan().ToString();
 		}
-		protected virtual void GetPath(scoped ref ValueList<char> builder) {
-			Parent?.GetPath(ref builder);
+		private void GetPath(scoped ref ValueList<char> builder) {
+			if (Parent is null) // Root
+				return;
+			Parent.GetPath(ref builder);
 			builder.AddRange(Name.AsSpan());
+			if (this is DirectoryRecord)
+				builder.Add('/');
 		}
 
 		protected internal uint? _NameHash;

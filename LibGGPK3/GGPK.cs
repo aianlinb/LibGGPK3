@@ -10,6 +10,7 @@ using SystemExtensions;
 using SystemExtensions.Spans;
 using SystemExtensions.Streams;
 using LibGGPK3.Records;
+using File = System.IO.File;
 
 [module: SkipLocalsInit]
 

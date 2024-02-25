@@ -1,5 +1,4 @@
-﻿using LibBundle3.Nodes;
-using LibBundledGGPK3;
+﻿using LibBundledGGPK3;
 using System;
 using System.IO;
 using System.Reflection;

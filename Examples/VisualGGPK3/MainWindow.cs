@@ -215,9 +215,13 @@ namespace VisualGGPK3 {
 								data = data[0] == 3 ? data[28..] : data[16..];
 								while (data[0] == '*') {
 									data = data[1..];
+									if (data.Length > 384 * 1024)
+										throw new StackOverflowException();
+#pragma warning disable CA2014
 									Span<char> path = stackalloc char[data.Length * 2];
+#pragma warning restore CA2014
 									if (!Index!.TryGetFile(path[Encoding.UTF8.GetChars(data, path)..], out var file))
-										goto default;
+										throw new FileNotFoundException(null, path[Encoding.UTF8.GetChars(data, path)..].ToString(), null);
 									if (path.EndsWith(".header"))
 										data = data[0] == 3 ? data[28..] : data[16..];
 								}
@@ -257,8 +261,8 @@ namespace VisualGGPK3 {
 				if (sfd.ShowDialog(this) != DialogResult.Ok)
 					return;
 				var span = fi.Read().Span;
-				using (var f = File.Create(sfd.FileName, 0, FileOptions.SequentialScan))
-					f.Write(span);
+				using (var f = File.OpenHandle(sfd.FileName, FileMode.Create, FileAccess.Write, FileShare.None, FileOptions.None, span.Length))
+					RandomAccess.Write(f, span, 0);
 				MessageBox.Show(this, $"Extracted {span.Length} bytes to\r\n{sfd.FileName}", "Done", MessageBoxType.Information);
 			} else if (clickedItem is DirectoryTreeItem di) {
 				var sfd = new SaveFileDialog() {
@@ -311,16 +315,17 @@ namespace VisualGGPK3 {
 		private void OnCopyPathClicked(object? sender, EventArgs _) {
 			if (clickedItem is null)
 				return;
-			var builder = new StringBuilder(64);
+			var builder = new StringBuilder(128);
 			GetPath(clickedItem, builder);
-			Clipboard.Instance.Text = builder.ToString().TrimStart('/');
+			Clipboard.Instance.Text = builder.ToString();
 		}
 		private static void GetPath(ITreeItem node, StringBuilder builder) {
-			if (node.Parent is not null) {
-				GetPath(node.Parent, builder);
-				builder.Append('/');
-			}
+			if (node.Parent is null) // Root
+				return;
+			GetPath(node.Parent, builder);
 			builder.Append(node.Text);
+			if (node is DirectoryTreeItem)
+				builder.Append('/');
 		}
 
 		private void OnSaveAsPngClicked(object? sender, EventArgs _) {

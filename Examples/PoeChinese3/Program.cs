@@ -29,8 +29,8 @@ namespace PoeChinese3 {
 
 				string? path;
 				if (args.Length == 0) {
-					Console.WriteLine($"請輸入檔案路徑 (原版 / Steam版)");
-					Console.Write("Path to (Content.ggpk / _.index.bin): ");
+					Console.WriteLine($"請輸入檔案路徑");
+					Console.Write("Path to Content.ggpk (_.index.bin for Steam/Epic): ");
 					path = Console.ReadLine()?.Trim();
 					if (path?.Length > 1 && path[0] == '"' && path[^1] == '"')
 						path = path[1..^1].Trim();

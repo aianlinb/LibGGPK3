@@ -15,6 +15,7 @@ using SystemExtensions;
 using SystemExtensions.Collections;
 using SystemExtensions.Spans;
 using SystemExtensions.Streams;
+using File = System.IO.File;
 
 [module: SkipLocalsInit]
 
@@ -320,9 +321,7 @@ namespace LibBundle3 {
 				if (!b.HasValue)
 					continue;
 				var p = path + f.Path[trim..];
-				Directory.CreateDirectory(Path.GetDirectoryName(p)!);
-				using (var fs = File.Create(p))
-					fs.Write(b.Value.Span);
+				SystemExtensions.File.WriteAllBytes(p, b.Value.Span);
 				++count;
 				progress?.Invoke();
 			}
@@ -365,15 +364,12 @@ namespace LibBundle3 {
 		public static int ExtractParallel(ITreeNode node, string path, Action? progress = null) {
 			path = Utils.ExpandPath(path.TrimEnd('/', '\\')) + "/";
 			var trim = Path.GetDirectoryName(ITreeNode.GetPath(node).TrimEnd('/'))!.Length;
-
 			var count = 0;
 			ExtractParallel(Recursefiles(node, path).Select(n => n.Record), (f, b) => {
 				if (!b.HasValue)
 					return;
 				var p = path + f.Path[trim..];
-				Directory.CreateDirectory(Path.GetDirectoryName(p)!);
-				using (var fs = File.Create(p))
-					fs.Write(b.Value.Span);
+				SystemExtensions.File.WriteAllBytes(p, b.Value.Span);
 				++count;
 				progress?.Invoke();
 			});
@@ -489,8 +485,7 @@ namespace LibBundle3 {
 		/// <returns>Number of files replaced</returns>
 		public static int Replace(ITreeNode node, string path, bool saveIndex = true) {
 			path = Utils.ExpandPath(path.TrimEnd('/', '\\')) + "/";
-			var trim = ITreeNode.GetPath(node).TrimEnd('/').Length;
-
+			var trim = ITreeNode.GetPath(node).Length;
 			byte[] b = null!;
 			IEnumerable<FileRecord> Enumerate() {
 				foreach (var fr in Recursefiles(node).Select(n => n.Record)) {

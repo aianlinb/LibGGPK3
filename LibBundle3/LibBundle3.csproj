@@ -6,11 +6,11 @@
 	</PropertyGroup>
 	
 	<ItemGroup>
-		<None Update="oo2core\oo2core.dll" Condition="'$(RuntimeIdentifier)' == '' Or '$(RuntimeIdentifier.StartsWith(`win`))' == 'true'">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<TargetPath>oo2core.dll</TargetPath>
-		</None>
 		<PackageReference Include="aianlinb.SystemExtensions" Version="*" />
+		
+		<None Include="$(SolutionDir)README.md" Pack="true" PackagePath="/" Visible="false" />
+		<None Include="$(SolutionDir)LICENSE" Pack="true" PackagePath="/" Visible="false" />
+		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="*" PrivateAssets="All"/>
 	</ItemGroup>
 	
 </Project>

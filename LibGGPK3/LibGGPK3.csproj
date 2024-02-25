@@ -7,6 +7,10 @@
 	
 	<ItemGroup>
 		<PackageReference Include="aianlinb.SystemExtensions" Version="*" />
+
+		<None Include="$(SolutionDir)README.md" Pack="true" PackagePath="/" Visible="false" />
+		<None Include="$(SolutionDir)LICENSE" Pack="true" PackagePath="/" Visible="false" />
+		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="*" PrivateAssets="All"/>
 	</ItemGroup>
 	
 </Project>

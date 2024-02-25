@@ -7,7 +7,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using SystemExtensions;
-using SystemExtensions.Collections;
 using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records {
@@ -244,12 +243,6 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		protected unsafe override int CaculateRecordLength() {
 			return Entries.Length * sizeof(Entry) + (Name.Length + 1) * (Ggpk.Record.GGPKVersion == 4 ? 4 : 2) + (sizeof(int) * 4 + 32/*_Hash.Length*/);
-		}
-
-		protected override void GetPath(scoped ref ValueList<char> builder) {
-			Parent?.GetPath(ref builder);
-			builder.AddRange(Name.AsSpan());
-			builder.Add('/');
 		}
 
 		/// <summary>

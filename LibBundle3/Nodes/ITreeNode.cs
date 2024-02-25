@@ -15,7 +15,7 @@ namespace LibBundle3.Nodes {
 		public string Name { get; }
 
 		/// <summary>
-		/// Get the absolute path of the node in the tree, and ends with '/' if this is <see cref="IDirectoryNode"/>
+		/// Get the absolute path of the <paramref name="node"/> in the tree, and ends with '/' if this is <see cref="IDirectoryNode"/>
 		/// </summary>
 		[SkipLocalsInit]
 		public static string GetPath(ITreeNode node) {
@@ -25,7 +25,9 @@ namespace LibBundle3.Nodes {
 				return builder.AsSpan().ToString();
 		}
 		private void GetPath(scoped ref ValueList<char> builder) {
-			Parent?.GetPath(ref builder);
+			if (Parent is null) // Root
+				return;
+			Parent.GetPath(ref builder);
 			builder.AddRange(Name.AsSpan());
 			if (this is IDirectoryNode)
 				builder.Add('/');

@@ -8,10 +8,6 @@
 		<OutputType>WinExe</OutputType>
 	</PropertyGroup>
 	
-	<ItemGroup>
-		<PackageReference Include="Eto.Forms" Version="*" />
-	</ItemGroup>
-	
 	<Choose>
 		<When Condition="'$(RuntimeIdentifier.StartsWith(`win`))' == 'true' Or '$(RuntimeIdentifier)' == ''">
 			<PropertyGroup>

@@ -1,5 +1,9 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using LibBundle3.Records;
+using SystemExtensions;
+
+using File = System.IO.File;
 
 namespace LibBundle3 {
 	public class DriveBundleFactory : IBundleFileFactory {
@@ -22,7 +26,11 @@ namespace LibBundle3 {
 		}
 
 		public virtual Stream CreateBundle(string bundlePath) {
-			return File.Create(baseDirectory + bundlePath);
+			bundlePath = baseDirectory + bundlePath;
+			if (File.Exists(bundlePath))
+				ThrowHelper.Throw<InvalidOperationException>("A file with the same name already exists: " + bundlePath);
+			Directory.CreateDirectory(Path.GetDirectoryName(bundlePath)!);
+			return File.Create(bundlePath);
 		}
 
 		public virtual bool RemoveAllCreatedBundle(string customBundleBasePath) {
