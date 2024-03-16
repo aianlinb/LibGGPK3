@@ -625,24 +625,6 @@ namespace LibBundle3 {
 			return b;
 		}
 
-		/// <summary>
-		/// Remove all custom bundles created by <see cref="GetBundleToWrite"/>.
-		/// </summary>
-		/// <remarks>
-		/// You shouldn't call this function unless there are some errors caused by these bundles.
-		/// Make sure there is no file in these bundles (using <see cref="FileRecord.Redirect"/> on each of <see cref="BundleRecord.Files"/>, or just restore _.index.bin).
-		/// </remarks>
-		public virtual void RemoveCustomBundles() {
-			EnsureNotDisposed();
-			foreach (var b in CustomBundles)
-				if (b._Files.Count > 0)
-					ThrowHelper.Throw<InvalidOperationException>($"Failed to remove bundle: {b.Path}\r\nThere are still some files point to the bundle");
-			_Bundles = _Bundles.Where(b => !b._Path.StartsWith(CUSTOM_BUNDLE_BASE_PATH)).ToArray();
-			CustomBundles.Clear();
-			bundleFactory.RemoveAllCreatedBundle(CUSTOM_BUNDLE_BASE_PATH);
-			Save();
-		}
-
 		#region NameHashing
 		/// <summary>
 		/// Get the hash of a file path

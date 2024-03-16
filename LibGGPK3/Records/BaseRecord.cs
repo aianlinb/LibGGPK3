@@ -4,9 +4,9 @@
 	/// </summary>
 	public abstract class BaseRecord(int length, GGPK ggpk) {
 		/// <summary>
-		/// Length of the entire record in bytes
+		/// GGPK which contains this record
 		/// </summary>
-		public int Length { get; protected internal set; } = length;
+		public GGPK Ggpk { get; } = ggpk;
 
 		/// <summary>
 		/// Offset in pack file where record begins
@@ -14,9 +14,9 @@
 		public long Offset { get; protected internal set; }
 
 		/// <summary>
-		/// GGPK which contains this record
+		/// Length of the entire record in bytes
 		/// </summary>
-		public GGPK Ggpk { get; } = ggpk;
+		public int Length { get; protected internal set; } = length;
 
 		/// <summary>
 		/// Write the record data to the current position of GGPK stream, this method must set <see cref="Offset"/> to where the record begins

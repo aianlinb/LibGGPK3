@@ -44,6 +44,9 @@ namespace LibGGPK3.Records {
 			s.Seek(DataLength, SeekOrigin.Current);
 		}
 
+		/// <summary>
+		/// Internal Usage
+		/// </summary>
 		protected internal FileRecord(string name, GGPK ggpk) : base(default, ggpk) {
 			Name = name;
 			Length = CaculateRecordLength();

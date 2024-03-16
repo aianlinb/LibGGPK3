@@ -13,7 +13,6 @@ using SystemExtensions.Streams;
 namespace LibGGPK3.Records {
 	public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk) {
 		protected static readonly SHA256 Hash256 = SHA256.Create();
-		private static readonly byte[] HashOfEmpty = Hash256.ComputeHash([]);
 		/// <summary>
 		/// File/Directory name
 		/// </summary>
@@ -25,7 +24,7 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// SHA256 hash of the file content
 		/// </summary>
-		protected internal readonly byte[] _Hash = (byte[])HashOfEmpty.Clone();
+		protected internal readonly byte[] _Hash = new byte[32]; // Should be set in derived class
 		/// <summary>
 		/// Parent node
 		/// </summary>
@@ -159,9 +158,12 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		public string GetPath() {
 			var builder = new ValueList<char>(stackalloc char[256]);
-			GetPath(ref builder);
-			using (builder)
+			try {
+				GetPath(ref builder);
 				return builder.AsSpan().ToString();
+			} finally {
+				builder.Dispose();
+			}
 		}
 		private void GetPath(scoped ref ValueList<char> builder) {
 			if (Parent is null) // Root

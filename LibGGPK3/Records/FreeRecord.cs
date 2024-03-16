@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
+using SystemExtensions;
 using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records {
@@ -79,10 +81,15 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Update the link after the Offset of this FreeRecord is changed
 		/// </summary>
-		/// <param name="node">Node in <see cref="GGPK.FreeRecordList"/> to remove</param>
+		/// <param name="node">Node in <see cref="GGPK.FreeRecordList"/> of this record</param>
 		protected internal virtual LinkedListNode<FreeRecord> UpdateOffset(LinkedListNode<FreeRecord>? node = null) {
+			if (node is not null) {
+				if (node.Value != this)
+					ThrowHelper.Throw<ArgumentException>("The provided node doesn't belong to this record", nameof(node));
+			} else
+				node = Ggpk.FreeRecordList.Find(this);
+
 			var s = Ggpk.baseStream;
-			node ??= Ggpk.FreeRecordList.Find(this);
 			var lastFree = node is null ? Ggpk.FreeRecordList.Last?.Value : node.Previous?.Value;
 			if (lastFree is null) { // empty
 				Ggpk.Record.FirstFreeRecordOffset = Offset;

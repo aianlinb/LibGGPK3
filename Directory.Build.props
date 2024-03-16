@@ -1,10 +1,9 @@
 <Project>
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
-		<Version>2.1.0</Version>
+		<Version>2.2.0</Version>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<NoWin32Manifest>true</NoWin32Manifest>
 		<ProduceReferenceAssembly>false</ProduceReferenceAssembly>
 		<InvariantGlobalization>true</InvariantGlobalization>
 		<PredefinedCulturesOnly>false</PredefinedCulturesOnly>

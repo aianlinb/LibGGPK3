@@ -29,14 +29,19 @@ namespace LibBundledGGPK3 {
 		}
 
 		public virtual Stream CreateBundle(string bundlePath) {
+			var dir = Bundles2;
 			var i = bundlePath.LastIndexOf('/');
-			if (i < 0)
-				return new GGFileStream(Bundles2.AddFile(bundlePath));
-			return new GGFileStream(Ggpk.FindOrCreateDirectory(bundlePath.AsSpan(0, i), Bundles2).AddFile(bundlePath[(i + 1)..]));
+			if (i < 0) {
+				dir = Ggpk.FindOrCreateDirectory(bundlePath.AsSpan(0, i), dir);
+				bundlePath = bundlePath[(i + 1)..];
+			}
+			return new GGFileStream(dir.AddFile(bundlePath, stackalloc byte[60/* sizeof(Bundle.Header) */], true));
 		}
 
-		public virtual bool RemoveAllCreatedBundle(string customBundleBasePath) {
-			if (!Ggpk.TryFindNode(customBundleBasePath.TrimEnd('/'), out var node, Bundles2))
+		public virtual bool DeleteBundle(string bundlePath) {
+			if (!Ggpk.TryFindNode(bundlePath, out var node, Bundles2))
+				return false;
+			if (node is not FileRecord)
 				return false;
 			node.Remove();
 			return true;

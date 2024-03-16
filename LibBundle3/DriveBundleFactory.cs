@@ -19,7 +19,7 @@ namespace LibBundle3 {
 		/// </param>
 		public DriveBundleFactory(string baseDirectoryPath) {
 			baseDirectory = Path.GetFullPath(baseDirectoryPath);
-			if (baseDirectory[^1] != Path.DirectorySeparatorChar) // Works for C:\\ etc..
+			if (baseDirectory[^1] != Path.DirectorySeparatorChar) // Works for C:\ etc..
 				baseDirectory += Path.DirectorySeparatorChar;
 		}
 
@@ -29,23 +29,16 @@ namespace LibBundle3 {
 
 		public virtual Stream CreateBundle(string bundlePath) {
 			bundlePath = baseDirectory + bundlePath;
-			if (File.Exists(bundlePath))
-				ThrowHelper.Throw<InvalidOperationException>("A file with the same name already exists: " + bundlePath);
 			Directory.CreateDirectory(Path.GetDirectoryName(bundlePath)!);
 			return File.Create(bundlePath);
 		}
 
-		public virtual bool RemoveAllCreatedBundle(string customBundleBasePath) {
-			customBundleBasePath = customBundleBasePath.TrimEnd('/');
-			if (Directory.Exists(customBundleBasePath)) {
-				Directory.Delete(customBundleBasePath, true);
-				return true;
-			}
-			if (File.Exists(customBundleBasePath)) {
-				File.Delete(customBundleBasePath);
-				return true;
-			}
-			return false;
+		public virtual bool DeleteBundle(string bundlePath) {
+			bundlePath = baseDirectory + bundlePath;
+			if (!File.Exists(bundlePath))
+				return false;
+			File.Delete(bundlePath);
+			return true;
 		}
 	}
 }

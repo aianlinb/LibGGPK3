@@ -56,7 +56,7 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// Offset in pack file where <see cref="Entries"/> begins. This is only here because it makes rewriting the entries easier.
 		/// </summary>
-		protected internal long EntriesBegin { get; protected set; }
+		protected internal long EntriesBegin;
 
 		/// <summary>
 		/// Read a DirectoryRecord from GGPK
@@ -81,6 +81,9 @@ namespace LibGGPK3.Records {
 			s.Read(Entries = new Entry[totalEntries]);
 		}
 
+		/// <summary>
+		/// Internal Usage
+		/// </summary>
 		protected internal DirectoryRecord(string name, GGPK ggpk) : base(default, ggpk) {
 			Name = name;
 			Entries = [];
@@ -150,10 +153,15 @@ namespace LibGGPK3.Records {
 		/// Add a directory to this directory (which can't be <see cref="GGPK.Root"/>)
 		/// </summary>
 		/// <param name="name">Name of the directory</param>
-		/// <remarks>Experimental function, may produce unexpected errors</remarks>
-		public virtual DirectoryRecord AddDirectory(string name) {
+		/// <param name="dontThrowIfExist">
+		/// <see langword="true"/> to return the existing <see cref="DirectoryRecord"/> if one with the same name already exists.<br />
+		/// <see langword="false"/> or if the existing one isn't <see cref="DirectoryRecord"/>, throws <see cref="InvalidOperationException"/>.
+		/// </param>-->
+		public virtual DirectoryRecord AddDirectory(string name, bool dontThrowIfExist = false) {
 			var dir = new DirectoryRecord(name, Ggpk) { Parent = this };
-			AddNode(dir);
+			var i = AddNode(dir);
+			if (i < 0)
+				dir = this[Entries[~i].NameHash] as DirectoryRecord ?? throw ThrowHelper.Create<InvalidOperationException>("A file/directory with the same name already exists: " + GetPath() + name);
 			return dir;
 		}
 
@@ -162,30 +170,45 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		/// <param name="name">Name of the file</param>
 		/// <param name="content">Content of the file</param>
-		/// <remarks>Experimental function, may produce unexpected errors</remarks>
-		public virtual FileRecord AddFile(string name, ReadOnlySpan<byte> content = default) {
+		/// <param name="overwrite">
+		/// Whether to overwrite the existing <see cref="FileRecord"/> with the same name.
+		/// <para>Note that this still throws if the existing node isn't <see cref="FileRecord"/>.</para>
+		/// </param>
+		/// <returns>The <see cref="FileRecord"/> added/overwritten</returns>
+		public virtual FileRecord AddFile(string name, ReadOnlySpan<byte> content = default, bool overwrite = false) {
 			var file = new FileRecord(name, Ggpk) { Parent = this };
-			if (!content.IsEmpty) {
-				file.Length += file.DataLength = content.Length;
-				if (!Hash256.TryComputeHash(content, file._Hash, out _))
-					ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < 32
-				AddNode(file);
-				Ggpk.baseStream.Position = file.DataOffset;
-				Ggpk.baseStream.Write(content);
-			} else
-				AddNode(file);
+			file.Length += file.DataLength = content.Length;
+			if (!Hash256.TryComputeHash(content, file._Hash, out _))
+				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < 32
+			var i = AddNode(file);
+			if (i < 0) {
+				if (!overwrite || this[Entries[~i].NameHash] is not FileRecord fr)
+					throw ThrowHelper.Create<InvalidOperationException>("A file/directory with the same name already exists: " + GetPath() + name);
+				fr.Write(content);
+				return fr;
+			}
+			if (!content.IsEmpty)
+				lock (Ggpk.baseStream) {
+					Ggpk.baseStream.Position = file.DataOffset;
+					Ggpk.baseStream.Write(content);
+				}
 			return file;
 		}
 
 		/// <summary>
 		/// Internal implementation of <see cref="AddDirectory"/> and <see cref="AddFile"/>
 		/// </summary>
-		protected virtual void AddNode(TreeNode node) {
-			if (InsertEntry(new(node.NameHash, default)) < 0) // Entry.Offset will be set in node.WriteWithNewLength(int) which calls TreeNode.UpdateOffset()
-				ThrowHelper.Throw<InvalidOperationException>("A file/directory with the same name already exists: " + node.GetPath());
+		/// <returns>
+		/// The index of the entry is inserted, or ~index of the existing entry with the same namehash if failed to insert.
+		/// </returns>
+		protected virtual int AddNode(TreeNode node) {
+			var i = InsertEntry(new(node.NameHash, -1)); // Entry.Offset will be set in `node.WriteWithNewLength(node.Length)` which calls TreeNode.UpdateOffset()
+			if (i < 0)
+				return i;
 			(_Children ??= new(Entries.Length)).Add(node.NameHash, node);
 			WriteWithNewLength();
 			node.WriteWithNewLength(node.Length);
+			return i;
 		}
 
 		/// <returns>
@@ -201,11 +224,11 @@ namespace LibGGPK3.Records {
 			// Array.Insert(ref Entries, i, entry)
 			var tmp = Entries;
 			Entries = new Entry[tmp.Length + 1];
-			Entries[i] = entry;
-			if (i > 0)
+			if (i != 0)
 				Array.Copy(tmp, 0, Entries, 0, i);
-			if (i < Entries.Length)
-				Array.Copy(tmp, i, Entries, i + 1, Entries.Length - i - 1);
+			Entries[i] = entry;
+			if (i != tmp.Length)
+				Array.Copy(tmp, i, Entries, i + 1, tmp.Length - i);
 			WriteWithNewLength();
 			return i;
 		}
@@ -226,9 +249,9 @@ namespace LibGGPK3.Records {
 			// Array.RemoveAt(ref Entries, i)
 			var tmp = Entries;
 			Entries = new Entry[tmp.Length - 1];
-			if (i > 0)
+			if (i != 0)
 				Array.Copy(tmp, 0, Entries, 0, i);
-			if (i < Entries.Length)
+			if (i != Entries.Length)
 				Array.Copy(tmp, i + 1, Entries, i, Entries.Length - i);
 			WriteWithNewLength();
 			return i;
