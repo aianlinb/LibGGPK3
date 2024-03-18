@@ -31,7 +31,7 @@ namespace LibBundledGGPK3 {
 		public virtual Stream CreateBundle(string bundlePath) {
 			var dir = Bundles2;
 			var i = bundlePath.LastIndexOf('/');
-			if (i < 0) {
+			if (i >= 0) {
 				dir = Ggpk.FindOrCreateDirectory(bundlePath.AsSpan(0, i), dir);
 				bundlePath = bundlePath[(i + 1)..];
 			}

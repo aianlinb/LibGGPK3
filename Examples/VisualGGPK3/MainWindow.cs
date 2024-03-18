@@ -176,8 +176,8 @@ namespace VisualGGPK3 {
 							var span = fileItem.Read().Span;
 #if Windows
 							if (span.Length > 204800) {
-								MessageBox.Show(this, "This text file is too large, only the first 200KB will be shown", "Warning", MessageBoxButtons.OK, MessageBoxType.Warning);
-								span = span[..204800];
+								MessageBox.Show(this, "This text file is too large, only the first 100KB will be shown", "Warning", MessageBoxButtons.OK, MessageBoxType.Warning);
+								span = span[..102400];
 							}
 #endif
 							if (span.IsEmpty)
