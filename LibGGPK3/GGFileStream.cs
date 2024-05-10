@@ -198,13 +198,13 @@ namespace LibGGPK3 {
 			}
 		}
 
+		/// <param name="disposing"><see langword="true"/> to call <see cref="Flush"/> first</param>
 		protected override void Dispose(bool disposing) {
 			if (disposing)
 				Flush();
-			_Buffer?.Close();
+			_Buffer?.Dispose();
 			lock (instances)
 				instances.Remove(Record);
-			base.Dispose(disposing);
 		}
 
 		~GGFileStream() {

@@ -29,7 +29,7 @@ namespace LibGGPK3.Records {
 			var s = ggpk.baseStream;
 			Offset = s.Position - 8;
 			var nameLength = s.Read<int>() - 1;
-			s.ReadExactly(_Hash, 0, 32);
+			s.ReadExactly(_Hash, 0, LENGTH_OF_HASH);
 			if (Ggpk.Record.GGPKVersion == 4) {
 				Span<byte> b = stackalloc byte[nameLength * sizeof(int)];
 				s.ReadExactly(b);
@@ -49,11 +49,12 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		protected internal FileRecord(string name, GGPK ggpk) : base(default, ggpk) {
 			Name = name;
+			ThrowIfNameContainsSlash();
 			Length = CaculateRecordLength();
 		}
 
 		protected override int CaculateRecordLength() {
-			return (Name.Length + 1) * (Ggpk.Record.GGPKVersion == 4 ? 4 : 2) + 44 + DataLength; // (4 + 4 + 4 + Hash.Length + (Name + "\0").Length * 2) + DataLength
+			return 12 + LENGTH_OF_HASH + (Ggpk.Record.GGPKVersion == 4 ? sizeof(int) : sizeof(char)) * (Name.Length + 1) + DataLength; // (4 + 4 + 4 + Hash.Length + (Name + "\0").Length * sizeof(char/int)) + DataLength
 		}
 
 		[SkipLocalsInit]
@@ -63,7 +64,7 @@ namespace LibGGPK3.Records {
 			s.Write(Length);
 			s.Write(Tag);
 			s.Write(Name.Length + 1);
-			s.Write(_Hash, 0, /*_Hash.Length*/32);
+			s.Write(_Hash, 0, LENGTH_OF_HASH);
 			if (Ggpk.Record.GGPKVersion == 4) {
 				Span<byte> span = stackalloc byte[Name.Length * sizeof(int)];
 				s.Write(span[..Encoding.UTF32.GetBytes(Name, span)]);
@@ -80,9 +81,8 @@ namespace LibGGPK3.Records {
 		/// Get the file content of this record
 		/// </summary>
 		public virtual byte[] Read() {
-			lock (Ggpk.baseStream) {
-				var s = Ggpk.baseStream;
-				s.Flush();
+			var s = Ggpk.baseStream;
+			lock (s) {
 				s.Position = DataOffset;
 				var buffer = GC.AllocateUninitializedArray<byte>(DataLength);
 				s.ReadExactly(buffer, 0, DataLength);
@@ -95,9 +95,8 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		public virtual byte[] Read(Range range) {
 			var (offset, length) = range.GetOffsetAndLength(DataLength);
-			lock (Ggpk.baseStream) {
-				var s = Ggpk.baseStream;
-				s.Flush();
+			var s = Ggpk.baseStream;
+			lock (s) {
 				s.Position = DataOffset + offset;
 				var buffer = GC.AllocateUninitializedArray<byte>(length);
 				s.ReadExactly(buffer, 0, length);
@@ -111,20 +110,23 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		public virtual void Write(ReadOnlySpan<byte> newContent) {
 			if (!Hash256.TryComputeHash(newContent, _Hash, out _))
-				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < 32
-			lock (Ggpk.baseStream) {
-				var s = Ggpk.baseStream;
+				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < LENGTH_OF_HASH
+			var s = Ggpk.baseStream;
+			lock (s) {
 				if (newContent.Length != DataLength) { // Replace a FreeRecord
 					DataLength = newContent.Length;
 					WriteWithNewLength();
-					// Offset and DataOffset will be set by WriteRecordData() in above method
+					// Offset and DataOffset will be set by WriteRecordData() in above line
 				} else {
 					s.Position = Offset + sizeof(int) * 3;
-					s.Write(_Hash, 0, /*_Hash.Length*/32);
+					s.Write(_Hash, 0, LENGTH_OF_HASH);
 				}
 				s.Position = DataOffset;
 				s.Write(newContent);
-				s.Flush();
+
+				// Performance reduced when replacing in batches
+				//if (Parent != Ggpk.Root)
+				//	Parent?.RenewHash();
 			}
 		}
 	}

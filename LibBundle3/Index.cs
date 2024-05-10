@@ -230,8 +230,6 @@ namespace LibBundle3 {
 				f.Serialize(ms);
 
 			ms.Write(_Directories.Length);
-			/*foreach (var d in _Directories)
-				ms.Write(d);*/
 			ms.Write(_Directories);
 
 			ms.Write(directoryBundleData, 0, directoryBundleData.Length);
@@ -396,17 +394,17 @@ namespace LibBundle3 {
 		/// <param name="funcGetData">Function to get the content to write for each file</param>
 		/// <returns>Number of files replaced</returns>
 		public static int Replace(IEnumerable<FileRecord> files, GetDataHandler funcGetData, bool saveIndex = true) {
-			var first = files.FirstOrDefault();
-			if (first is null)
+			using var er = files.GetEnumerator();
+			if (!er.MoveNext())
 				return 0;
-
-			var index = first.BundleRecord.Index;
+			
+			var index = er.Current.BundleRecord.Index;
 			var count = 0;
 			var b = index.GetBundleToWrite(out var originalSize);
 			try {
 				using var ms = new MemoryStream(originalSize);
 				ms.Write(b.ReadWithoutCache(0, originalSize)); // Read original data of bundle
-				foreach (var fr in files) {
+				foreach (var fr in er.AsEnumerable()) {
 					if (fr.BundleRecord.Index != index)
 						throw new InvalidOperationException("Attempt to mixedly use FileRecords come from different Index");
 					if (ms.Length >= index.MaxBundleSize) { // Change another bundle to write
@@ -600,12 +598,12 @@ namespace LibBundle3 {
 		public virtual BundleRecord GetSmallestBundle() {
 			EnsureNotDisposed();
 			var br = _Bundles.MinBy(b => b.UncompressedSize) ?? throw new("Unable to find an available bundle");
-			if (br.TryBundle(out var b))
+			if (br.TryGetBundle(out var b))
 				return b;
 
 			var list = _Bundles.OrderBy(b => b.UncompressedSize);
 			foreach (var b in list)
-				if (br.TryBundle(out var b))
+				if (br.TryGetBundle(out var b))
 					return b;
 			throw new("Unable to find an available bundle");
 		}*/
@@ -615,13 +613,12 @@ namespace LibBundle3 {
 		/// <param name="bundlePath">Relative path of the bundle without ".bundle.bin"</param>
 		protected virtual Bundle CreateBundle(string bundlePath) {
 			EnsureNotDisposed();
-			var count = _Bundles.Length;
-			var br = new BundleRecord(bundlePath, 0, this, count);
+			var len = _Bundles.Length;
+			var br = new BundleRecord(bundlePath, 0, this, len);
 			var b = new Bundle(bundleFactory.CreateBundle(bundlePath + ".bundle.bin"), br);
-			Array.Resize(ref _Bundles, count + 1);
-			_Bundles[count] = br;
+			Array.Resize(ref _Bundles, len + 1);
+			_Bundles[len] = br;
 			baseBundle.UncompressedSize += br.RecordLength; // Hack to prevent MemoryStream from reallocating in next line
-			Save();
 			return b;
 		}
 
@@ -782,8 +779,6 @@ namespace LibBundle3 {
 			_readonlyFiles = null;
 			_Root = null;
 		}
-
-		~Index() => Dispose();
 
 		/// <summary>
 		/// Currently unused

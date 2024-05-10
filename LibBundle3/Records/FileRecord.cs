@@ -97,7 +97,7 @@ namespace LibBundle3.Records {
 					Span<byte> b = len <= 4096 ? stackalloc byte[len] : (rented = ArrayPool<byte>.Shared.Rent(len)).AsSpan(0, len);
 					bundle.ReadWithoutCache(0, size).AsSpan().CopyTo(b);
 					newContent.CopyTo(b[size..]);
-					bundle.Save(b); // TODO: Save only the appended part of data
+					bundle.Save(b);
 				} finally {
 					if (rented is not null)
 						ArrayPool<byte>.Shared.Return(rented);

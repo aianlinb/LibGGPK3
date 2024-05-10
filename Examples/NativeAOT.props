@@ -4,12 +4,8 @@
 		<PublishAOT>true</PublishAOT>
 		<IlcInvariantGlobalization>true</IlcInvariantGlobalization>
 		<!--IlcOptimizationPreference>Speed</IlcOptimizationPreference-->
-		<IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
 		<IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
-		<IlcTrimMetadata>true</IlcTrimMetadata>
 		<DebuggerSupport>false</DebuggerSupport>
-		<EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
-		<EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
 		<EventSourceSupport>false</EventSourceSupport>
 		<HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
 		<MetadataUpdaterSupport>false</MetadataUpdaterSupport>

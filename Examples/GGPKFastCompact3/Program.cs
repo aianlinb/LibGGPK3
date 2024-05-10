@@ -8,7 +8,6 @@ using LibGGPK3;
 
 namespace GGPKFastCompact3 {
 	public static class Program {
-		private static readonly CancellationTokenSource cancel = new();
 		public static void Main(string[] args) {
 			try {
 				var version = Assembly.GetExecutingAssembly().GetName().Version!;
@@ -38,31 +37,33 @@ namespace GGPKFastCompact3 {
 				var prog = -1;
 				Console.WriteLine("Start compaction . . .");
 				Console.WriteLine();
-				Console.CancelKeyPress += OnCancelKeyPress;
-				using var tsk = ggpk.FastCompactAsync(cancel.Token, new Progress<int>(i => {
-					prog = i;
-					if (prog > max)
-						max = prog;
-				}));
-				while (prog < 0) {
-					Thread.Sleep(200);
-					if (tsk.Exception is not null)
-						throw tsk.Exception;
+				using (var cancel = new CancellationTokenSource()) {
+					void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e) {
+						e.Cancel = true;
+						cancel.Cancel();
+					}
+					Console.CancelKeyPress += OnCancelKeyPress;
+					var lastTime = DateTime.UtcNow;
+					try {
+						ggpk.FastCompact(cancel.Token, new Progress<int>(i => {
+							prog = i;
+							if (prog > max)
+								max = prog;
+							var now = DateTime.UtcNow;
+							if ((now - lastTime).TotalMilliseconds >= 600) {
+								Console.WriteLine($"Remaining FreeRecords to be filled: {prog}/{max}");
+								lastTime = now;
+							}
+						}));
+					} catch (OperationCanceledException) {
+						Console.WriteLine("Cancelled!");
+					} finally {
+						Console.CancelKeyPress -= OnCancelKeyPress;
+					}
 				}
-				while (!tsk.IsCompleted) {
-					Console.WriteLine($"Remaining FreeRecords to be filled: {prog}/{max}");
-					Thread.Sleep(500);
-				}
-				Console.CancelKeyPress -= OnCancelKeyPress;
 				Console.WriteLine($"Remaining FreeRecords to be filled: {prog}/{max}");
 				Console.WriteLine();
-				cancel.Dispose();
-				if (tsk.Exception is not null)
-					throw tsk.Exception!;
-				if (tsk.IsCanceled)
-					Console.WriteLine("Cancelled!");
-				else
-					Console.WriteLine("Done!");
+				Console.WriteLine("Done!");
 				var size2 = new FileInfo(args[0]).Length;
 				Console.WriteLine("GGPK size: " + size2);
 				Console.WriteLine("Reduced " + (size - size2) + " bytes");
@@ -73,11 +74,6 @@ namespace GGPKFastCompact3 {
 			Console.WriteLine();
 			Console.WriteLine("Enter to exit . . .");
 			Console.ReadLine();
-		}
-
-		private static void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e) {
-			e.Cancel = true;
-			cancel.Cancel();
 		}
 	}
 }

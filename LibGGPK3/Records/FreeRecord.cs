@@ -23,7 +23,7 @@ namespace LibGGPK3.Records {
 		protected internal FreeRecord(int length, GGPK ggpk) : base(length, ggpk) {
 			Offset = ggpk.baseStream.Position - 8;
 			NextFreeOffset = ggpk.baseStream.Read<long>();
-			ggpk.baseStream.Seek(Length - sizeof(long) * 2, SeekOrigin.Current);
+			ggpk.baseStream.Position = Offset + Length;
 		}
 
 		/// <summary>
@@ -50,32 +50,33 @@ namespace LibGGPK3.Records {
 		/// <param name="node">Node in <see cref="GGPK.FreeRecordList"/> to remove</param>
 		protected internal virtual void RemoveFromList(LinkedListNode<FreeRecord>? node = null) {
 			var s = Ggpk.baseStream;
-			node ??= Ggpk.FreeRecordList.Find(this);
-			if (node is null)
-				return;
-			var previous = node.Previous?.Value;
-			var next = node.Next?.Value;
-			if (next is null)
-				if (previous is null) {
-					Ggpk.Record.FirstFreeRecordOffset = 0;
+			lock (s) {
+				node ??= Ggpk.FreeRecordList.Find(this);
+				if (node is null)
+					return;
+				var previous = node.Previous?.Value;
+				var next = node.Next?.Value;
+				if (next is null)
+					if (previous is null) {
+						Ggpk.Record.FirstFreeRecordOffset = 0;
+						s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
+						s.Write((long)0);
+					} else {
+						previous.NextFreeOffset = 0;
+						s.Position = previous.Offset + sizeof(long);
+						s.Write((long)0);
+					}
+				else if (previous is null) {
+					Ggpk.Record.FirstFreeRecordOffset = next.Offset;
 					s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
-					s.Write((long)0);
+					s.Write(next.Offset);
 				} else {
-					previous.NextFreeOffset = 0;
+					previous.NextFreeOffset = next.Offset;
 					s.Position = previous.Offset + sizeof(long);
-					s.Write((long)0);
+					s.Write(next.Offset);
 				}
-			else if (previous is null) {
-				Ggpk.Record.FirstFreeRecordOffset = next.Offset;
-				s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
-				s.Write(next.Offset);
-			} else {
-				previous.NextFreeOffset = next.Offset;
-				s.Position = previous.Offset + sizeof(long);
-				s.Write(next.Offset);
+				Ggpk.FreeRecordList.Remove(node);
 			}
-			Ggpk.FreeRecordList.Remove(node);
-			s.Flush();
 		}
 
 		/// <summary>
@@ -90,17 +91,19 @@ namespace LibGGPK3.Records {
 				node = Ggpk.FreeRecordList.Find(this);
 
 			var s = Ggpk.baseStream;
-			var lastFree = node is null ? Ggpk.FreeRecordList.Last?.Value : node.Previous?.Value;
-			if (lastFree is null) { // empty
-				Ggpk.Record.FirstFreeRecordOffset = Offset;
-				s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
-				s.Write(Offset);
-			} else {
-				lastFree.NextFreeOffset = Offset;
-				s.Position = lastFree.Offset + sizeof(long);
-				s.Write(Offset);
+			lock (s) {
+				var lastFree = node is null ? Ggpk.FreeRecordList.Last?.Value : node.Previous?.Value;
+				if (lastFree is null) { // empty
+					Ggpk.Record.FirstFreeRecordOffset = Offset;
+					s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
+					s.Write(Offset);
+				} else {
+					lastFree.NextFreeOffset = Offset;
+					s.Position = lastFree.Offset + sizeof(long);
+					s.Write(Offset);
+				}
+				return node ?? Ggpk.FreeRecordList.AddLast(this);
 			}
-			return node ?? Ggpk.FreeRecordList.AddLast(this);
 		}
 	}
 }

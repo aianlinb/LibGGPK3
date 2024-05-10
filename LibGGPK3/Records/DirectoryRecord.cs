@@ -23,7 +23,7 @@ namespace LibGGPK3.Records {
 		/// </remarks>
 		/// <param name="nameHash">Murmur2 hash of lowercase entry name (can be calculated by <see cref="TreeNode.GetNameHash"/>)</param>
 		/// <param name="offset">Offset in pack file where the record begins</param>
-		[DebuggerDisplay($"{{{{{nameof(NameHash)}={{{nameof(NameHash)}}}, {nameof(Offset)}={{{nameof(Offset)}}}}}}}")]
+		[DebuggerDisplay($"Entry \\{{{nameof(NameHash)}={{{nameof(NameHash)}}}, {nameof(Offset)}={{{nameof(Offset)}}}\\}}")]
 		[StructLayout(LayoutKind.Sequential, Size = sizeof(uint) + sizeof(long), Pack = sizeof(uint))]
 		protected internal struct Entry(uint nameHash, long offset) : IComparable<uint> {
 			/// <summary>
@@ -67,7 +67,7 @@ namespace LibGGPK3.Records {
 			Offset = s.Position - 8;
 			var nameLength = s.Read<int>() - 1; // '\0'
 			var totalEntries = s.Read<int>();
-			s.ReadExactly(_Hash, 0, /*_Hash.Length*/32);
+			s.ReadExactly(_Hash, 0, LENGTH_OF_HASH);
 			if (Ggpk.Record.GGPKVersion == 4) {
 				Span<byte> b = stackalloc byte[nameLength * sizeof(int)]; // UTF32
 				s.ReadExactly(b);
@@ -86,6 +86,7 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		protected internal DirectoryRecord(string name, GGPK ggpk) : base(default, ggpk) {
 			Name = name;
+			ThrowIfNameContainsSlash();
 			Entries = [];
 			Length = CaculateRecordLength();
 		}
@@ -160,9 +161,18 @@ namespace LibGGPK3.Records {
 		public virtual DirectoryRecord AddDirectory(string name, bool dontThrowIfExist = false) {
 			var dir = new DirectoryRecord(name, Ggpk) { Parent = this };
 			var i = AddNode(dir);
-			if (i < 0)
-				dir = this[Entries[~i].NameHash] as DirectoryRecord ?? throw ThrowHelper.Create<InvalidOperationException>("A file/directory with the same name already exists: " + GetPath() + name);
-			return dir;
+			if (i < 0) {
+				if (!dontThrowIfExist)
+					Throw();
+				dir = this[Entries[~i].NameHash] as DirectoryRecord;
+				if (dir is null)
+					Throw();
+			}
+			return dir!;
+
+			void Throw() {
+				throw new InvalidOperationException($"A file/directory with the same name already exists: {GetPath()}{name}");
+			}
 		}
 
 		/// <summary>
@@ -179,7 +189,7 @@ namespace LibGGPK3.Records {
 			var file = new FileRecord(name, Ggpk) { Parent = this };
 			file.Length += file.DataLength = content.Length;
 			if (!Hash256.TryComputeHash(content, file._Hash, out _))
-				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < 32
+				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < LENGTH_OF_HASH
 			var i = AddNode(file);
 			if (i < 0) {
 				if (!overwrite || this[Entries[~i].NameHash] is not FileRecord fr)
@@ -261,21 +271,25 @@ namespace LibGGPK3.Records {
 		/// Caculate the length of the record should be in ggpk file
 		/// </summary>
 		protected override unsafe int CaculateRecordLength() {
-			return Entries.Length * sizeof(Entry) + (Name.Length + 1) * (Ggpk.Record.GGPKVersion == 4 ? 4 : 2) + (sizeof(int) * 4 + 32/*_Hash.Length*/);
+			return sizeof(int) * 4 + LENGTH_OF_HASH + (Ggpk.Record.GGPKVersion == 4 ? sizeof(int) : sizeof(char)) * (Name.Length + 1) + sizeof(Entry) * Entries.Length;
 		}
 
 		/// <summary>
 		/// Write the record to ggpk file to its current position
 		/// </summary>
+		/// <remarks>
+		/// <see langword="lock"/> the <see cref="GGPK.baseStream"/> while calling this method
+		/// </remarks>
 		[SkipLocalsInit]
 		protected internal override unsafe void WriteRecordData() {
+			// All method (WriteWithNewLength only) calling this will lock the stream
 			var s = Ggpk.baseStream;
 			Offset = s.Position;
 			s.Write(Length);
 			s.Write(Tag);
 			s.Write(Name.Length + 1);
 			s.Write(Entries.Length);
-			s.Write(_Hash, 0, /*_Hash.Length*/32); // Keep the hash original to prevent the game from starting patching
+			s.Write(_Hash, 0, LENGTH_OF_HASH); // Keep the hash original to prevent the game from starting patching
 			if (Ggpk.Record.GGPKVersion == 4) {
 				Span<byte> span = stackalloc byte[Name.Length * sizeof(int)];
 				s.Write(span[..Encoding.UTF32.GetBytes(Name, span)]);
@@ -286,6 +300,26 @@ namespace LibGGPK3.Records {
 			}
 			EntriesBegin = s.Position;
 			s.Write(Entries);
+		}
+
+		/// <summary>
+		/// Recalculate <see cref="TreeNode._Hash"/> of the directory
+		/// </summary>
+		protected internal unsafe void RenewHash() {
+			var len = LENGTH_OF_HASH * Entries.Length;
+			var combination = stackalloc byte[len];
+			var pos = combination;
+			foreach (var n in Children) {
+				new ReadOnlySpan<byte>(n._Hash).CopyTo(new(pos, LENGTH_OF_HASH));
+				pos += LENGTH_OF_HASH;
+			}
+			if (!Hash256.TryComputeHash(new(combination, len), _Hash, out _))
+				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < LENGTH_OF_HASH
+			var s = Ggpk.baseStream;
+			lock (s) {
+				s.Position = sizeof(int) * 4;
+				s.Write(_Hash, 0, LENGTH_OF_HASH);
+			}
 		}
 	}
 }

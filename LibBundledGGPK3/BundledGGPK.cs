@@ -5,6 +5,8 @@ using LibBundle3;
 using LibGGPK3;
 using LibGGPK3.Records;
 
+using SystemExtensions;
+
 namespace LibBundledGGPK3 {
 	/// <summary>
 	/// <see cref="GGPK"/> but also parses "Bundles2/_.index.bin" to <see cref="Index"/>
@@ -21,8 +23,12 @@ namespace LibBundledGGPK3 {
 		/// </param>
 		/// <exception cref="FileNotFoundException" />
 		public BundledGGPK(string filePath, bool parsePathsInIndex = true) : base(filePath) {
-			var bundles2 = Root["Bundles2"] as DirectoryRecord ?? throw new DirectoryNotFoundException("Cannot find directory \"Bundles2\" in GGPK: " + filePath);
-			var index = bundles2["_.index.bin"] as FileRecord ?? throw new FileNotFoundException("Cannot find file \"Bundles2/_.index.bin\" in GGPK: " + filePath);
+			var bundles2 = Root["Bundles2"] as DirectoryRecord;
+			if (bundles2 is null)
+				ThrowHelper.Throw<DirectoryNotFoundException>("Cannot find directory \"Bundles2\" in GGPK: " + filePath);
+			var index = bundles2["_.index.bin"] as FileRecord;
+			if (index is null)
+				ThrowHelper.Throw<FileNotFoundException>("Cannot find file \"Bundles2/_.index.bin\" in GGPK: " + filePath);
 			Index = new(new GGFileStream(index), false, parsePathsInIndex, new GGPKBundleFactory(this, bundles2));
 		}
 

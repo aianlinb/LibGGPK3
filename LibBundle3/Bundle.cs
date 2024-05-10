@@ -90,6 +90,8 @@ namespace LibBundle3 {
 		/// <param name="record">Record of this bundle file</param>
 		public unsafe Bundle(Stream stream, bool leaveOpen = false, BundleRecord? record = null) {
 			ArgumentNullException.ThrowIfNull(stream);
+			if (!BitConverter.IsLittleEndian)
+				ThrowHelper.Throw<NotSupportedException>("Big-endian device is not supported");
 			baseStream = stream;
 			this.leaveOpen = leaveOpen;
 			Record = record;
@@ -114,7 +116,6 @@ namespace LibBundle3 {
 			metadata = new();
 			stream.Write(in metadata);
 			stream.SetLength(stream.Position);
-			stream.Flush();
 		}
 
 		/// <summary>
@@ -319,13 +320,14 @@ namespace LibBundle3 {
 					int l;
 					for (var i = 0; i < last; ++i) {
 						l = (int)Oodle.Compress(p, tmp);
-						metadata.compressed_size += compressed_chunk_sizes[i] = l;
+						compressed_chunk_sizes[i] = l;
+						metadata.compressed_size += l;
 						p += metadata.chunk_size;
 						baseStream.Write(new(tmp, l));
 					}
 					l = (int)Oodle.Compress(p, metadata.GetLastChunkSize(), tmp);
-					metadata.compressed_size += compressed_chunk_sizes[last] = l;
-					//p += metadata.GetLastChunkSize();  // Unneeded
+					compressed_chunk_sizes[last] = l;
+					metadata.compressed_size += l;
 					baseStream.Write(new(tmp, l));
 				}
 			} finally {

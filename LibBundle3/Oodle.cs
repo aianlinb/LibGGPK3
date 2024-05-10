@@ -64,7 +64,7 @@ namespace LibBundle3 {
 			}
 			if (preAllocatedMemory is null || preAllocatedMemory.Length < l)
 				preAllocatedMemory = GC.AllocateUninitializedArray<byte>(l, true); // pinned
-			end:
+		end:
 			Oodle.settings = settings;
 #pragma warning disable CS8774 // preAllocatedMemory is not null if Initialize has been called before
 		}
@@ -120,6 +120,7 @@ namespace LibBundle3 {
 		public static nint Compress(byte* buffer, nint bufferSize, byte* output) {
 			return OodleLZ_Compress(settings.Compressor, buffer, bufferSize, output, settings.CompressionLevel,
 				scratchMem: Unsafe.AsPointer(ref MemoryMarshal.GetArrayDataReference(preAllocatedMemory!)), scratchSize: preAllocatedMemory!.Length);
+			// preAllocatedMemory is pinned so AsPointer is safe
 		}
 
 		/// <param name="buffer">The compressed data to decompress</param>
@@ -154,6 +155,7 @@ namespace LibBundle3 {
 		public static nint Decompress(byte* buffer, nint bufferSize, byte* output, nint uncompressedSize) {
 			return OodleLZ_Decompress(buffer, bufferSize, output, uncompressedSize,
 				decoderMemory: Unsafe.AsPointer(ref MemoryMarshal.GetArrayDataReference(preAllocatedMemory!)), decoderMemorySize: preAllocatedMemory!.Length);
+			// preAllocatedMemory is pinned so AsPointer is safe
 		}
 
 		/// <summary>

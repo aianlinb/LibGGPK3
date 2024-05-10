@@ -3,7 +3,7 @@
 <plist version="1.0">
   <dict>
 	<key>CFBundleIdentifier</key>
-	<string>aianlinb.LibGGPK3.VisualGGPK3</string>
+	<string>LibGGPK3.VisualGGPK3</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2022-2024 aianlinb</string>
 	<key>CFBundleShortVersionString</key>

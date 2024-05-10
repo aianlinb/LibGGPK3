@@ -1,40 +1,37 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 
 using LibBundle3.Records;
-
-using SystemExtensions;
 
 using File = System.IO.File;
 
 namespace LibBundle3 {
-	public class DriveBundleFactory : IBundleFileFactory {
+	public readonly struct DriveBundleFactory : IBundleFileFactory {
 		/// <summary>
-		/// Path of "Bundles2" (parent of _.index.bin) on disk.
+		/// Path of "Bundles2" (parent of _.index.bin) on disk. (ends with slash)
 		/// </summary>
-		protected readonly string baseDirectory;
+		public string BaseDirectory { get; }
 
 		/// <param name="baseDirectoryPath">
 		/// Path of "Bundles2" (parent of _.index.bin) on disk.
 		/// </param>
 		public DriveBundleFactory(string baseDirectoryPath) {
-			baseDirectory = Path.GetFullPath(baseDirectoryPath);
-			if (baseDirectory[^1] != Path.DirectorySeparatorChar) // Works for C:\ etc..
-				baseDirectory += Path.DirectorySeparatorChar;
+			BaseDirectory = Path.GetFullPath(baseDirectoryPath);
+			if (BaseDirectory[^1] != Path.DirectorySeparatorChar) // Works for C:\ etc..
+				BaseDirectory += Path.DirectorySeparatorChar;
 		}
 
-		public virtual Bundle GetBundle(BundleRecord record) {
-			return new(baseDirectory + record.Path, record);
+		public Bundle GetBundle(BundleRecord record) {
+			return new(BaseDirectory + record.Path, record);
 		}
 
-		public virtual Stream CreateBundle(string bundlePath) {
-			bundlePath = baseDirectory + bundlePath;
+		public Stream CreateBundle(string bundlePath) {
+			bundlePath = BaseDirectory + bundlePath;
 			Directory.CreateDirectory(Path.GetDirectoryName(bundlePath)!);
 			return File.Create(bundlePath);
 		}
 
-		public virtual bool DeleteBundle(string bundlePath) {
-			bundlePath = baseDirectory + bundlePath;
+		public bool DeleteBundle(string bundlePath) {
+			bundlePath = BaseDirectory + bundlePath;
 			if (!File.Exists(bundlePath))
 				return false;
 			File.Delete(bundlePath);

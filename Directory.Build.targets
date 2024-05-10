@@ -6,7 +6,7 @@
 		<PackageProjectUrl>https://github.com/aianlinb/LibGGPK3</PackageProjectUrl>
 		<PackageTags>LibGGPK3;libggpk;POE;PathOfExile;aianlinb</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+		<PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
 		<RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
 		<IncludeSymbols>true</IncludeSymbols>

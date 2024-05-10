@@ -1,11 +1,12 @@
 <Project>
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
-		<Version>2.2.1</Version>
+		<Version>2.3.0</Version>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<ProduceReferenceAssembly>false</ProduceReferenceAssembly>
 		<InvariantGlobalization>true</InvariantGlobalization>
+		<RollForward>LatestMajor</RollForward>
 		<PredefinedCulturesOnly>false</PredefinedCulturesOnly>
 		<BaseOutputPath>$(SolutionDir)bin/</BaseOutputPath>
 		<OutDir>$(BaseOutputPath)$(Configuration)/</OutDir>

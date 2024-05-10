@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using System.Threading.Tasks;
 
 using LibGGPK3.Records;
 
@@ -16,6 +15,7 @@ using SystemExtensions.Streams;
 using File = System.IO.File;
 
 [module: SkipLocalsInit]
+[assembly: InternalsVisibleTo("LibBundledGGPK3")]
 
 namespace LibGGPK3 {
 	/// <summary>
@@ -71,6 +71,8 @@ namespace LibGGPK3 {
 		/// <param name="leaveOpen">If false, close the <paramref name="stream"/> when this instance is disposed</param>
 		public GGPK(Stream stream, bool leaveOpen = false) {
 			ArgumentNullException.ThrowIfNull(stream);
+			if (!BitConverter.IsLittleEndian)
+				ThrowHelper.Throw<NotSupportedException>("Big-endian device is not supported");
 			baseStream = stream;
 			this.leaveOpen = leaveOpen;
 			Record = (GGPKRecord)ReadRecord(0);
@@ -186,8 +188,8 @@ namespace LibGGPK3 {
 		/// </summary>
 		/// <param name="progress">returns the number of FreeRecords remaining to be filled.
 		/// This won't be always decreasing</param>
-		public virtual Task FastCompactAsync(CancellationToken? cancellation = null, IProgress<int>? progress = null) {
-			return Task.Run(() => {
+		public virtual void FastCompact(CancellationToken? cancellation = null, IProgress<int>? progress = null) {
+			lock (baseStream) {
 				cancellation?.ThrowIfCancellationRequested();
 				FreeRecordConcat();
 
@@ -229,7 +231,8 @@ namespace LibGGPK3 {
 					}
 				}
 				progress?.Report(freeList.Count);
-			});
+				baseStream.Flush();
+			}
 		}
 
 		/// <summary>
@@ -237,31 +240,32 @@ namespace LibGGPK3 {
 		/// </summary>
 		public virtual void FixFreeRecordList() {
 			EnsureNotDisposed();
-			var s = baseStream;
-			baseStream.Position = 0;
-			Record.FirstFreeRecordOffset = 0;
-			var list = new LinkedList<FreeRecord>();
-			FreeRecord? last = null;
-			while (s.Position < s.Length) {
-				var record = ReadRecord();
-				if (record is FreeRecord fr) {
-					if (last is not null)
-						last.NextFreeOffset = fr.Offset;
-					else
-						Record.FirstFreeRecordOffset = fr.Offset;
-					last = fr;
-					list.AddLast(last);
+			lock (baseStream) {
+				baseStream.Position = 0;
+				Record.FirstFreeRecordOffset = 0;
+				var list = new LinkedList<FreeRecord>();
+				FreeRecord? last = null;
+				while (baseStream.Position < baseStream.Length) {
+					var record = ReadRecord();
+					if (record is FreeRecord fr) {
+						if (last is not null)
+							last.NextFreeOffset = fr.Offset;
+						else
+							Record.FirstFreeRecordOffset = fr.Offset;
+						last = fr;
+						list.AddLast(last);
+					}
 				}
+				if (last is not null)
+					last.NextFreeOffset = 0;
+				baseStream.Position = Record.Offset + 20;
+				baseStream.Write(Record.FirstFreeRecordOffset);
+				foreach (var fr in list) {
+					baseStream.Position = fr.Offset + 8;
+					baseStream.Write(fr.NextFreeOffset);
+				}
+				baseStream.Flush();
 			}
-			if (last is not null)
-				last.NextFreeOffset = 0;
-			baseStream.Position = Record.Offset + 20;
-			s.Write(Record.FirstFreeRecordOffset);
-			foreach (var fr in list) {
-				baseStream.Position = fr.Offset + 8;
-				s.Write(fr.NextFreeOffset);
-			}
-			s.Flush();
 		}
 
 		/// <summary>
@@ -271,27 +275,29 @@ namespace LibGGPK3 {
 			EnsureNotDisposed();
 			if (FreeRecordList.Count == 0)
 				return;
-			var list = FreeRecordList.ToList();
-			list.Sort(Comparer<FreeRecord>.Create((x, y) => x.Offset.CompareTo(y.Offset)));
-			var @continue = true;
-			FreeRecord? current = default;
-			for (var i = 0; @continue;) {
-				var changed = false;
-				current = list[i];
-				while ((@continue = ++i < list.Count) && current.Offset + current.Length == list[i].Offset) {
-					current.Length += list[i].Length;
-					list[i].RemoveFromList();
-					changed = true;
+			lock (baseStream) {
+				var list = FreeRecordList.ToList();
+				list.Sort(Comparer<FreeRecord>.Create((x, y) => x.Offset.CompareTo(y.Offset)));
+				var @continue = true;
+				FreeRecord? current = default;
+				for (var i = 0; @continue;) {
+					var changed = false;
+					current = list[i];
+					while ((@continue = ++i < list.Count) && current.Offset + current.Length == list[i].Offset) {
+						current.Length += list[i].Length;
+						list[i].RemoveFromList();
+						changed = true;
+					}
+					if (changed) {
+						baseStream.Position = current.Offset;
+						baseStream.Write(current.Length);
+					}
 				}
-				if (changed) {
-					baseStream.Position = current.Offset;
-					baseStream.Write(current.Length);
+				if (current is not null && current.Offset + current.Length >= baseStream.Length) {
+					baseStream.SetLength(current.Offset);
+					current.RemoveFromList();
 				}
-			}
-			if (current is not null && current.Offset + current.Length >= baseStream.Length) {
 				baseStream.Flush();
-				baseStream.SetLength(current.Offset);
-				current.RemoveFromList();
 			}
 		}
 
@@ -330,7 +336,12 @@ namespace LibGGPK3 {
 			} else {
 				if (!Directory.Exists(path))
 					return 0;
-				return ((DirectoryRecord)record).Children.Sum(r => Replace(r, $"{path}/{r.Name}"));
+				var sum = 0;
+				foreach (var r in ((DirectoryRecord)record).Children)
+					sum += Replace(r, $"{path}/{r.Name}");
+				if (sum != 0 && record != record.Ggpk.Root /*Prevent game from update*/)
+					((DirectoryRecord)record).RenewHash();
+				return sum;
 			}
 		}
 
@@ -342,12 +353,10 @@ namespace LibGGPK3 {
 				if (!leaveOpen)
 					baseStream?.Close();
 			} catch { /*Closing closed stream*/ }
-			_FreeRecords?.Clear();
-			_FreeRecords = null;
-		}
-
-		~GGPK() {
-			Dispose();
+			if (_FreeRecords is not null) {
+				_FreeRecords.Clear();
+				_FreeRecords = null;
+			}
 		}
 	}
 }

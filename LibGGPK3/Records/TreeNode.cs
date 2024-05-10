@@ -21,10 +21,11 @@ namespace LibGGPK3.Records {
 		/// SHA256 hash of the file content
 		/// </summary>
 		public virtual ReadOnlyMemory<byte> Hash => _Hash;
+		public const int LENGTH_OF_HASH = 32;
 		/// <summary>
 		/// SHA256 hash of the file content
 		/// </summary>
-		protected internal readonly byte[] _Hash = new byte[32]; // Should be set in derived class
+		protected internal readonly byte[] _Hash = new byte[LENGTH_OF_HASH]; // Should be set in derived class
 		/// <summary>
 		/// Parent node
 		/// </summary>
@@ -42,38 +43,40 @@ namespace LibGGPK3.Records {
 		/// <returns>The <see cref="FreeRecord"/> created at the original position if the record is moved, or <see langword="null"/> if replaced in place</returns>
 		/// <remarks>Don't set <see cref="BaseRecord.Length"/> before calling this method, the method will update it</remarks>
 		protected internal virtual LinkedListNode<FreeRecord>? WriteWithNewLength(int newLength, LinkedListNode<FreeRecord>? specify = null) {
-			if (Offset != 0 && newLength == Length && specify is null) {
-				Ggpk.baseStream.Position = Offset;
-				WriteRecordData();
-				return null;
-			}
-			var original = Offset == 0 ? null : MarkAsFree();
-
-			Length = newLength;
 			var s = Ggpk.baseStream;
-			specify ??= Ggpk.FindBestFreeRecord(Length);
-			if (specify is null) {
-				s.Seek(0, SeekOrigin.End); // Write to the end of GGPK
-				WriteRecordData();
-			} else {
-				var free = specify.Value;
-				if (free.Length < Length + 16 && free.Length != Length)
-					throw new ArgumentException("The length of specified FreeRecord must not be between Length and Length-16 (exclusive): " + free.Length, nameof(specify));
-				s.Position = free.Offset;
-				WriteRecordData();
-				free.Length -= Length;
-				if (free.Length >= 16) { // Update length of FreeRecord
-					s.Position = free.Offset + Length;
-					free.WriteRecordData();
-					free.UpdateOffset();
-				} else
-					free.RemoveFromList(specify);
-				if (free == original?.Value)
+			lock (s) {
+				if (Offset != default && newLength == Length && specify is null) {
+					s.Position = Offset;
+					WriteRecordData();
 					return null;
-			}
+				}
+				var original = Offset == default ? null : MarkAsFree();
 
-			UpdateOffset();
-			return original;
+				Length = newLength;
+				specify ??= Ggpk.FindBestFreeRecord(Length);
+				if (specify is null) {
+					s.Seek(0, SeekOrigin.End); // Write to the end of GGPK
+					WriteRecordData();
+				} else {
+					var free = specify.Value;
+					if (free.Length < Length + 16 && free.Length != Length)
+						throw new ArgumentException("The length of specified FreeRecord must not be between Length and Length-16 (exclusive): " + free.Length, nameof(specify));
+					s.Position = free.Offset;
+					WriteRecordData();
+					free.Length -= Length;
+					if (free.Length >= 16) { // Update length of FreeRecord
+						s.Position = free.Offset + Length;
+						free.WriteRecordData();
+						free.UpdateOffset();
+					} else // free.Length == 0
+						free.RemoveFromList(specify);
+					if (free == original?.Value)
+						return null;
+				}
+
+				UpdateOffset();
+				return original;
+			}
 		}
 
 		/// <summary>
@@ -81,72 +84,73 @@ namespace LibGGPK3.Records {
 		/// </summary>
 		protected virtual LinkedListNode<FreeRecord>? MarkAsFree() {
 			var s = Ggpk.baseStream;
-			s.Position = Offset;
-
-			LinkedListNode<FreeRecord>? previous = null;
-			var length = Length;
-			var right = false;
-			// Combine with FreeRecords nearby
-			for (var fn = Ggpk.FreeRecordList.First; fn is not null; fn = fn.Next) {
-				var f = fn.Value;
-				if (f.Offset == Offset + length) {
-					length += f.Length;
-					if (previous is not null)
-						previous.Value.Length += f.Length;
-					f.RemoveFromList(fn);
-					right = true;
-				} else if (previous is null && f.Offset + f.Length == Offset) {
-					f.Length += length;
-					previous = fn;
+			lock (s) {
+				LinkedListNode<FreeRecord>? previous = null;
+				var length = Length;
+				var right = false;
+				// Combine with FreeRecords nearby
+				for (var fn = Ggpk.FreeRecordList.First; fn is not null; fn = fn.Next) {
+					var f = fn.Value;
+					if (f.Offset == Offset + length) {
+						length += f.Length;
+						if (previous is not null)
+							previous.Value.Length += f.Length;
+						f.RemoveFromList(fn);
+						right = true;
+					} else if (previous is null && f.Offset + f.Length == Offset) {
+						f.Length += length;
+						previous = fn;
+					}
+					if (right && previous is not null) // In most cases, there won't be contiguous FreeRecords in GGPK
+						break;
 				}
-				if (right && previous is not null) // In most cases, there won't be contiguous FreeRecords in GGPK
-					break;
-			}
 
-			if (previous is not null) {
-				var fPrevious = previous.Value;
-				if (fPrevious.Offset + fPrevious.Length >= s.Length) {
+				if (previous is not null) {
+					var fPrevious = previous.Value;
+					if (fPrevious.Offset + fPrevious.Length >= s.Length) {
+						// Trim if the record is at the end of the ggpk file
+						fPrevious.RemoveFromList(previous);
+						s.SetLength(fPrevious.Offset);
+						return null;
+					}
+					// Update record length
+					s.Position = fPrevious.Offset;
+					s.Write(fPrevious.Length);
+					return previous;
+				} else if (Offset + length >= s.Length) {
 					// Trim if the record is at the end of the ggpk file
-					fPrevious.RemoveFromList(previous);
-					s.Flush();
-					s.SetLength(fPrevious.Offset);
+					s.SetLength(Offset);
 					return null;
 				}
-				// Update record length
-				s.Position = fPrevious.Offset;
-				s.Write(fPrevious.Length);
-				return previous;
-			} else if (Offset + length >= s.Length) {
-				// Trim if the record is at the end of the ggpk file
-				s.Flush();
-				s.SetLength(Offset);
-				return null;
-			}
 
-			// Write FreeRecord
-			var free = new FreeRecord(Offset, length, 0, Ggpk);
-			Ggpk.baseStream.Position = Offset;
-			free.WriteRecordData();
-			return free.UpdateOffset();
+				// Write FreeRecord
+				var free = new FreeRecord(Offset, length, 0, Ggpk);
+				s.Position = Offset;
+				free.WriteRecordData();
+				return free.UpdateOffset();
+			}
 		}
 
 		/// <summary>
 		/// Update the offset of this record in <see cref="Parent"/>.<see cref="DirectoryRecord.Entries"/>
 		/// </summary>
 		protected virtual unsafe void UpdateOffset() {
-			if (Parent is DirectoryRecord dr) {
-				var i = dr.Entries.AsSpan().BinarySearch((DirectoryRecord.Entry.NameHashWrapper)NameHash);
-				if (i < 0)
-					throw new KeyNotFoundException($"{GetPath()} update offset failed: NameHash={NameHash}, Offset={Offset}");
-				dr.Entries[i].Offset = Offset;
-				Ggpk.baseStream.Position = dr.EntriesBegin + sizeof(DirectoryRecord.Entry) * i + sizeof(uint);
-				Ggpk.baseStream.Write(Offset);
-			} else if (this == Ggpk.Root) {
-				Ggpk.Record.RootDirectoryOffset = Offset;
-				Ggpk.baseStream.Position = Ggpk.Record.Offset + (sizeof(int) + sizeof(long));
-				Ggpk.baseStream.Write(Offset);
-			} else
-				throw new NullReferenceException(nameof(Parent));
+			var s = Ggpk.baseStream;
+			lock (s) {
+				if (Parent is DirectoryRecord dr) {
+					var i = dr.Entries.AsSpan().BinarySearch((DirectoryRecord.Entry.NameHashWrapper)NameHash);
+					if (i < 0)
+						ThrowHelper.Throw<KeyNotFoundException>($"{GetPath()} update offset failed: NameHash={NameHash}, Offset={Offset}");
+					dr.Entries[i].Offset = Offset;
+					s.Position = dr.EntriesBegin + sizeof(DirectoryRecord.Entry) * i + sizeof(uint);
+					s.Write(Offset);
+				} else if (this == Ggpk.Root) {
+					Ggpk.Record.RootDirectoryOffset = Offset;
+					s.Position = Ggpk.Record.Offset + (sizeof(int) + sizeof(long));
+					s.Write(Offset);
+				} else
+					ThrowHelper.Throw<NullReferenceException>(nameof(Parent));
+			}
 		}
 
 		/// <summary>
@@ -263,6 +267,17 @@ namespace LibGGPK3.Records {
 				foreach (var t in dr.Children)
 					foreach (var tt in RecurseTree(t))
 						yield return tt;
+		}
+
+		[System.Diagnostics.DebuggerNonUserCode]
+		protected void ThrowIfNameContainsSlash() {
+			if (Name.Contains('/'))
+				Throw();
+
+			[DoesNotReturn, System.Diagnostics.DebuggerNonUserCode]
+			static void Throw() {
+				throw new ArgumentException("Name cannot contain '/'", "name");
+			}
 		}
 
 		/// <summary>
