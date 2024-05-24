@@ -4,10 +4,10 @@
 		<Version>2.3.0</Version>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+		<CheckForOverflowUnderflow Condition="$(Configuration) == 'Debug'">true</CheckForOverflowUnderflow>
 		<InvariantGlobalization>true</InvariantGlobalization>
-		<RollForward>LatestMajor</RollForward>
 		<PredefinedCulturesOnly>false</PredefinedCulturesOnly>
+		<RollForward>LatestMajor</RollForward>
 		<BaseOutputPath>$(SolutionDir)bin/</BaseOutputPath>
 		<OutDir>$(BaseOutputPath)$(Configuration)/</OutDir>
 		<NoWarn>1573;1591</NoWarn>

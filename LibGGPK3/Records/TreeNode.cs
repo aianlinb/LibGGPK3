@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
+using System.Runtime.Intrinsics;
 
 using SystemExtensions;
 using SystemExtensions.Collections;
@@ -12,7 +12,6 @@ using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records {
 	public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk) {
-		protected static readonly SHA256 Hash256 = SHA256.Create();
 		/// <summary>
 		/// File/Directory name
 		/// </summary>
@@ -20,12 +19,8 @@ namespace LibGGPK3.Records {
 		/// <summary>
 		/// SHA256 hash of the file content
 		/// </summary>
-		public virtual ReadOnlyMemory<byte> Hash => _Hash;
-		public const int LENGTH_OF_HASH = 32;
-		/// <summary>
-		/// SHA256 hash of the file content
-		/// </summary>
-		protected internal readonly byte[] _Hash = new byte[LENGTH_OF_HASH]; // Should be set in derived class
+		public Vector256<byte> Hash; // Should be set in derived class
+		public const int LENGTH_OF_HASH = 32; // sizeof(Vector256<byte>)
 		/// <summary>
 		/// Parent node
 		/// </summary>

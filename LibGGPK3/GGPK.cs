@@ -72,7 +72,7 @@ namespace LibGGPK3 {
 		public GGPK(Stream stream, bool leaveOpen = false) {
 			ArgumentNullException.ThrowIfNull(stream);
 			if (!BitConverter.IsLittleEndian)
-				ThrowHelper.Throw<NotSupportedException>("Big-endian device is not supported");
+				ThrowHelper.Throw<NotSupportedException>("Big-endian architecture is not supported");
 			baseStream = stream;
 			this.leaveOpen = leaveOpen;
 			Record = (GGPKRecord)ReadRecord(0);
@@ -339,7 +339,7 @@ namespace LibGGPK3 {
 				var sum = 0;
 				foreach (var r in ((DirectoryRecord)record).Children)
 					sum += Replace(r, $"{path}/{r.Name}");
-				if (sum != 0 && record != record.Ggpk.Root /*Prevent game from update*/)
+				if (sum != 0 && record != record.Ggpk.Root) // Keep the hash of ROOT original to prevent the game from starting patching
 					((DirectoryRecord)record).RenewHash();
 				return sum;
 			}

@@ -91,7 +91,7 @@ namespace LibBundle3 {
 		public unsafe Bundle(Stream stream, bool leaveOpen = false, BundleRecord? record = null) {
 			ArgumentNullException.ThrowIfNull(stream);
 			if (!BitConverter.IsLittleEndian)
-				ThrowHelper.Throw<NotSupportedException>("Big-endian device is not supported");
+				ThrowHelper.Throw<NotSupportedException>("Big-endian architecture is not supported");
 			baseStream = stream;
 			this.leaveOpen = leaveOpen;
 			Record = record;

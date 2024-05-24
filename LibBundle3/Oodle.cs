@@ -9,8 +9,11 @@ using SystemExtensions;
 
 namespace LibBundle3 {
 	/// <summary>
-	/// All methods here are thread-safe, but you must call <see cref="Initialize"/> at least once before first time using any other method <b>*on each thread*</b>
+	/// Oodle (de)compression for bundles (needs oo2core native library to work)
 	/// </summary>
+	/// <remarks>
+	/// All methods here are thread-safe, but you must call <see cref="Initialize"/> at least once before first time using any other method <b>*on each thread*</b>
+	/// </remarks>
 	public static unsafe class Oodle { // Current Oodle Version: 2.9.12
 #pragma warning disable SYSLIB1054 // All parameters are unmanaged types.
 		[DllImport("oo2core")]
@@ -32,7 +35,7 @@ namespace LibBundle3 {
 		[ThreadStatic]
 		private static Settings settings;
 		[ThreadStatic]
-		private static byte[]? preAllocatedMemory;
+		private static byte[]? preAllocatedMemory; // fixed
 
 		/// <summary>
 		/// Call this method before first time using any other method <b>*on each thread*</b>

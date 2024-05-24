@@ -202,9 +202,9 @@ namespace VPatchGGPK3 {
 		public static unsafe string GetPatchServer(bool tw = false) {
 			using var tcp = new Socket(SocketType.Stream, ProtocolType.Tcp);
 			if (tw)
-				tcp.Connect(Dns.GetHostAddresses("patch.pathofexile.tw"), 12999);
+				tcp.Connect("patch.pathofexile.tw", 12999);
 			else
-				tcp.Connect(Dns.GetHostAddresses("patch.pathofexile.com"), 12995); // (us.)login.pathofexile.com
+				tcp.Connect("patch.pathofexile.com", 12995); // (us.)login.pathofexile.com
 			var b = stackalloc byte[256];
 			*(short*)b = 0x0601; // b[0] = 1, b[1] = 6
 			tcp.Send(new ReadOnlySpan<byte>(b, 2));

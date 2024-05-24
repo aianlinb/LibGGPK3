@@ -5,9 +5,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+using System.Security.Cryptography;
 using System.Text;
 
 using SystemExtensions;
+using SystemExtensions.Spans;
 using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records {
@@ -67,7 +70,7 @@ namespace LibGGPK3.Records {
 			Offset = s.Position - 8;
 			var nameLength = s.Read<int>() - 1; // '\0'
 			var totalEntries = s.Read<int>();
-			s.ReadExactly(_Hash, 0, LENGTH_OF_HASH);
+			s.Read(out Hash);
 			if (Ggpk.Record.GGPKVersion == 4) {
 				Span<byte> b = stackalloc byte[nameLength * sizeof(int)]; // UTF32
 				s.ReadExactly(b);
@@ -188,7 +191,7 @@ namespace LibGGPK3.Records {
 		public virtual FileRecord AddFile(string name, ReadOnlySpan<byte> content = default, bool overwrite = false) {
 			var file = new FileRecord(name, Ggpk) { Parent = this };
 			file.Length += file.DataLength = content.Length;
-			if (!Hash256.TryComputeHash(content, file._Hash, out _))
+			if (!SHA256.TryHashData(content, file.Hash.AsSpan(), out _))
 				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < LENGTH_OF_HASH
 			var i = AddNode(file);
 			if (i < 0) {
@@ -289,7 +292,7 @@ namespace LibGGPK3.Records {
 			s.Write(Tag);
 			s.Write(Name.Length + 1);
 			s.Write(Entries.Length);
-			s.Write(_Hash, 0, LENGTH_OF_HASH); // Keep the hash original to prevent the game from starting patching
+			s.Write(Hash);
 			if (Ggpk.Record.GGPKVersion == 4) {
 				Span<byte> span = stackalloc byte[Name.Length * sizeof(int)];
 				s.Write(span[..Encoding.UTF32.GetBytes(Name, span)]);
@@ -303,22 +306,19 @@ namespace LibGGPK3.Records {
 		}
 
 		/// <summary>
-		/// Recalculate <see cref="TreeNode._Hash"/> of the directory
+		/// Recalculate <see cref="TreeNode.Hash"/> of the directory
 		/// </summary>
 		protected internal unsafe void RenewHash() {
-			var len = LENGTH_OF_HASH * Entries.Length;
-			var combination = stackalloc byte[len];
-			var pos = combination;
-			foreach (var n in Children) {
-				new ReadOnlySpan<byte>(n._Hash).CopyTo(new(pos, LENGTH_OF_HASH));
-				pos += LENGTH_OF_HASH;
-			}
-			if (!Hash256.TryComputeHash(new(combination, len), _Hash, out _))
+			var combination = stackalloc Vector256<byte>[Entries.Length];
+			var i = 0;
+			foreach (var n in Children)
+				combination[i++] = n.Hash;
+			if (!SHA256.TryHashData(new ReadOnlySpan<byte>((byte*)combination, LENGTH_OF_HASH * Entries.Length), Hash.AsSpan(), out _))
 				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < LENGTH_OF_HASH
 			var s = Ggpk.baseStream;
 			lock (s) {
 				s.Position = sizeof(int) * 4;
-				s.Write(_Hash, 0, LENGTH_OF_HASH);
+				s.Write(Hash);
 			}
 		}
 	}

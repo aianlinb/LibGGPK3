@@ -2,9 +2,11 @@
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 
 using SystemExtensions;
+using SystemExtensions.Spans;
 using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records {
@@ -29,7 +31,7 @@ namespace LibGGPK3.Records {
 			var s = ggpk.baseStream;
 			Offset = s.Position - 8;
 			var nameLength = s.Read<int>() - 1;
-			s.ReadExactly(_Hash, 0, LENGTH_OF_HASH);
+			s.Read(out Hash);
 			if (Ggpk.Record.GGPKVersion == 4) {
 				Span<byte> b = stackalloc byte[nameLength * sizeof(int)];
 				s.ReadExactly(b);
@@ -64,7 +66,7 @@ namespace LibGGPK3.Records {
 			s.Write(Length);
 			s.Write(Tag);
 			s.Write(Name.Length + 1);
-			s.Write(_Hash, 0, LENGTH_OF_HASH);
+			s.Write(Hash);
 			if (Ggpk.Record.GGPKVersion == 4) {
 				Span<byte> span = stackalloc byte[Name.Length * sizeof(int)];
 				s.Write(span[..Encoding.UTF32.GetBytes(Name, span)]);
@@ -109,7 +111,7 @@ namespace LibGGPK3.Records {
 		/// and move this record to a <see cref="FreeRecord"/> with most suitable size, or end of file if not found.
 		/// </summary>
 		public virtual void Write(ReadOnlySpan<byte> newContent) {
-			if (!Hash256.TryComputeHash(newContent, _Hash, out _))
+			if (!SHA256.TryHashData(newContent, Hash.AsSpan(), out _))
 				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < LENGTH_OF_HASH
 			var s = Ggpk.baseStream;
 			lock (s) {
@@ -119,7 +121,7 @@ namespace LibGGPK3.Records {
 					// Offset and DataOffset will be set by WriteRecordData() in above line
 				} else {
 					s.Position = Offset + sizeof(int) * 3;
-					s.Write(_Hash, 0, LENGTH_OF_HASH);
+					s.Write(Hash);
 				}
 				s.Position = DataOffset;
 				s.Write(newContent);
