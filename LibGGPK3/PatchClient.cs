@@ -14,7 +14,7 @@ using SystemExtensions;
 using SystemExtensions.Collections;
 using SystemExtensions.Spans;
 
-namespace LibBundledGGPK3;
+namespace LibGGPK3;
 
 /// <summary>
 /// Client to interact with the patch server.
@@ -81,7 +81,7 @@ public class PatchClient : IDisposable {
 				span = span.Slice(32); // 32 bytes empty
 				var length = span.ReadAndSlice<ushort>();
 				Utils.EnsureBigEndian(ref length);
-				CdnUrl = MemoryMarshal.Cast<byte, char>(span)[..length].ToString();
+				CdnUrl = new(MemoryMarshal.Cast<byte, char>(span)[..length]);
 			}
 		}
 	}
@@ -220,5 +220,11 @@ public class PatchClient : IDisposable {
 	public virtual void Dispose() {
 		GC.SuppressFinalize(this);
 		socket.Dispose();
+	}
+
+	public static async Task<string> GetPatchCdnUrl(EndPoint server) {
+		using var client = new PatchClient();
+		await client.ConnectAsync(server);
+		return client.CdnUrl!;
 	}
 }

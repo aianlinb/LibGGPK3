@@ -12,6 +12,9 @@ public interface IBundleFileFactory {
 	/// <summary>
 	/// Get a <see cref="Stream"/> (which will be cleared before writing) to write when creating a new bundle with specified <paramref name="bundlePath"/> (ends with ".bundle.bin")
 	/// </summary>
+	/// <remarks>
+	/// If the bundle already exists, it will be overwritten.
+	/// </remarks>
 	/// <param name="bundlePath">Relative path of the bundle which ends with ".bundle.bin"</param>
 	public Stream CreateBundle(string bundlePath);
 

@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 using SystemExtensions;
 using SystemExtensions.Spans;
 
-namespace LibBundledGGPK3;
+namespace LibGGPK3;
 public static class LZ4 {
 	private const int MATCHLEN_BITS = 4;
 	private const int MATCHLEN_MASK = (1 << MATCHLEN_BITS) - 1;
