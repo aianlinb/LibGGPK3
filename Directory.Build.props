@@ -1,12 +1,13 @@
 <Project>
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
-		<Version>2.3.1</Version>
+		<Version>2.4.0</Version>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<CheckForOverflowUnderflow Condition="$(Configuration) == 'Debug'">true</CheckForOverflowUnderflow>
 		<InvariantGlobalization>true</InvariantGlobalization>
 		<PredefinedCulturesOnly>false</PredefinedCulturesOnly>
+		<IsAotCompatible>true</IsAotCompatible>
 		<RollForward>LatestMajor</RollForward>
 		<BaseOutputPath>$(SolutionDir)bin/</BaseOutputPath>
 		<OutDir>$(BaseOutputPath)$(Configuration)/</OutDir>

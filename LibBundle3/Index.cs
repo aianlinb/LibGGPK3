@@ -18,8 +18,6 @@ using SystemExtensions.Collections;
 using SystemExtensions.Spans;
 using SystemExtensions.Streams;
 
-using File = System.IO.File;
-
 [module: SkipLocalsInit]
 
 namespace LibBundle3;
@@ -399,6 +397,7 @@ public class Index : IDisposable {
 			return 0;
 
 		var index = er.Current.BundleRecord.Index;
+		er.Reset();
 		var count = 0;
 		var b = index.GetBundleToWrite(out var originalSize);
 		try {

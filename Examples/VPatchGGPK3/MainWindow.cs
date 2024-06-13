@@ -112,7 +112,7 @@ public class MainWindow : Form {
 	private void OnLoadComplete(object? sender, EventArgs e) {
 		var path = AppContext.BaseDirectory;
 		if (string.IsNullOrEmpty(path))
-			path = Path.GetDirectoryName(Environment.ProcessPath ?? Assembly.GetExecutingAssembly()?.Location ?? Assembly.GetEntryAssembly()?.Location ?? Process.GetCurrentProcess().MainModule?.FileName);
+			path = Path.GetDirectoryName(Environment.ProcessPath);
 		if (!string.IsNullOrEmpty(path))
 			Environment.CurrentDirectory = path;
 		try {

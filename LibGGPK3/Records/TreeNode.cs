@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -16,10 +17,11 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// File/Directory name
 	/// </summary>
 	public virtual string Name { get; protected init; } = "";
+	protected internal Vector256<byte> _Hash; // Should be set in derived class
 	/// <summary>
 	/// SHA256 hash of the file content
 	/// </summary>
-	public Vector256<byte> Hash; // Should be set in derived class
+	public Vector256<byte> Hash => _Hash;
 	public const int LENGTH_OF_HASH = 32; // sizeof(Vector256<byte>)
 	/// <summary>
 	/// Parent node
@@ -137,7 +139,7 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 				if (i < 0)
 					ThrowHelper.Throw<KeyNotFoundException>($"{GetPath()} update offset failed: NameHash={NameHash}, Offset={Offset}");
 				dr.Entries[i].Offset = Offset;
-				s.Position = dr.EntriesBegin + sizeof(DirectoryRecord.Entry) * i + sizeof(uint);
+				s.Position = dr.EntriesOffset + sizeof(DirectoryRecord.Entry) * i + sizeof(uint);
 				s.Write(Offset);
 			} else if (this == Ggpk.Root) {
 				Ggpk.Record.RootDirectoryOffset = Offset;
@@ -159,7 +161,7 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 		var builder = new ValueList<char>(stackalloc char[256]);
 		try {
 			GetPath(ref builder);
-			return builder.AsSpan().ToString();
+			return new(builder.AsSpan());
 		} finally {
 			builder.Dispose();
 		}
@@ -183,17 +185,22 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// Move the node from <see cref="Parent"/> to <paramref name="directory"/> (which can't be <see cref="GGPK.Root"/>)
 	/// </summary>
 	/// <param name="directory">The new parent node to move to (which can't be <see cref="GGPK.Root"/>)</param>
-	/// <exception cref="InvalidOperationException">Thrown when <see langword="this"/> instance or <see cref="Parent"/> or <paramref name="directory"/> is <see cref="GGPK.Root"/></exception>
+	/// <remarks>
+	/// <para><see cref="GGPK.Root"/> can't be moved.</para>
+	/// <para>Do not move the children of <see cref="GGPK.Root"/>, otherwise it will break the ggpk when the game starts.</para>
+	/// </remarks>
 	[MemberNotNull(nameof(Parent))]
 	public virtual void MoveTo(DirectoryRecord directory) {
-		if (Parent == Ggpk.Root || this == Ggpk.Root /*|| directory == Ggpk.Root (will be checked in next "if")*/)
-			ThrowHelper.Throw<InvalidOperationException>("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
-		if (directory.InsertEntry(new(NameHash, Offset)) < 0)
-			ThrowHelper.Throw<InvalidOperationException>($"A file/directory with name: {Name} is already exist in: {directory.GetPath()}");
+		if (this == Ggpk.Root)
+			ThrowHelper.Throw<InvalidOperationException>("You can't move the root directory");
+		Debug.Assert(Parent != Ggpk.Root && directory != Ggpk.Root, "Warning: You shouldn't change the children of the root directory, otherwise it will break the ggpk when the game starts.");
+		
+		var i = directory.InsertEntry(new(NameHash, Offset));
+		if (i < 0)
+			directory.ThrowExist(Name);
+		directory.Children[i] = this;
 		Parent!.RemoveEntry(NameHash);
 		Parent = directory;
-		directory._Children ??= new(directory.Entries.Length);
-		directory._Children.Add(NameHash, this);
 		directory.WriteWithNewLength();
 	}
 
@@ -201,22 +208,24 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// Remove this record and all children permanently from ggpk.
 	/// </summary>
 	/// <remarks>
-	/// Do not use any record instance of removed node (This node and all children of it) after calling this.
-	/// Otherwise it may break ggpk.
+	/// <para><see cref="GGPK.Root"/> can't be removed.</para>
+	/// <para>Do not remove the children of <see cref="GGPK.Root"/>, otherwise it will break the ggpk when the game starts.</para>
+	/// <para>Do not use any record instance of the removed nodes or its children after calling this, otherwise it may break the ggpk.</para>
 	/// </remarks>
 	[MemberNotNull(nameof(Parent))]
 	public virtual void Remove() {
-		if (Parent is null /*(this == Ggpk.Root)*/ || Parent == Ggpk.Root)
-			ThrowHelper.Throw<InvalidOperationException>("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
+		if (this == Ggpk.Root)
+			ThrowHelper.Throw<InvalidOperationException>("You can't remove the root directory");
+		Debug.Assert(Parent != Ggpk.Root, "Warning: You shouldn't remove the children of the root directory, otherwise it will break the ggpk when the game starts.");
 		RemoveRecursively();
-		Parent.RemoveEntry(NameHash);
+		Parent!.RemoveEntry(NameHash);
 	}
 	/// <summary>
 	/// Internal implementation of <see cref="Remove"/>
 	/// </summary>
 	protected virtual void RemoveRecursively() {
 		if (this is DirectoryRecord dr)
-			foreach (var c in dr.Children)
+			foreach (var c in dr)
 				c.RemoveRecursively();
 		MarkAsFree();
 	}
@@ -259,7 +268,7 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	public static IEnumerable<TreeNode> RecurseTree(TreeNode node) {
 		yield return node;
 		if (node is DirectoryRecord dr)
-			foreach (var t in dr.Children)
+			foreach (var t in dr)
 				foreach (var tt in RecurseTree(t))
 					yield return tt;
 	}

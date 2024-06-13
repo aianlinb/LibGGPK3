@@ -22,7 +22,7 @@ public class GGPKDirectoryTreeItem : DirectoryTreeItem {
 
 	protected internal ReadOnlyCollection<ITreeItem>? _ChildItems;
 	public override ReadOnlyCollection<ITreeItem> ChildItems =>
-		_ChildItems ??= new(Record.Children.OrderBy(tn => tn, NodeComparer.Instance).Select(
+		_ChildItems ??= new(Record.OrderBy(tn => tn, NodeComparer.Instance).Select(
 				t => t is FileRecord f ?
 				(ITreeItem)new GGPKFileTreeItem(f, this) :
 				new GGPKDirectoryTreeItem((DirectoryRecord)t, this, Tree)

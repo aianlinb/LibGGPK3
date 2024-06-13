@@ -31,7 +31,7 @@ public class FileRecord : TreeNode {
 		var s = ggpk.baseStream;
 		Offset = s.Position - 8;
 		var nameLength = s.Read<int>() - 1;
-		s.Read(out Hash);
+		s.Read(out _Hash);
 		if (Ggpk.Record.GGPKVersion == 4) {
 			Span<byte> b = stackalloc byte[nameLength * sizeof(int)];
 			s.ReadExactly(b);
@@ -111,7 +111,7 @@ public class FileRecord : TreeNode {
 	/// and move this record to a <see cref="FreeRecord"/> with most suitable size, or end of file if not found.
 	/// </summary>
 	public virtual void Write(ReadOnlySpan<byte> newContent) {
-		if (!SHA256.TryHashData(newContent, Hash.AsSpan(), out _))
+		if (!SHA256.TryHashData(newContent, _Hash.AsSpan(), out _))
 			ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < LENGTH_OF_HASH
 		var s = Ggpk.baseStream;
 		lock (s) {
@@ -125,10 +125,7 @@ public class FileRecord : TreeNode {
 			}
 			s.Position = DataOffset;
 			s.Write(newContent);
-
-			// Performance reduced when replacing in batches
-			//if (Parent != Ggpk.Root)
-			//	Parent?.RenewHash();
+			Ggpk.dirtyHashes.Add(Parent!);
 		}
 	}
 }

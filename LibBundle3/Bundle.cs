@@ -83,7 +83,7 @@ public class Bundle : IDisposable {
 	/// <param name="record">Record of this bundle file</param>
 	/// <exception cref="FileNotFoundException" />
 	public Bundle(string filePath, BundleRecord? record = null) :
-		this(System.IO.File.Open(Utils.ExpandPath(filePath), FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false, record) { }
+		this(File.Open(Utils.ExpandPath(filePath), FileMode.Open, FileAccess.ReadWrite, FileShare.Read), false, record) { }
 
 	/// <param name="stream">Stream of the bundle file</param>
 	/// <param name="leaveOpen">If false, close the <paramref name="stream"/> when this instance is disposed</param>

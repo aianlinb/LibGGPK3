@@ -35,7 +35,7 @@ public class GGPKBundleFactory(GGPK ggpk, DirectoryRecord bundles2) : IBundleFil
 			dir = Ggpk.FindOrCreateDirectory(bundlePath.AsSpan(0, i), dir);
 			bundlePath = bundlePath[(i + 1)..];
 		}
-		return new GGFileStream(dir.AddFile(bundlePath, overwrite: true));
+		return new GGFileStream(dir.AddFile(bundlePath, dontThrowIfExist: true));
 	}
 
 	public virtual bool DeleteBundle(string bundlePath) {

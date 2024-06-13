@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
@@ -10,11 +13,12 @@ using System.Security.Cryptography;
 using System.Text;
 
 using SystemExtensions;
+using SystemExtensions.Collections;
 using SystemExtensions.Spans;
 using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records;
-public class DirectoryRecord : TreeNode {
+public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// <summary>PDIR</summary>
 	public const int Tag = 0x52494450;
 
@@ -39,9 +43,7 @@ public class DirectoryRecord : TreeNode {
 		public long Offset = offset;
 
 		public readonly int CompareTo(uint nameHash) => NameHash.CompareTo(nameHash);
-		public override readonly int GetHashCode() => unchecked((int)NameHash);
 
-		[StructLayout(LayoutKind.Sequential, Size = sizeof(uint), Pack = sizeof(uint))]
 		public readonly struct NameHashWrapper(uint nameHash) : IComparable<Entry> {
 			public readonly uint NameHash = nameHash;
 			public readonly int CompareTo(Entry other) => NameHash.CompareTo(other.NameHash);
@@ -52,14 +54,18 @@ public class DirectoryRecord : TreeNode {
 	}
 
 	/// <summary>
-	/// Records (File/Directory) this directory contains.
+	/// Entries of this directory recorded in ggpk.
 	/// </summary>
-	/// <remarks>They must be sorted by <see cref="Entry.NameHash"/></remarks>
+	/// <remarks>They must be in order of <see cref="Entry.NameHash"/></remarks>
 	protected internal Entry[] Entries;
 	/// <summary>
-	/// Offset in pack file where <see cref="Entries"/> begins. This is only here because it makes rewriting the entries easier.
+	/// Offset in ggpk where <see cref="Entries"/> begins. This is only here because it makes rewriting the entries easier.
 	/// </summary>
-	protected internal long EntriesBegin;
+	protected internal long EntriesOffset;
+	/// <summary>
+	/// Children of this directory.
+	/// </summary>
+	protected internal TreeNode?[] Children;
 
 	/// <summary>
 	/// Read a DirectoryRecord from GGPK
@@ -70,7 +76,7 @@ public class DirectoryRecord : TreeNode {
 		Offset = s.Position - 8;
 		var nameLength = s.Read<int>() - 1; // '\0'
 		var totalEntries = s.Read<int>();
-		s.Read(out Hash);
+		s.Read(out _Hash);
 		if (Ggpk.Record.GGPKVersion == 4) {
 			Span<byte> b = stackalloc byte[nameLength * sizeof(int)]; // UTF32
 			s.ReadExactly(b);
@@ -80,8 +86,10 @@ public class DirectoryRecord : TreeNode {
 			Name = s.ReadString(nameLength);
 			s.Seek(sizeof(char), SeekOrigin.Current); // Null terminator
 		}
-		EntriesBegin = s.Position;
-		s.Read(Entries = new Entry[totalEntries]);
+		EntriesOffset = s.Position;
+		Entries = new Entry[totalEntries];
+		Children = new TreeNode?[totalEntries];
+		s.Read(Entries);
 	}
 
 	/// <summary>
@@ -91,67 +99,51 @@ public class DirectoryRecord : TreeNode {
 		Name = name;
 		ThrowIfNameContainsSlash();
 		Entries = [];
+		Children = [];
 		Length = CaculateRecordLength();
 	}
 
-	protected internal Dictionary<uint, TreeNode>? _Children;
-	[MemberNotNull(nameof(_Children))]
-	public virtual IEnumerable<TreeNode> Children {
-		get {
-			if (_Children?.Count == Entries.Length)
-				return _Children.Values;
+	/// <summary>
+	/// Child count of this directory.
+	/// </summary>
+	public virtual int Count => Entries.Length;
 
-			[MemberNotNull(nameof(_Children))] // Not working here...
-			IEnumerable<TreeNode> GetChildren() {
-				if (_Children is null) {
-					_Children = new(Entries.Length);
-					foreach (var e in Entries) {
-						var node = (TreeNode)Ggpk.ReadRecord(e.Offset);
-						node.Parent = this;
-						node._NameHash = e.NameHash;
-						_Children[e.NameHash] = node;
-						yield return node;
-					}
-				} else {
-					foreach (var e in Entries) {
-						if (!_Children.TryGetValue(e.NameHash, out var node)) {
-							node = (TreeNode)Ggpk.ReadRecord(e.Offset);
-							node.Parent = this;
-							_Children[e.NameHash] = node;
-						}
-						yield return node;
-					}
-				}
-			}
-#pragma warning disable CS8774 // _Children was set in GetChildren()
-			return GetChildren();
-#pragma warning restore CS8774
-		}
+	public virtual TreeNode this[int index] => Children[index] ??= ReadNode(Entries[index]);
+	protected virtual TreeNode ReadNode(Entry entry) {
+		var node = (TreeNode)Ggpk.ReadRecord(entry.Offset);
+		node.Parent = this;
+		node._NameHash = entry.NameHash;
+		return node;
 	}
+	public struct Enumerator(DirectoryRecord directory) : IEnumerator<TreeNode> {
+		private int index = -1;
+
+		public readonly TreeNode Current => directory[index];
+		readonly object IEnumerator.Current => Current;
+
+		public bool MoveNext() => (uint)++index < (uint)directory.Count;
+		public void Reset() => index = -1;
+		public readonly void Dispose() { }
+	}
+	public virtual Enumerator GetEnumerator() => new(this);
+	IEnumerator<TreeNode> IEnumerable<TreeNode>.GetEnumerator() => GetEnumerator();
+	IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
 	/// <summary>
-	/// Get child with the given namehash
+	/// Get child with the given <paramref name="nameHash"/> which can be gotten from <see cref="TreeNode.GetNameHash"/> or <see cref="TreeNode.NameHash"/>.
 	/// </summary>
-	/// <param name="nameHash">namehash calculated from <see cref="TreeNode.GetNameHash"/> or <see cref="TreeNode.NameHash"/></param>
-	[MemberNotNull(nameof(_Children))]
 	public TreeNode? this[uint nameHash] {
 		get {
-			_Children ??= new(Entries.Length);
-			if (!_Children.TryGetValue(nameHash, out var node)) {
-				var i = Entries.AsSpan().BinarySearch((Entry.NameHashWrapper)nameHash);
-				if (i < 0)
-					return null;
-				node = (TreeNode)Ggpk.ReadRecord(Entries[i].Offset);
-				node.Parent = this;
-				_Children[nameHash] = node;
-			}
-			return node;
+			var i = Entries.AsSpan().BinarySearch((Entry.NameHashWrapper)nameHash);
+			if (i < 0)
+				return null;
+			return this[i];
 		}
 	}
-	[MemberNotNull(nameof(_Children))]
-#pragma warning disable CS8774 // _Children was set in this[uint nameHash]
+	/// <summary>
+	/// Get child with the given <paramref name="name"/>.
+	/// </summary>
 	public TreeNode? this[ReadOnlySpan<char> name] => this[GetNameHash(name)];
-#pragma warning restore CS8774
 
 	/// <summary>
 	/// Add a directory to this directory (which can't be <see cref="GGPK.Root"/>)
@@ -160,52 +152,51 @@ public class DirectoryRecord : TreeNode {
 	/// <param name="dontThrowIfExist">
 	/// <see langword="true"/> to return the existing <see cref="DirectoryRecord"/> if one with the same name already exists.<br />
 	/// <see langword="false"/> or if the existing one isn't <see cref="DirectoryRecord"/>, throws <see cref="InvalidOperationException"/>.
-	/// </param>-->
+	/// </param>
+	/// <returns>The <see cref="DirectoryRecord"/> added/existed</returns>
+	/// <remarks>
+	/// Do not call this method on <see cref="GGPK.Root"/>, otherwise it will break the GGPK when the game starts.
+	/// </remarks>
+	/// <exception cref="DuplicateNameException"/>
 	public virtual DirectoryRecord AddDirectory(string name, bool dontThrowIfExist = false) {
 		var dir = new DirectoryRecord(name, Ggpk) { Parent = this };
 		var i = AddNode(dir);
-		if (i < 0) {
-			if (!dontThrowIfExist)
-				Throw();
-			dir = this[Entries[~i].NameHash] as DirectoryRecord;
-			if (dir is null)
-				Throw();
-		}
-		return dir!;
-
-		void Throw() {
-			throw new InvalidOperationException($"A file/directory with the same name already exists: {GetPath()}{name}");
-		}
+		if (i < 0 && (!dontThrowIfExist || (dir = this[Entries[~i].NameHash] as DirectoryRecord) is null))
+			ThrowExist(name);
+		return dir;
 	}
-
 	/// <summary>
-	/// Add a file to this directory (which can't be <see cref="GGPK.Root"/>)
+	/// Add a file to this directory.
 	/// </summary>
 	/// <param name="name">Name of the file</param>
-	/// <param name="content">Content of the file</param>
-	/// <param name="overwrite">
-	/// Whether to overwrite the existing <see cref="FileRecord"/> with the same name.
+	/// <param name="preallocatedSize">
+	/// Size in bytes of the file content which will be passed to <see cref="FileRecord.Write"/> later by the caller.
+	/// Not used when one with the same name already exists.
+	/// </param>
+	/// <param name="dontThrowIfExist">
+	/// Whether to return the existing <see cref="FileRecord"/> with the same name instead of throwing an exception.
 	/// <para>Note that this still throws if the existing node isn't <see cref="FileRecord"/>.</para>
 	/// </param>
-	/// <returns>The <see cref="FileRecord"/> added/overwritten</returns>
-	public virtual FileRecord AddFile(string name, ReadOnlySpan<byte> content = default, bool overwrite = false) {
-		var file = new FileRecord(name, Ggpk) { Parent = this };
-		file.Length += file.DataLength = content.Length;
-		if (!SHA256.TryHashData(content, file.Hash.AsSpan(), out _))
-			ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < LENGTH_OF_HASH
+	/// <returns>The <see cref="FileRecord"/> added/existed</returns>
+	/// <remarks>
+	/// Do not call this method on <see cref="GGPK.Root"/>, otherwise it will break the GGPK when the game starts.
+	/// </remarks>
+	/// <exception cref="DuplicateNameException"/>
+	public virtual FileRecord AddFile(string name, int preallocatedSize = 0, bool dontThrowIfExist = false) {
+		var file = new FileRecord(name, Ggpk) {
+			Parent = this,
+			DataLength = preallocatedSize
+		};
+		file.Length += preallocatedSize;
 		var i = AddNode(file);
-		if (i < 0) {
-			if (!overwrite || this[Entries[~i].NameHash] is not FileRecord fr)
-				throw ThrowHelper.Create<InvalidOperationException>("A file/directory with the same name already exists: " + GetPath() + name);
-			fr.Write(content);
-			return fr;
-		}
-		if (!content.IsEmpty)
-			lock (Ggpk.baseStream) {
-				Ggpk.baseStream.Position = file.DataOffset;
-				Ggpk.baseStream.Write(content);
-			}
+		if (i < 0 && (!dontThrowIfExist || (file = this[Entries[~i].NameHash] as FileRecord) is null))
+			ThrowExist(name);
 		return file;
+	}
+	/// <exception cref="DuplicateNameException"/>
+	[DoesNotReturn]
+	internal void ThrowExist(string name) {
+		throw new DuplicateNameException($"A file/directory with the same name already exists: {GetPath()}{name}");
 	}
 
 	/// <summary>
@@ -218,7 +209,7 @@ public class DirectoryRecord : TreeNode {
 		var i = InsertEntry(new(node.NameHash, -1)); // Entry.Offset will be set in `node.WriteWithNewLength(node.Length)` which calls TreeNode.UpdateOffset()
 		if (i < 0)
 			return i;
-		(_Children ??= new(Entries.Length)).Add(node.NameHash, node);
+		Children[i] = node;
 		WriteWithNewLength();
 		node.WriteWithNewLength(node.Length);
 		return i;
@@ -228,20 +219,13 @@ public class DirectoryRecord : TreeNode {
 	/// The index of the entry is inserted, or ~index of the existing entry with the same namehash if failed to insert.
 	/// </returns>
 	protected internal virtual int InsertEntry(in Entry entry) {
-		if (this == Ggpk.Root)
-			ThrowHelper.Throw<InvalidOperationException>("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
+		Debug.Assert(this != Ggpk.Root, "Warning: You shouldn't change child elements of the root folder, otherwise it will break the GGPK when the game starts.");
 		var i = ~Entries.AsSpan().BinarySearch((Entry.NameHashWrapper)entry.NameHash);
 		if (i < 0) // Exist
 			return i;
 
-		// Array.Insert(ref Entries, i, entry)
-		var tmp = Entries;
-		Entries = new Entry[tmp.Length + 1];
-		if (i != 0)
-			Array.Copy(tmp, 0, Entries, 0, i);
-		Entries[i] = entry;
-		if (i != tmp.Length)
-			Array.Copy(tmp, i, Entries, i + 1, tmp.Length - i);
+		Entries = Entries.Insert(i, entry);
+		Children = Children.Insert(i, null);
 		WriteWithNewLength();
 		return i;
 	}
@@ -252,20 +236,13 @@ public class DirectoryRecord : TreeNode {
 	/// <param name="nameHash"><see cref="TreeNode.NameHash"/> or namehash calculated from <see cref="TreeNode.GetNameHash"/></param>
 	/// <returns>The index of the entry is removed, or ~index of the first entry with a larger namehash if not found</returns>
 	protected internal virtual int RemoveEntry(uint nameHash) {
-		if (this == Ggpk.Root)
-			ThrowHelper.Throw<InvalidOperationException>("You can't change child elements of the root folder, otherwise it will break the GGPK when the game starts");
+		Debug.Assert(this != Ggpk.Root, "Warning: You shouldn't change child elements of the root folder, otherwise it will break the GGPK when the game starts.");
 		var i = Entries.AsSpan().BinarySearch((Entry.NameHashWrapper)nameHash);
 		if (i < 0) // Not found
 			return i;
-		_Children?.Remove(nameHash);
 
-		// Array.RemoveAt(ref Entries, i)
-		var tmp = Entries;
-		Entries = new Entry[tmp.Length - 1];
-		if (i != 0)
-			Array.Copy(tmp, 0, Entries, 0, i);
-		if (i != Entries.Length)
-			Array.Copy(tmp, i + 1, Entries, i, Entries.Length - i);
+		Entries = Entries.RemoveAt(i);
+		Children = Children.RemoveAt(i);
 		WriteWithNewLength();
 		return i;
 	}
@@ -301,7 +278,7 @@ public class DirectoryRecord : TreeNode {
 			s.Write(Name);
 			s.Write<short>(0); // Null terminator
 		}
-		EntriesBegin = s.Position;
+		EntriesOffset = s.Position;
 		s.Write(Entries);
 	}
 
@@ -311,13 +288,13 @@ public class DirectoryRecord : TreeNode {
 	protected internal unsafe void RenewHash() {
 		var combination = stackalloc Vector256<byte>[Entries.Length];
 		var i = 0;
-		foreach (var n in Children)
+		foreach (var n in this)
 			combination[i++] = n.Hash;
-		if (!SHA256.TryHashData(new ReadOnlySpan<byte>((byte*)combination, LENGTH_OF_HASH * Entries.Length), Hash.AsSpan(), out _))
-			ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // _Hash.Length < LENGTH_OF_HASH
+		if (!SHA256.TryHashData(new ReadOnlySpan<byte>((byte*)combination, LENGTH_OF_HASH * Entries.Length), _Hash.AsSpan(), out _))
+			ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // Hash.Length < LENGTH_OF_HASH (== sizeof(Vector256<byte>) == 32)
 		var s = Ggpk.baseStream;
 		lock (s) {
-			s.Position = sizeof(int) * 4;
+			s.Position = Offset + sizeof(int) * 4L;
 			s.Write(Hash);
 		}
 	}

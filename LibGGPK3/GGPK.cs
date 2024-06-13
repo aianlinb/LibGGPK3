@@ -12,8 +12,6 @@ using SystemExtensions;
 using SystemExtensions.Spans;
 using SystemExtensions.Streams;
 
-using File = System.IO.File;
-
 [module: SkipLocalsInit]
 [assembly: InternalsVisibleTo("LibBundledGGPK3")]
 
@@ -24,6 +22,7 @@ namespace LibGGPK3;
 public class GGPK : IDisposable {
 	protected internal readonly Stream baseStream;
 	protected readonly bool leaveOpen;
+	protected internal readonly HashSet<DirectoryRecord> dirtyHashes = [];
 	/// <summary>
 	/// Contains information about the ggpk file
 	/// </summary>
@@ -315,7 +314,7 @@ public class GGPK : IDisposable {
 		} else {
 			var count = 0;
 			Directory.CreateDirectory(path);
-			foreach (var f in ((DirectoryRecord)record).Children)
+			foreach (var f in (DirectoryRecord)record)
 				count += Extract(f, path);
 			return count;
 		}
@@ -337,22 +336,42 @@ public class GGPK : IDisposable {
 			if (!Directory.Exists(path))
 				return 0;
 			var sum = 0;
-			foreach (var r in ((DirectoryRecord)record).Children)
+			foreach (var r in (DirectoryRecord)record)
 				sum += Replace(r, $"{path}/{r.Name}");
-			if (sum != 0 && record != record.Ggpk.Root) // Keep the hash of ROOT original to prevent the game from starting patching
-				((DirectoryRecord)record).RenewHash();
 			return sum;
 		}
 	}
 
 	protected virtual void EnsureNotDisposed() => ObjectDisposedException.ThrowIf(!baseStream.CanRead, this);
 
+	/// <summary>
+	/// Renew the hashes of all directories after modification.
+	/// </summary>
+	/// <param name="forceRenewRoot">
+	/// The Hash of <see cref="Root"/> and its children won't be renew by default, <see langword="true"/> to force renew them
+	/// (this will cause the game to start patching on startup and revert all modifications to ggpk).
+	/// </param>
+	/// <remarks>
+	/// This will be automatically called when <see cref="Dispose"/>.
+	/// </remarks>
+	public virtual void RenewHashes(bool forceRenewRoot = false) {
+		EnsureNotDisposed();
+		lock (baseStream) {
+			dirtyHashes.Remove(null!);
+			if (!forceRenewRoot)
+				dirtyHashes.Remove(Root); // Keep the hash of ROOT original to prevent the game from starting patching
+			foreach (var dr in dirtyHashes)
+				if (forceRenewRoot || dr.Parent != Root) // Keep the hash of directories under ROOT original to prevent the game from starting patching
+					dr.RenewHash();
+			dirtyHashes.Clear();
+		}
+	}
+
 	public virtual void Dispose() {
 		GC.SuppressFinalize(this);
-		try {
-			if (!leaveOpen)
-				baseStream?.Close();
-		} catch { /*Closing closed stream*/ }
+		RenewHashes();
+		if (!leaveOpen)
+			baseStream.Close();
 		if (_FreeRecords is not null) {
 			_FreeRecords.Clear();
 			_FreeRecords = null;

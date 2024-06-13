@@ -2,8 +2,6 @@
 
 using LibBundle3.Records;
 
-using File = System.IO.File;
-
 namespace LibBundle3;
 public class DriveBundleFactory : IBundleFileFactory {
 	/// <summary>

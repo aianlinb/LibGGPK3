@@ -28,14 +28,23 @@ public class ServerBundleFactory(string baseDirectory, string patchCdnUrl) : Dri
 		var path = BaseDirectory + rp;
 		if (File.Exists(path))
 			return new(path, record); // base.GetBundle(record)
+		return new(Download("Bundles2/" + rp), false, record);
+	}
 
-		using var res = http.Send(new(HttpMethod.Get, rp));
+	private FileStream Download(string path) {
+		using var res = http.Send(new(HttpMethod.Get, path));
 		if (!res.IsSuccessStatusCode)
-			throw ThrowHelper.Create<HttpRequestException>($"Failed to download bundle ({res.StatusCode}): {rp}");
+			ThrowHelper.Throw<HttpRequestException>($"Failed to download file ({res.StatusCode}): {path}");
 		var fs = File.Create(path);
 		using (var s = res.Content.ReadAsStream())
 			s.CopyTo(fs);
-		return new(fs, false, record);
+		return fs;
+	}
+	/// <summary>
+	/// Downloads the "Bundles2/_.index.bin" file and saves it to the baseDirectory
+	/// </summary>
+	public void DownloadIndex() {
+		Download("Bundles2/_.index.bin").Dispose();
 	}
 
 	public virtual void Dispose() {
