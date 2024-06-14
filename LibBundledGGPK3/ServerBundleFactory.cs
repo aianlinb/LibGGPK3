@@ -14,7 +14,7 @@ namespace LibBundledGGPK3;
 /// <remarks>
 /// Remember to call <see cref="Dispose"/> when done.
 /// </remarks>
-/// <param name="baseDirectory">Path on drive to save the downloaded bundles</param>
+/// <param name="baseDirectory">Path of "Bundles2" (parent of _.index.bin) on the drive.</param>
 /// <param name="patchCdnUrl">Can get from <see cref="LibGGPK3.PatchClient.GetPatchCdnUrl"/></param>
 public class ServerBundleFactory(string baseDirectory, string patchCdnUrl) : DriveBundleFactory(baseDirectory), IDisposable {
 	public Uri CdnUrl => http.BaseAddress!;
@@ -28,14 +28,16 @@ public class ServerBundleFactory(string baseDirectory, string patchCdnUrl) : Dri
 		var path = BaseDirectory + rp;
 		if (File.Exists(path))
 			return new(path, record); // base.GetBundle(record)
-		return new(Download("Bundles2/" + rp), false, record);
+		return new(Download(rp), false, record);
 	}
 
-	private FileStream Download(string path) {
-		using var res = http.Send(new(HttpMethod.Get, path));
+	/// <param name="bundlePath">Relative path of the bundle which ends with ".bundle.bin"</param>
+	private Stream Download(string bundlePath) {
+		using var res = http.Send(new(HttpMethod.Get, "Bundles2/" + bundlePath));
 		if (!res.IsSuccessStatusCode)
-			ThrowHelper.Throw<HttpRequestException>($"Failed to download file ({res.StatusCode}): {path}");
-		var fs = File.Create(path);
+			ThrowHelper.Throw<HttpRequestException>($"Failed to download file ({(int)res.StatusCode} {res.StatusCode}): {bundlePath}");
+
+		var fs = CreateBundle(bundlePath);
 		using (var s = res.Content.ReadAsStream())
 			s.CopyTo(fs);
 		return fs;
@@ -44,7 +46,7 @@ public class ServerBundleFactory(string baseDirectory, string patchCdnUrl) : Dri
 	/// Downloads the "Bundles2/_.index.bin" file and saves it to the baseDirectory
 	/// </summary>
 	public void DownloadIndex() {
-		Download("Bundles2/_.index.bin").Dispose();
+		Download("_.index.bin").Dispose();
 	}
 
 	public virtual void Dispose() {

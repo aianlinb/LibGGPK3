@@ -247,7 +247,6 @@ public class PatchClient : IDisposable {
 	public virtual async Task<int> UpdateNode(TreeNode node) {
 		string path;
 		if (node == node.Ggpk.Root) {
-			Debug.WriteLine("ROOT");
 			path = string.Empty;
 		} else {
 			path = node.Parent!.GetPath().TrimEnd('/');
@@ -260,14 +259,12 @@ public class PatchClient : IDisposable {
 		return await UpdateCore(node, path).ConfigureAwait(false);
 		async Task<int> UpdateCore(TreeNode node, string path) {
 			if (node is FileRecord fr) {
-				Debug.WriteLine("Updating: " + path);
 				using var res = await http.GetAsync(path).ConfigureAwait(false);
 				var b = await res.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
 				fr.Write(b);
 				return 1;
 			}
 
-			Debug.WriteLine("Dir: " + path);
 			var root = path.Length == 0;
 			var entries = await QueryDirectoryAsync(path).ConfigureAwait(false);
 			if (root) {
