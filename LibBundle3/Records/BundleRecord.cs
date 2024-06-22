@@ -73,7 +73,7 @@ public class BundleRecord {
 	/// <summary>
 	/// Size of the content when <see cref="Serialize"/> to <see cref="Index"/>
 	/// </summary>
-	protected internal int RecordLength => Encoding.UTF8.GetByteCount(_Path) + (sizeof(int) + sizeof(int));
+	protected internal int RecordLength => _Path.Length + (sizeof(int) + sizeof(int));
 	/// <summary>
 	/// Function to serialize the record to <see cref="Index"/>
 	/// </summary>

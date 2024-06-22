@@ -11,6 +11,9 @@ using SystemExtensions;
 using SystemExtensions.Streams;
 
 namespace LibBundle3;
+/// <remarks>
+/// Read/Save are not thread-safe.
+/// </remarks>
 public class Bundle : IDisposable {
 	/// <summary>
 	/// Metadata of a bundle file which is stored at the beginning of the file in 60 bytes
@@ -306,7 +309,7 @@ public class Bundle : IDisposable {
 		Oodle.Initialize(new() { ChunkSize = metadata.chunk_size, Compressor = metadata.compressor, CompressionLevel = compressionLevel, EnableCompressing = true });
 		metadata.uncompressed_size_long = metadata.uncompressed_size = newContent.Length;
 		metadata.chunk_count = metadata.uncompressed_size / metadata.chunk_size;
-		if (metadata.uncompressed_size % metadata.chunk_size != 0)
+		if (metadata.uncompressed_size > metadata.chunk_count * metadata.chunk_size)
 			++metadata.chunk_count;
 		metadata.head_size = metadata.chunk_count * sizeof(int) + (sizeof(Header) - sizeof(int) * 3);
 		baseStream.Position = (sizeof(int) * 3) + metadata.head_size;

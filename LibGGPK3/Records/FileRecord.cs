@@ -116,8 +116,9 @@ public class FileRecord : TreeNode {
 		var s = Ggpk.baseStream;
 		lock (s) {
 			if (newContent.Length != DataLength) { // Replace a FreeRecord
+				var diff = newContent.Length - DataLength;
 				DataLength = newContent.Length;
-				WriteWithNewLength();
+				WriteWithNewLength(Length + diff);
 				// Offset and DataOffset will be set by WriteRecordData() in above line
 			} else {
 				s.Position = Offset + sizeof(int) * 3;

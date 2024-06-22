@@ -38,9 +38,11 @@ public class Index : IDisposable {
 	protected internal readonly DirectoryRecord[] _Directories;
 	protected readonly Dictionary<ulong, FileRecord> _Files;
 
-	public virtual ReadOnlySpan<BundleRecord> Bundles => _Bundles;
-	protected ReadOnlyDictionary<ulong, FileRecord>? _readonlyFiles;
-	public virtual ReadOnlyDictionary<ulong, FileRecord> Files => _readonlyFiles ??= new(_Files);
+	public virtual ReadOnlyMemory<BundleRecord> Bundles => _Bundles;
+	/// <summary>
+	/// Files with their <see cref="FileRecord.PathHash"/> as key.
+	/// </summary>
+	public virtual ReadOnlyDictionary<ulong, FileRecord> Files => new(_Files);
 
 	protected internal readonly IBundleFileFactory bundleFactory;
 	/// <summary>
@@ -591,21 +593,6 @@ public class Index : IDisposable {
 		return b;
 	}
 
-	/*/// <summary>
-	/// Get an available bundle with smallest uncompressed_size
-	/// </summary>
-	public virtual BundleRecord GetSmallestBundle() {
-		EnsureNotDisposed();
-		var br = _Bundles.MinBy(b => b.UncompressedSize) ?? throw new("Unable to find an available bundle");
-		if (br.TryGetBundle(out var b))
-			return b;
-
-		var list = _Bundles.OrderBy(b => b.UncompressedSize);
-		foreach (var b in list)
-			if (br.TryGetBundle(out var b))
-				return b;
-		throw new("Unable to find an available bundle");
-	}*/
 	/// <summary>
 	/// Create a new bundle and add it to <see cref="Bundles"/> using <see cref="IBundleFileFactory.CreateBundle"/>
 	/// </summary>
@@ -617,7 +604,7 @@ public class Index : IDisposable {
 		var b = new Bundle(bundleFactory.CreateBundle(bundlePath + ".bundle.bin"), br);
 		Array.Resize(ref _Bundles, len + 1);
 		_Bundles[len] = br;
-		baseBundle.UncompressedSize += br.RecordLength; // Hack to prevent MemoryStream from reallocating in next line
+		baseBundle.UncompressedSize += br.RecordLength; // Hack to prevent MemoryStream from reallocating when saving
 		return b;
 	}
 
@@ -702,12 +689,12 @@ public class Index : IDisposable {
 					hash = (hash ^ ch) * FNV_prime;
 			} else
 				foreach (ulong ch in utf8Str) {
-					if (ch is < 91 and >= 65)
-						hash = (hash ^ (ch + 32)) * FNV_prime; // ToLower
+					if (ch is >= 'A' and <= 'Z')
+						hash = (hash ^ (ch + (ulong)('A' - 'a'))) * FNV_prime; // ToLower
 					else
 						hash = (hash ^ ch) * FNV_prime;
 				}
-			return (((hash ^ 43) * FNV_prime) ^ 43) * FNV_prime; // "++" ('+' == 43)
+			return (((hash ^ '+') * FNV_prime) ^ '+') * FNV_prime; // filenames end with two '+'
 		}
 	}
 	#endregion NameHashing
@@ -773,9 +760,8 @@ public class Index : IDisposable {
 
 	public virtual void Dispose() {
 		GC.SuppressFinalize(this);
-		baseBundle?.Dispose();
+		baseBundle.Dispose();
 		_Bundles = null!;
-		_readonlyFiles = null;
 		_Root = null;
 	}
 

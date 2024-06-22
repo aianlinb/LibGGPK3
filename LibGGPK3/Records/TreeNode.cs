@@ -50,25 +50,26 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 			var original = Offset == default ? null : MarkAsFree();
 
 			Length = newLength;
-			specify ??= Ggpk.FindBestFreeRecord(Length);
+			specify ??= Ggpk.FindBestFreeRecord(newLength);
 			if (specify is null) {
 				s.Seek(0, SeekOrigin.End); // Write to the end of GGPK
 				WriteRecordData();
 			} else {
 				var free = specify.Value;
-				if (free.Length < Length + 16 && free.Length != Length)
+				if (free == original?.Value)
+					original = null;
+
+				if (free.Length < newLength + 16 && free.Length != newLength)
 					throw new ArgumentException("The length of specified FreeRecord must not be between Length and Length-16 (exclusive): " + free.Length, nameof(specify));
 				s.Position = free.Offset;
 				WriteRecordData();
-				free.Length -= Length;
+				free.Length -= newLength;
 				if (free.Length >= 16) { // Update length of FreeRecord
-					s.Position = free.Offset + Length;
+					s.Position = free.Offset + newLength;
 					free.WriteRecordData();
 					free.UpdateOffset();
 				} else // free.Length == 0
 					free.RemoveFromList(specify);
-				if (free == original?.Value)
-					return null;
 			}
 
 			UpdateOffset();
@@ -273,12 +274,11 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 					yield return tt;
 	}
 
-	[System.Diagnostics.DebuggerNonUserCode]
 	protected void ThrowIfNameContainsSlash() {
 		if (Name.Contains('/'))
 			Throw();
 
-		[DoesNotReturn, System.Diagnostics.DebuggerNonUserCode]
+		[DoesNotReturn, DebuggerNonUserCode]
 		static void Throw() {
 			throw new ArgumentException("Name cannot contain '/'", "name");
 		}

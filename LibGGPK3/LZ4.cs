@@ -76,8 +76,7 @@ public static class LZ4 {
 		}
 	}
 
-	[DoesNotReturn]
-	[DebuggerNonUserCode]
+	[DoesNotReturn, DebuggerNonUserCode]
 	private static void ThrowOffsetTooLarge() {
 		throw new InvalidDataException("Attempt to seek before the beginning of the output span.\nOr the extDict provided is not long enough.");
 	}

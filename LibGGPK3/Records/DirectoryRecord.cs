@@ -194,7 +194,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 		return file;
 	}
 	/// <exception cref="DuplicateNameException"/>
-	[DoesNotReturn]
+	[DoesNotReturn, DebuggerNonUserCode]
 	internal void ThrowExist(string name) {
 		throw new DuplicateNameException($"A file/directory with the same name already exists: {GetPath()}{name}");
 	}

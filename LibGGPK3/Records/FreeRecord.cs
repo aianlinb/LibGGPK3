@@ -41,7 +41,7 @@ public class FreeRecord : BaseRecord {
 		s.Write(Length);
 		s.Write(Tag);
 		s.Write(NextFreeOffset);
-		s.Seek(Length - sizeof(long) * 2, SeekOrigin.Current);
+		s.Seek(Length - (sizeof(int) + sizeof(int) + sizeof(long)), SeekOrigin.Current);
 	}
 
 	/// <summary>

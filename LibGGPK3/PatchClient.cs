@@ -304,8 +304,7 @@ public class PatchClient : IDisposable {
 	}
 
 	/// <exception cref="InvalidDataException"/>
-	[DoesNotReturn]
-	[DebuggerNonUserCode]
+	[DoesNotReturn, DebuggerNonUserCode]
 	protected static void ThrowInvalidOpcode() {
 		throw new InvalidDataException("Invalid response opcode");
 	}
