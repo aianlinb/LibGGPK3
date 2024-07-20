@@ -3,7 +3,6 @@ using System.Buffers;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
-using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Reflection;
@@ -115,21 +114,29 @@ public class MainWindow : Form {
 			path = Path.GetDirectoryName(Environment.ProcessPath);
 		if (!string.IsNullOrEmpty(path))
 			Environment.CurrentDirectory = path;
-		try {
-			var args = Environment.GetCommandLineArgs();
-			if (args.Length > 1 && File.Exists(Path.GetFullPath(args[1])))
-				ggpkPath.Text = args[1];
-			else if (File.Exists("VPatchGGPK3.txt"))
-				ggpkPath.Text = File.ReadAllText("VPatchGGPK3.txt");
-			else if (OperatingSystem.IsMacOS())
-				ggpkPath.Text = "~/Library/Application Support/Path of Exile/Content.ggpk";
-			else if (OperatingSystem.IsWindows())
-				ggpkPath.Text = @"C:\Program Files (x86)\Grinding Gear Games\Path of Exile\Content.ggpk";
-		} catch {
-			if (OperatingSystem.IsMacOS())
-				ggpkPath.Text = "~/Library/Application Support/Path of Exile/Content.ggpk";
-			else if (OperatingSystem.IsWindows())
-				ggpkPath.Text = @"C:\Program Files (x86)\Grinding Gear Games\Path of Exile\Content.ggpk";
+
+		var args = Environment.GetCommandLineArgs();
+		if (args.Length > 1 && TrySetPath(Path.GetFullPath(args[1])))
+			return;
+
+		if (File.Exists("VPatchGGPK3.txt")) {
+			try {
+				if (TrySetPath(File.ReadAllText("VPatchGGPK3.txt")))
+					return;
+			} catch { /*No permission ro read*/ }
+		}
+
+		if (OperatingSystem.IsMacOS() && TrySetPath("~/Library/Application Support/Path of Exile/Content.ggpk"))
+			return;
+		if (OperatingSystem.IsWindows())
+			TrySetPath(@"C:\Program Files (x86)\Grinding Gear Games\Path of Exile\Content.ggpk");
+
+		bool TrySetPath(string path) {
+			if (File.Exists(path)) {
+				ggpkPath.Text = path;
+				return true;
+			}
+			return false;
 		}
 	}
 
@@ -170,10 +177,16 @@ public class MainWindow : Form {
 			foreach (var entry in zip.Entries) {
 				if (entry.FullName.EndsWith('/')) // directory
 					continue;
-				if (!ggpk.TryFindNode(entry.FullName, out var node) || node is not FileRecord fr) {
-					output.Append("Not found in ggpk: " + entry.FullName + "\r\n", true);
+
+				var notExist = !ggpk.TryFindNode(entry.FullName, out var node);
+				FileRecord fr;
+				if (notExist) {
+					fr = ggpk.FindOrAddFile(entry.FullName, preallocatedSize: (int)entry.Length);
+				} else if ((fr = (node as FileRecord)!) is null) {
+					output.Append("Error: A directory exists with the same path of the file: " + entry.FullName + "\r\n", true);
 					continue;
 				}
+
 				await Task.Run(() => {
 					var len = (int)entry.Length;
 					var b = ArrayPool<byte>.Shared.Rent(len);
@@ -185,7 +198,7 @@ public class MainWindow : Form {
 						ArrayPool<byte>.Shared.Return(b);
 					}
 				});
-				output.Append("Replaced: " + entry.FullName + "\r\n", true);
+				output.Append((notExist ? "Added: " : "Replaced: ") + entry.FullName + "\r\n", true);
 			}
 			output.Append("\r\nDone!\r\n", true);
 			output.Append("中文化完成!\r\n", true);

@@ -155,7 +155,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// </param>
 	/// <returns>The <see cref="DirectoryRecord"/> added/existed</returns>
 	/// <remarks>
-	/// Do not call this method on <see cref="GGPK.Root"/>, otherwise it will break the GGPK when the game starts.
+	/// Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
 	/// </remarks>
 	/// <exception cref="DuplicateNameException"/>
 	public virtual DirectoryRecord AddDirectory(string name, bool dontThrowIfExist = false) {
@@ -179,7 +179,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// </param>
 	/// <returns>The <see cref="FileRecord"/> added/existed</returns>
 	/// <remarks>
-	/// Do not call this method on <see cref="GGPK.Root"/>, otherwise it will break the GGPK when the game starts.
+	/// Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
 	/// </remarks>
 	/// <exception cref="DuplicateNameException"/>
 	public virtual FileRecord AddFile(string name, int preallocatedSize = 0, bool dontThrowIfExist = false) {
@@ -205,6 +205,9 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// <returns>
 	/// The index of the entry is inserted, or ~index of the existing entry with the same namehash if failed to insert.
 	/// </returns>
+	/// <remarks>
+	/// Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
+	/// </remarks>
 	protected virtual int AddNode(TreeNode node) {
 		var i = InsertEntry(new(node.NameHash, -1)); // Entry.Offset will be set in `node.WriteWithNewLength(node.Length)` which calls TreeNode.UpdateOffset()
 		if (i < 0)
@@ -218,12 +221,13 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// <returns>
 	/// The index of the entry is inserted, or ~index of the existing entry with the same namehash if failed to insert.
 	/// </returns>
+	/// <remarks>
+	/// Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
+	/// </remarks>
 	protected internal virtual int InsertEntry(in Entry entry) {
-		Debug.Assert(this != Ggpk.Root, "Warning: You shouldn't change child elements of the root folder, otherwise it will break the GGPK when the game starts.");
 		var i = ~Entries.AsSpan().BinarySearch((Entry.NameHashWrapper)entry.NameHash);
 		if (i < 0) // Exist
 			return i;
-
 		Entries = Entries.Insert(i, entry);
 		Children = Children.Insert(i, null);
 		WriteWithNewLength();
@@ -235,12 +239,13 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// </summary>
 	/// <param name="nameHash"><see cref="TreeNode.NameHash"/> or namehash calculated from <see cref="TreeNode.GetNameHash"/></param>
 	/// <returns>The index of the entry is removed, or ~index of the first entry with a larger namehash if not found</returns>
+	/// <remarks>
+	/// Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
+	/// </remarks>
 	protected internal virtual int RemoveEntry(uint nameHash) {
-		Debug.Assert(this != Ggpk.Root, "Warning: You shouldn't change child elements of the root folder, otherwise it will break the GGPK when the game starts.");
 		var i = Entries.AsSpan().BinarySearch((Entry.NameHashWrapper)nameHash);
 		if (i < 0) // Not found
 			return i;
-
 		Entries = Entries.RemoveAt(i);
 		Children = Children.RemoveAt(i);
 		WriteWithNewLength();

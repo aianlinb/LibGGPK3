@@ -54,7 +54,7 @@ public class FileRecord {
 		if (bundle is not null)
 			return bundle.Read(Offset, Size);
 		if (BundleRecord.TryGetBundle(out bundle, out var ex))
-			using (bundle) // TODO: BundlePool implementation
+			using (bundle) // TODO: Bundle cache implementation
 				return bundle.ReadWithoutCache(Offset, Size);
 		ex?.ThrowKeepStackTrace();
 		throw new FileNotFoundException("Failed to get bundle: " + BundleRecord.Path);
@@ -112,9 +112,9 @@ public class FileRecord {
 	/// Must call <see cref="Index.Save"/> to save changes after editing all files you want.
 	/// </summary>
 	public virtual void Redirect(BundleRecord bundle, int offset, int size) {
-		if (bundle.Index != BundleRecord.Index)
-			ThrowHelper.Throw<InvalidOperationException>("Attempt to redirect the file to a bundle in another index");
 		if (BundleRecord != bundle) {
+			if (bundle.Index != BundleRecord.Index)
+				ThrowHelper.Throw<InvalidOperationException>("Attempt to redirect the file to a bundle in another index");
 			BundleRecord._Files.Remove(this);
 			BundleRecord = bundle;
 			bundle._Files.Add(this);

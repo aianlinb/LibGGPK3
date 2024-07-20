@@ -3,6 +3,8 @@ using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 
+using LibBundle3.Records;
+
 using LibBundledGGPK3;
 
 namespace PatchBundledGGPK3;

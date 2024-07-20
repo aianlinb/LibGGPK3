@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Linq;
 
 using LibBundle3.Records;
 
@@ -33,6 +34,11 @@ public class DriveBundleFactory : IBundleFileFactory {
 		if (!File.Exists(bundlePath))
 			return false;
 		File.Delete(bundlePath);
+
+		var dir = Path.GetDirectoryName(bundlePath)!;
+		if (!Directory.EnumerateFileSystemEntries(dir).Any())
+			Directory.Delete(dir);
+
 		return true;
 	}
 }

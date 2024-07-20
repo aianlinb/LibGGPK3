@@ -48,7 +48,7 @@ public class Index : IDisposable {
 	/// <summary>
 	/// Size to limit each bundle when writing, default to 200MB
 	/// </summary>
-	public virtual int MaxBundleSize { get; set; } = 209715200;
+	public virtual int MaxBundleSize { get; set; } = 200 * 1024 * 1024;
 
 	protected DirectoryNode? _Root;
 	/// <summary>
@@ -113,7 +113,7 @@ public class Index : IDisposable {
 	/// and <see cref="Root"/> and <see cref="BuildTree"/> will be unable to use until you call <see cref="ParsePaths"/> manually.
 	/// </param>
 	/// <param name="bundleFactory">Factory to handle .bin files of <see cref="Bundle"/></param>
-	public unsafe Index(Stream stream, bool leaveOpen = true, bool parsePaths = true, IBundleFileFactory? bundleFactory = null) {
+	public unsafe Index(Stream stream, bool leaveOpen = false, bool parsePaths = true, IBundleFileFactory? bundleFactory = null) {
 		ArgumentNullException.ThrowIfNull(stream);
 		baseBundle = new(stream, leaveOpen);
 		this.bundleFactory = bundleFactory ?? new DriveBundleFactory(string.Empty);
@@ -215,8 +215,19 @@ public class Index : IDisposable {
 	/// </summary>
 	public virtual unsafe void Save() {
 		EnsureNotDisposed();
-		using var ms = new MemoryStream(baseBundle.UncompressedSize);
 
+		using var removed = new ValueList<BundleRecord>();
+		for (int i = 0; i < CustomBundles.Count; ++i) {
+			var br = CustomBundles[i];
+			if (br.Files.Count == 0) { // Empty bundle
+				CustomBundles.RemoveAt(i--);
+				_Bundles.RemoveAt(br.BundleIndex);
+				baseBundle.UncompressedSize -= br.RecordLength;
+				removed.Add(br);
+			}
+		}
+
+		using var ms = new MemoryStream(baseBundle.UncompressedSize);
 		ms.Write(_Bundles.Length);
 		foreach (var b in _Bundles)
 			b.Serialize(ms);
@@ -234,6 +245,9 @@ public class Index : IDisposable {
 
 		ms.Write(directoryBundleData, 0, directoryBundleData.Length);
 		baseBundle.Save(new(ms.GetBuffer(), 0, (int)ms.Length));
+
+		foreach (var br in removed)
+			bundleFactory.DeleteBundle(br.Path);
 	}
 
 	/// <summary>
@@ -447,23 +461,18 @@ public class Index : IDisposable {
 			dict.Add(f, zip);
 		}
 
-		byte[]? array = null;
-		try {
-			return Replace(dict.Keys, (FileRecord fr, int _, out ReadOnlySpan<byte> content) => {
-				if (array is not null)
-					ArrayPool<byte>.Shared.Return(array);
-				var zip = dict[fr];
-				var length = (int)zip.Length;
-				using var fs = zip.Open();
-				array = ArrayPool<byte>.Shared.Rent(length);
-				fs.ReadExactly(new(array, 0, length));
-				content = new(array, 0, length);
-				return true;
-			}, saveIndex);
-		} finally {
-			if (array is not null)
-				ArrayPool<byte>.Shared.Return(array);
-		}
+		using var renter = new ArrayPoolRenter<byte>(0);
+		var array = renter.Array;
+		return Replace(dict.Keys, (FileRecord fr, int _, out ReadOnlySpan<byte> content) => {
+			var zip = dict[fr];
+			var length = (int)zip.Length;
+			using var fs = zip.Open();
+			if (array.Length < length)
+				array = renter.Resize(length);
+			fs.ReadExactly(new(array, 0, length));
+			content = new(array, 0, length);
+			return true;
+		}, saveIndex);
 	}
 
 	/// <summary>
@@ -587,6 +596,7 @@ public class Index : IDisposable {
 					}
 				}
 				b = CreateBundle(path);
+				CustomBundles.Add(b.Record!);
 				originalSize = GetSize(b.Record!);
 			}
 		}

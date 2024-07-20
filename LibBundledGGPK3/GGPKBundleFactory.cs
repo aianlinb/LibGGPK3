@@ -32,8 +32,8 @@ public class GGPKBundleFactory(GGPK ggpk, DirectoryRecord bundles2) : IBundleFil
 		var dir = Bundles2;
 		var i = bundlePath.LastIndexOf('/');
 		if (i >= 0) {
-			dir = Ggpk.FindOrCreateDirectory(bundlePath.AsSpan(0, i), dir);
-			bundlePath = bundlePath[(i + 1)..];
+			dir = Ggpk.FindOrAddDirectory(bundlePath.AsSpan(0, i), dir);
+			bundlePath = bundlePath.Substring(i + 1);
 		}
 		return new GGFileStream(dir.AddFile(bundlePath, dontThrowIfExist: true));
 	}
@@ -44,6 +44,8 @@ public class GGPKBundleFactory(GGPK ggpk, DirectoryRecord bundles2) : IBundleFil
 		if (node is not FileRecord)
 			return false;
 		node.Remove();
+		if (node.Parent.Count == 0)
+			node.Parent.Remove();
 		return true;
 	}
 }

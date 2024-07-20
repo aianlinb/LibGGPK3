@@ -20,8 +20,8 @@ public static class Program {
 				args[0] = Console.ReadLine()!;
 				Console.Write("Path to zip file: ");
 				args[1] = Console.ReadLine()!;
-			} else if (args.Length != 2) {
-				Console.WriteLine("Usage: PatchGGPK3 <PathToGGPK> <ZipFile>");
+			} else if (args.Length != 2 && args.Length != 3) {
+				Console.WriteLine("Usage: PatchGGPK3 <PathToGGPK> <ZipFile> [allowAdd]");
 				Console.WriteLine();
 				Console.WriteLine("Enter to exit . . .");
 				Console.ReadLine();
@@ -41,6 +41,7 @@ public static class Program {
 				Console.ReadLine();
 				return;
 			}
+			var allowAdd = args.Length == 3 && args[2].Equals("allowAdd", StringComparison.InvariantCultureIgnoreCase);
 
 			Console.WriteLine("GGPK: " + args[0]);
 			Console.WriteLine("Patch file: " + args[1]);
@@ -54,13 +55,23 @@ public static class Program {
 			foreach (var entry in zip.Entries) {
 				if (entry.FullName.EndsWith('/'))
 					continue;
-				Console.Write("Replacing " + entry.FullName + " . . . ");
-				if (!ggpk.TryFindNode(entry.FullName, out var node) || node is not FileRecord fr) {
+
+				var notExist = !ggpk.TryFindNode(entry.FullName, out var node);
+				FileRecord fr;
+				if (notExist) {
+					if (!allowAdd) {
+						++failed;
+						Console.Error.WriteLine("Error: File not found in ggpk: " + entry.FullName);
+						continue;
+					}
+					fr = ggpk.FindOrAddFile(entry.FullName, preallocatedSize: (int)entry.Length);
+				} else if ((fr = (node as FileRecord)!) is null) {
 					++failed;
-					Console.WriteLine();
-					Console.WriteLine("Not found in GGPK!");
+					Console.Error.WriteLine("Error: A directory exists with the same path of the file: " + entry.FullName);
 					continue;
 				}
+
+				Console.Write((notExist ? "Adding: " : "Replacing: ") + entry.FullName + " . . . ");
 				var len = (int)entry.Length;
 				var b = ArrayPool<byte>.Shared.Rent(len);
 				try {

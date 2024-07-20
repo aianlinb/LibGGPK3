@@ -6,7 +6,7 @@
 	</PropertyGroup>
 	
 	<ItemGroup>
-		<PackageReference Include="aianlinb.SystemExtensions" Version="1.6.2" />
+		<PackageReference Include="aianlinb.SystemExtensions" Version="1.7.0" />
 	</ItemGroup>
 	
 </Project>

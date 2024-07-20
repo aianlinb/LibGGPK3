@@ -188,14 +188,12 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// <param name="directory">The new parent node to move to (which can't be <see cref="GGPK.Root"/>)</param>
 	/// <remarks>
 	/// <para><see cref="GGPK.Root"/> can't be moved.</para>
-	/// <para>Do not move the children of <see cref="GGPK.Root"/>, otherwise it will break the ggpk when the game starts.</para>
+	/// <para>Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.</para>
 	/// </remarks>
 	[MemberNotNull(nameof(Parent))]
 	public virtual void MoveTo(DirectoryRecord directory) {
 		if (this == Ggpk.Root)
 			ThrowHelper.Throw<InvalidOperationException>("You can't move the root directory");
-		Debug.Assert(Parent != Ggpk.Root && directory != Ggpk.Root, "Warning: You shouldn't change the children of the root directory, otherwise it will break the ggpk when the game starts.");
-		
 		var i = directory.InsertEntry(new(NameHash, Offset));
 		if (i < 0)
 			directory.ThrowExist(Name);
@@ -210,14 +208,13 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// </summary>
 	/// <remarks>
 	/// <para><see cref="GGPK.Root"/> can't be removed.</para>
-	/// <para>Do not remove the children of <see cref="GGPK.Root"/>, otherwise it will break the ggpk when the game starts.</para>
+	/// <para>Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.</para>
 	/// <para>Do not use any record instance of the removed nodes or its children after calling this, otherwise it may break the ggpk.</para>
 	/// </remarks>
 	[MemberNotNull(nameof(Parent))]
 	public virtual void Remove() {
 		if (this == Ggpk.Root)
 			ThrowHelper.Throw<InvalidOperationException>("You can't remove the root directory");
-		Debug.Assert(Parent != Ggpk.Root, "Warning: You shouldn't remove the children of the root directory, otherwise it will break the ggpk when the game starts.");
 		RemoveRecursively();
 		Parent!.RemoveEntry(NameHash);
 	}

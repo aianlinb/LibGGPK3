@@ -137,26 +137,40 @@ public class GGPK : IDisposable {
 	/// <summary>
 	/// Find the record with a <paramref name="path"/>, or create it if not found
 	/// </summary>
-	/// <param name="path">Relative path (with forward slash) in GGPK (which not start or end with slash) under <paramref name="root"/></param>
+	/// <param name="path">Relative path (with forward slashes) in GGPK under <paramref name="root"/></param>
 	/// <param name="root">Node to start searching, or null for <see cref="Root"/></param>
 	/// <returns>The node found</returns>
-	public virtual DirectoryRecord FindOrCreateDirectory(scoped ReadOnlySpan<char> path, DirectoryRecord? root = null) {
+	public virtual DirectoryRecord FindOrAddDirectory(scoped ReadOnlySpan<char> path, DirectoryRecord? root = null) {
 		EnsureNotDisposed();
 		root ??= Root;
 		if (path.IsEmpty)
 			return root;
-		foreach (var name in path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) {
-			var next = root[name];
-			if (next is DirectoryRecord dr)
-				root = dr;
-			else if (next is null)
-				root = root.AddDirectory(new string(name));
-			else if (next is FileRecord fr)
-				ThrowHelper.Throw<Exception>("Cannot create directory \"" + fr.GetPath() + "\" because there is a file with the same name exists");
-			else
-				ThrowHelper.Throw<InvalidCastException>("Unknown TreeNode type:" + next.ToString());
-		}
+
+		foreach (var name in path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+			root = root.AddDirectory(new(name), true); // Add directory if not found
 		return root;
+	}
+
+	/// <summary>
+	/// Find the record with a <paramref name="path"/>, or create it if not found
+	/// </summary>
+	/// <param name="path">Relative path (with forward slashes) in GGPK (which not start or end with slash) under <paramref name="root"/></param>
+	/// <param name="root">Node to start searching, or null for <see cref="Root"/></param>
+	/// <param name="preallocatedSize">Pre-allocate content size for the created file if it doesn't exist</param>
+	/// <returns>The node found</returns>
+	public virtual FileRecord FindOrAddFile(scoped ReadOnlySpan<char> path, DirectoryRecord? root = null, int preallocatedSize = 0) {
+		ArgumentOutOfRangeException.ThrowIfNegative(preallocatedSize);
+		if (path.IsEmpty || path.EndsWith('/'))
+			ThrowHelper.Throw<ArgumentException>("File name cannot be empty", nameof(path));
+
+		EnsureNotDisposed();
+		root ??= Root;
+		var i = path.LastIndexOf('/');
+		if (i >= 0) {
+			root = FindOrAddDirectory(path[..i], root);
+			path = path.Slice(i + 1);
+		}
+		return root.AddFile(new(path), preallocatedSize, true);
 	}
 
 	/// <summary>
@@ -352,7 +366,8 @@ public class GGPK : IDisposable {
 	/// (this will cause the game to start patching on startup and revert all modifications to ggpk).
 	/// </param>
 	/// <remarks>
-	/// This will be automatically called when <see cref="Dispose"/>.
+	/// <para>This will be automatically called when <see cref="Dispose"/>.</para>
+	/// <para>Only modifications on this instance will be tracked, this method does not apply retroactively.</para>
 	/// </remarks>
 	public virtual void RenewHashes(bool forceRenewRoot = false) {
 		EnsureNotDisposed();

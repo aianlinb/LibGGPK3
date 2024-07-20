@@ -234,7 +234,7 @@ public class PatchClient : IDisposable {
 	/// if its <see cref="TreeNode.Hash"/> doesn't match or it is <see cref="GGPK.Root"/>.
 	/// </summary>
 	/// <returns>
-	/// Number of <see cref="FileRecord"/> updated.
+	/// Number of <see cref="FileRecord"/> updated/added/removed.
 	/// </returns>
 	/// <remarks>
 	/// <para>
@@ -257,6 +257,7 @@ public class PatchClient : IDisposable {
 
 		var http = new HttpClient(new SocketsHttpHandler { UseCookies = false }) { BaseAddress = new(CdnUrl!) };
 		return await UpdateCore(node, path).ConfigureAwait(false);
+
 		async Task<int> UpdateCore(TreeNode node, string path) {
 			if (node is FileRecord fr) {
 				using var res = await http.GetAsync(path).ConfigureAwait(false);
@@ -289,6 +290,7 @@ public class PatchClient : IDisposable {
 				while (n.NameHash < namehash) {
 					n.Remove();
 					n = dir[i];
+					++count;
 				}
 
 				if (n.NameHash > namehash)
@@ -298,9 +300,9 @@ public class PatchClient : IDisposable {
 				count += await UpdateCore(n, root ? e.Name : $"{path}/{e.Name}");
 			}
 			return count;
-		}
 
-		static TreeNode AddNode(DirectoryRecord dir, EntryInfo e) => e.FileSize == -1 ? dir.AddDirectory(e.Name) : dir.AddFile(e.Name, e.FileSize);
+			static TreeNode AddNode(DirectoryRecord dir, EntryInfo e) => e.FileSize == -1 ? dir.AddDirectory(e.Name) : dir.AddFile(e.Name, e.FileSize);
+		}
 	}
 
 	/// <exception cref="InvalidDataException"/>
