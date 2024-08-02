@@ -29,10 +29,10 @@ public class GGPKDirectoryTreeItem : DirectoryTreeItem {
 			).ToList());
 
 	public override int Extract(string path) {
-		return GGPK.Extract(Record, path);
+		return GGPK.Extract(Record, path); // TODO: Progress
 	}
 
 	public override int Replace(string path) {
-		return GGPK.Replace(Record, path);
+		return GGPK.Replace(Record, path); // TODO: Progress
 	}
 }

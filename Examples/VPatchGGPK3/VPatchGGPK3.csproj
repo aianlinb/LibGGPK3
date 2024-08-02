@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	
 	<ItemGroup>
-		<ProjectReference Include="../../LibGGPK3/LibGGPK3.csproj" />
+		<ProjectReference Include="../../LibBundledGGPK3/LibBundledGGPK3.csproj" />
 	</ItemGroup>
 	
 	<Import Project="../EtoForms.props" />

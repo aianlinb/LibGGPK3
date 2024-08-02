@@ -5,7 +5,6 @@ using System.Data;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
@@ -59,13 +58,9 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// <remarks>They must be in order of <see cref="Entry.NameHash"/></remarks>
 	protected internal Entry[] Entries;
 	/// <summary>
-	/// Offset in ggpk where <see cref="Entries"/> begins. This is only here because it makes rewriting the entries easier.
-	/// </summary>
-	protected internal long EntriesOffset;
-	/// <summary>
 	/// Children of this directory.
 	/// </summary>
-	protected internal TreeNode?[] Children;
+	protected TreeNode?[] Children;
 
 	/// <summary>
 	/// Read a DirectoryRecord from GGPK
@@ -86,7 +81,6 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 			Name = s.ReadString(nameLength);
 			s.Seek(sizeof(char), SeekOrigin.Current); // Null terminator
 		}
-		EntriesOffset = s.Position;
 		Entries = new Entry[totalEntries];
 		Children = new TreeNode?[totalEntries];
 		s.Read(Entries);
@@ -97,7 +91,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// </summary>
 	protected internal DirectoryRecord(string name, GGPK ggpk) : base(default, ggpk) {
 		Name = name;
-		ThrowIfNameContainsSlash();
+		ThrowIfNameEmptyOrContainsSlash();
 		Entries = [];
 		Children = [];
 		Length = CaculateRecordLength();
@@ -146,52 +140,135 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	public TreeNode? this[ReadOnlySpan<char> name] => this[GetNameHash(name)];
 
 	/// <summary>
-	/// Add a directory to this directory (which can't be <see cref="GGPK.Root"/>)
+	/// Find a <see cref="TreeNode"/> with a <paramref name="path"/> relative to this directory.
 	/// </summary>
-	/// <param name="name">Name of the directory</param>
-	/// <param name="dontThrowIfExist">
-	/// <see langword="true"/> to return the existing <see cref="DirectoryRecord"/> if one with the same name already exists.<br />
-	/// <see langword="false"/> or if the existing one isn't <see cref="DirectoryRecord"/>, throws <see cref="InvalidOperationException"/>.
-	/// </param>
-	/// <returns>The <see cref="DirectoryRecord"/> added/existed</returns>
-	/// <remarks>
-	/// Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
-	/// </remarks>
-	/// <exception cref="DuplicateNameException"/>
-	public virtual DirectoryRecord AddDirectory(string name, bool dontThrowIfExist = false) {
-		var dir = new DirectoryRecord(name, Ggpk) { Parent = this };
-		var i = AddNode(dir);
-		if (i < 0 && (!dontThrowIfExist || (dir = this[Entries[~i].NameHash] as DirectoryRecord) is null))
-			ThrowExist(name);
-		return dir;
+	/// <param name="path">Relative path (with forward slash, but not starting or ending with slash) in ggpk under this directory</param>
+	/// <param name="node">The node found, or <see langword="null"/> when not found, or <see langword="this"/> if <paramref name="path"/> is empty</param>
+	/// <returns>Whether found a node.</returns>
+	public bool TryFindNode(scoped ReadOnlySpan<char> path, [NotNullWhen(true)] out TreeNode? node) {
+		if (path.IsEmpty) {
+			node = this;
+			return true;
+		}
+
+		var dir = this;
+		var et = path.Split('/');
+		while (et.MoveNext()) {
+			var next = dir[et.Current];
+			dir = (next as DirectoryRecord)!;
+			if (dir is null)
+				if (et.MoveNext()) {
+					node = null;
+					return false;
+				} else {
+					node = next;
+					return node is not null;
+				}
+		}
+		node = dir;
+		return true;
 	}
 	/// <summary>
-	/// Add a file to this directory.
+	/// Find a <see cref="DirectoryRecord"/> with a <paramref name="path"/> relative to this directory, or create it if not found.
 	/// </summary>
-	/// <param name="name">Name of the file</param>
+	/// <param name="path">Relative path (with forward slashes, but not starting with slash) in ggpk under this directory</param>
+	/// <param name="record">The node found</param>
+	/// <returns><see langword="true"/> if added a new directory, <see langword="false"/> if found.</returns>
+	public bool FindOrAddDirectory(scoped ReadOnlySpan<char> path, out DirectoryRecord record) {
+		path = path.TrimEnd('/');
+		if (path.IsEmpty) {
+			record = this;
+			return false;
+		}
+
+		var dir = this;
+		var added = false;
+		foreach (var name in path.Split('/'))
+			if (dir.AddDirectory(new(name), out dir)) // Add directory if not found
+				added = true;
+		record = dir;
+		return added;
+	}
+	/// <summary>
+	/// Find a <see cref="FileRecord"/> with a <paramref name="path"/> relative to this directory, or create it if not found.
+	/// </summary>
+	/// <param name="path">Relative path (with forward slashes, but not starting or ending with slash) in ggpk under this directory</param>
+	/// <param name="record">The node found</param>
 	/// <param name="preallocatedSize">
-	/// Size in bytes of the file content which will be passed to <see cref="FileRecord.Write"/> later by the caller.
-	/// Not used when one with the same name already exists.
+	/// Content size in bytes of the new created file which will be passed to <see cref="FileRecord.Write"/> of <paramref name="record"/> later by the caller.
+	/// Not used when the file already exists.
 	/// </param>
-	/// <param name="dontThrowIfExist">
-	/// Whether to return the existing <see cref="FileRecord"/> with the same name instead of throwing an exception.
-	/// <para>Note that this still throws if the existing node isn't <see cref="FileRecord"/>.</para>
-	/// </param>
-	/// <returns>The <see cref="FileRecord"/> added/existed</returns>
+	/// <returns><see langword="true"/> if added a new file, <see langword="false"/> if found.</returns>
+	public bool FindOrAddFile(scoped ReadOnlySpan<char> path, out FileRecord record, int preallocatedSize = 0) {
+		ArgumentOutOfRangeException.ThrowIfNegative(preallocatedSize);
+		if (path.IsEmpty || path.EndsWith('/'))
+			ThrowHelper.Throw<ArgumentException>("File name cannot be empty", nameof(path));
+
+		var dir = this;
+		var i = path.LastIndexOf('/');
+		if (i >= 0) {
+			dir.FindOrAddDirectory(path[..i], out dir);
+			path = path.Slice(i + 1);
+		}
+		return dir.AddFile(new(path), out record, preallocatedSize);
+	}
+
+	/// <summary>
+	/// Add a directory to this directory, or returns the existing one with the same name.
+	/// </summary>
+	/// <param name="name">Name of the directory</param>
+	/// <param name="record">The <see cref="DirectoryRecord"/> added/existed</param>
+	/// <see langword="true"/> if the directory is added successfully, <see langword="false"/> if one with the same name already exists.
 	/// <remarks>
-	/// Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
+	/// If a node exists with the same name but is not a <see cref="DirectoryRecord"/>, throws <see cref="DuplicateNameException"/>.
+	/// <para>Note that modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.</para>
 	/// </remarks>
 	/// <exception cref="DuplicateNameException"/>
-	public virtual FileRecord AddFile(string name, int preallocatedSize = 0, bool dontThrowIfExist = false) {
-		var file = new FileRecord(name, Ggpk) {
+	public virtual bool AddDirectory(string name, out DirectoryRecord record) {
+		record = new DirectoryRecord(name, Ggpk) { Parent = this };
+		var i = InsertNode(record);
+		if (i < 0) { // Exist
+			record = (this[Entries[~i].NameHash] as DirectoryRecord)!;
+			if (record is null)
+				ThrowExist(name);
+			return false;
+		}
+		record.WriteWithNewLength(record.Length);
+		return true;
+	}
+	/// <summary>
+	/// Add a file to this directory, or returns the existing one with the same name.
+	/// </summary>
+	/// <param name="name">Name of the file</param>
+	/// <param name="record">The <see cref="FileRecord"/> added/existed</param>
+	/// <param name="preallocatedSize">
+	/// Content size in bytes of the new created file which will be passed to <see cref="FileRecord.Write"/> of <paramref name="record"/> later by the caller.
+	/// Not used when the file already exists.
+	/// </param>
+	/// <returns>
+	/// <see langword="true"/> if the file is added successfully, <see langword="false"/> if one with the same name already exists.
+	/// </returns>
+	/// <remarks>
+	/// If a node exists with the same name but is not a <see cref="FileRecord"/>, throws <see cref="DuplicateNameException"/>.
+	/// <para>Note that modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.</para>
+	/// </remarks>
+	/// <exception cref="DuplicateNameException"/>
+	public virtual bool AddFile(string name, out FileRecord record, int preallocatedSize = 0) {
+		ArgumentOutOfRangeException.ThrowIfNegative(preallocatedSize);
+		record = new FileRecord(name, Ggpk) {
 			Parent = this,
 			DataLength = preallocatedSize
 		};
-		file.Length += preallocatedSize;
-		var i = AddNode(file);
-		if (i < 0 && (!dontThrowIfExist || (file = this[Entries[~i].NameHash] as FileRecord) is null))
-			ThrowExist(name);
-		return file;
+		record.Length += preallocatedSize;
+		var i = InsertNode(record);
+		if (i < 0) { // Exist
+			record = (this[Entries[~i].NameHash] as FileRecord)!;
+			if (record is null)
+				ThrowExist(name);
+			return false;
+		}
+		record.WriteWithNewLength(record.Length);
+		return true;
 	}
 	/// <exception cref="DuplicateNameException"/>
 	[DoesNotReturn, DebuggerNonUserCode]
@@ -200,31 +277,30 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	}
 
 	/// <summary>
-	/// Internal implementation of <see cref="AddDirectory"/> and <see cref="AddFile"/>
+	/// Insert a <paramref name="node"/> to this directory.
 	/// </summary>
 	/// <returns>
-	/// The index of the entry is inserted, or ~index of the existing entry with the same namehash if failed to insert.
+	/// The index of the entry that was inserted, or ~index (always negative) of the existing entry with the same namehash.
 	/// </returns>
 	/// <remarks>
-	/// Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
+	/// Note that modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
 	/// </remarks>
-	protected virtual int AddNode(TreeNode node) {
-		var i = InsertEntry(new(node.NameHash, -1)); // Entry.Offset will be set in `node.WriteWithNewLength(node.Length)` which calls TreeNode.UpdateOffset()
-		if (i < 0)
-			return i;
-		Children[i] = node;
-		WriteWithNewLength();
-		node.WriteWithNewLength(node.Length);
+	protected internal virtual int InsertNode(TreeNode node) {
+		var i = InsertEntry(new(node.NameHash, node.Offset));
+		if (i >= 0) // Inserted
+			Children[i] = node;
 		return i;
 	}
-
+	/// <summary>
+	/// Internal implementation of <see cref="InsertNode"/>.
+	/// </summary>
 	/// <returns>
-	/// The index of the entry is inserted, or ~index of the existing entry with the same namehash if failed to insert.
+	/// The index of the entry that was inserted, or ~index (always negative) of the existing entry with the same namehash.
 	/// </returns>
 	/// <remarks>
-	/// Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
+	/// Note that modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
 	/// </remarks>
-	protected internal virtual int InsertEntry(in Entry entry) {
+	protected virtual int InsertEntry(in Entry entry) {
 		var i = ~Entries.AsSpan().BinarySearch((Entry.NameHashWrapper)entry.NameHash);
 		if (i < 0) // Exist
 			return i;
@@ -240,7 +316,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// <param name="nameHash"><see cref="TreeNode.NameHash"/> or namehash calculated from <see cref="TreeNode.GetNameHash"/></param>
 	/// <returns>The index of the entry is removed, or ~index of the first entry with a larger namehash if not found</returns>
 	/// <remarks>
-	/// Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
+	/// Note that modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.
 	/// </remarks>
 	protected internal virtual int RemoveEntry(uint nameHash) {
 		var i = Entries.AsSpan().BinarySearch((Entry.NameHashWrapper)nameHash);
@@ -256,7 +332,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// Caculate the length of the record should be in ggpk file
 	/// </summary>
 	protected override unsafe int CaculateRecordLength() {
-		return sizeof(int) * 4 + LENGTH_OF_HASH + (Ggpk.Record.GGPKVersion == 4 ? sizeof(int) : sizeof(char)) * (Name.Length + 1) + sizeof(Entry) * Entries.Length;
+		return sizeof(int) * 4 + SIZE_OF_HASH + (Ggpk.Record.GGPKVersion == 4 ? sizeof(int) : sizeof(char)) * (Name.Length + 1) + sizeof(Entry) * Entries.Length;
 	}
 
 	/// <summary>
@@ -283,7 +359,6 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 			s.Write(Name);
 			s.Write<short>(0); // Null terminator
 		}
-		EntriesOffset = s.Position;
 		s.Write(Entries);
 	}
 
@@ -295,7 +370,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 		var i = 0;
 		foreach (var n in this)
 			combination[i++] = n.Hash;
-		if (!SHA256.TryHashData(new ReadOnlySpan<byte>((byte*)combination, LENGTH_OF_HASH * Entries.Length), _Hash.AsSpan(), out _))
+		if (!SHA256.TryHashData(new ReadOnlySpan<byte>((byte*)combination, SIZE_OF_HASH * Entries.Length), _Hash.AsSpan(), out _))
 			ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // Hash.Length < LENGTH_OF_HASH (== sizeof(Vector256<byte>) == 32)
 		var s = Ggpk.baseStream;
 		lock (s) {

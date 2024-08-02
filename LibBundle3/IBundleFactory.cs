@@ -3,7 +3,8 @@
 using LibBundle3.Records;
 
 namespace LibBundle3;
-public interface IBundleFileFactory {
+
+public interface IBundleFactory {
 	/// <summary>
 	/// Create a <see cref="Bundle"/> instance of the <paramref name="record"/>
 	/// </summary>

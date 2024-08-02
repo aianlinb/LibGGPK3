@@ -15,7 +15,7 @@ namespace LibBundledGGPK3;
 /// Remember to call <see cref="Dispose"/> when done.
 /// </remarks>
 /// <param name="baseDirectory">Path of "Bundles2" (parent of _.index.bin) on the drive.</param>
-/// <param name="patchCdnUrl">Can get from <see cref="LibGGPK3.PatchClient.GetPatchCdnUrl"/></param>
+/// <param name="patchCdnUrl">Can get from <see cref="LibGGPK3.PatchClient.GetPatchCdnUrlAsync"/></param>
 public class ServerBundleFactory(string baseDirectory, string patchCdnUrl) : DriveBundleFactory(baseDirectory), IDisposable {
 	public Uri CdnUrl => http.BaseAddress!;
 	protected readonly HttpClient http = new(new SocketsHttpHandler() { UseCookies = false }) {

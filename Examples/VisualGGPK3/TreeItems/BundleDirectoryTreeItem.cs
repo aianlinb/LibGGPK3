@@ -20,33 +20,32 @@ public class BundleDirectoryTreeItem : DirectoryTreeItem, IDirectoryNode {
 		Parent = parent;
 	}
 
-	protected readonly List<ITreeNode> _Children = [];
-	public virtual IList<ITreeNode> Children => _Children;
+	public virtual List<ITreeNode> Children { get; } = [];
 
 	protected ListWrapper<ITreeItem, ITreeNode>? _ChildItems;
 	public override IReadOnlyList<ITreeItem> ChildItems {
 		get {
 			if (_ChildItems is null) {
-				var tmp = new ITreeNode[_Children.Count];
+				var tmp = new ITreeNode[Children.Count];
 				int j = 0, k = 0;
-				for (var i = 0; i < _Children.Count; ++i) {
-					if (_Children[i] is IDirectoryNode dn)
-						_Children[j++] = dn;
+				for (var i = 0; i < Children.Count; ++i) {
+					if (Children[i] is IDirectoryNode dn)
+						Children[j++] = dn;
 					else
-						tmp[k++] = _Children[i];
+						tmp[k++] = Children[i];
 				}
-				tmp.AsSpan()[..k].CopyTo(CollectionsMarshal.AsSpan(_Children)[j..]);
-				_ChildItems = new(_Children);
+				tmp.AsSpan()[..k].CopyTo(CollectionsMarshal.AsSpan(Children)[j..]);
+				_ChildItems = new(Children);
 			}
 			return _ChildItems;
 		}
 	}
 
-	public override int Extract(string path) {
+	public override int Extract(string path) { // TODO: Progress
 		return Index.Extract(this, path);
 	}
 
-	public override int Replace(string path) {
+	public override int Replace(string path) { // TODO: Progress
 		return Index.Replace(this, path);
 	}
 
@@ -57,11 +56,8 @@ public class BundleDirectoryTreeItem : DirectoryTreeItem, IDirectoryNode {
 		return CreateInstance;
 	}
 
-	protected class ListWrapper<To, From> : IReadOnlyList<To> where To : class? where From : class? {
-		protected readonly IReadOnlyList<From> baseList;
-		public ListWrapper(IReadOnlyList<From> list) {
-			baseList = list;
-		}
+	protected class ListWrapper<To, From>(IReadOnlyList<From> list) : IReadOnlyList<To> where To : class? where From : class? {
+		protected readonly IReadOnlyList<From> baseList = list;
 
 		public virtual To this[int index] => (baseList[index] as To)!;
 

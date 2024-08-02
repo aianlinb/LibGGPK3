@@ -57,22 +57,22 @@ public static class LZ4 {
 					if (dictOffset < 0)
 						ThrowOffsetTooLarge();
 					if (matchLen <= beforeOut) {
-						extDict.SliceUnchecked(dictOffset, matchLen).CopyToAndSliceDest(ref output);
+						output.WriteAndSlice(extDict.SliceUnchecked(dictOffset, matchLen));
 						continue;
 					}
-					extDict.SliceUnchecked(dictOffset, beforeOut).CopyToAndSliceDest(ref output);
+					output.WriteAndSlice(extDict.SliceUnchecked(dictOffset, beforeOut));
 					matchLen -= beforeOut;
 					pMatch = ref outStart;
 				}
 			}
 
 			while (matchLen > offset) { // Support for overlapping matches
-				MemoryMarshal.CreateReadOnlySpan(in pMatch, offset).CopyToAndSliceDest(ref output);
+				output.WriteAndSlice(MemoryMarshal.CreateReadOnlySpan(in pMatch, offset));
 				matchLen -= offset;
 				if ((offset *= 2) < 0)
 					break; // overflow
 			}
-			MemoryMarshal.CreateReadOnlySpan(in pMatch, matchLen).CopyToAndSliceDest(ref output);
+			output.WriteAndSlice(MemoryMarshal.CreateReadOnlySpan(in pMatch, matchLen));
 		}
 	}
 

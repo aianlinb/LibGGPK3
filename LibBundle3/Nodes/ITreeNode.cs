@@ -35,13 +35,13 @@ public interface ITreeNode {
 	}
 
 	/// <summary>
-	/// Recursive all nodes under <paramref name="node"/> (contains self)
+	/// Recurse all nodes under <paramref name="node"/> (include self)
 	/// </summary>
 	public static IEnumerable<ITreeNode> RecurseTree(ITreeNode node) {
 		yield return node;
 		if (node is IDirectoryNode dr)
-			foreach (var t in dr.Children)
-				foreach (var tt in RecurseTree(node))
-					yield return tt;
+			foreach (var n in dr.Children)
+				foreach (var nn in RecurseTree(node))
+					yield return nn;
 	}
 }

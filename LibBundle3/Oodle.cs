@@ -9,7 +9,7 @@ using SystemExtensions;
 
 namespace LibBundle3;
 /// <summary>
-/// Oodle (de)compression for bundles (needs oo2core native library to work)
+/// Oodle (de)compressions for bundles (needs oo2core native library to work).
 /// </summary>
 /// <remarks>
 /// All methods here are thread-safe, but you must call <see cref="Initialize"/> at least once before first time using any other method <b>*on each thread*</b>
@@ -45,7 +45,7 @@ public static unsafe class Oodle { // Current Oodle Version: 2.9.12
 	/// Re-calling with the same <paramref name="settings"/> does nothing.
 	/// </remarks>
 	[MemberNotNull(nameof(preAllocatedMemory))]
-	public static void Initialize(in Settings settings) {
+	public static void Initialize(Settings settings) {
 		settings.Validate();
 		if (Oodle.settings.ChunkSize >= settings.ChunkSize) {
 			if (!settings.EnableCompressing)
@@ -67,7 +67,7 @@ public static unsafe class Oodle { // Current Oodle Version: 2.9.12
 		}
 		if (preAllocatedMemory is null || preAllocatedMemory.Length < l)
 			preAllocatedMemory = GC.AllocateUninitializedArray<byte>(l, true); // pinned
-		end:
+	end:
 		Oodle.settings = settings;
 #pragma warning disable CS8774 // preAllocatedMemory is not null if Initialize has been called before
 	}
@@ -99,7 +99,6 @@ public static unsafe class Oodle { // Current Oodle Version: 2.9.12
 	/// <remarks>
 	/// Call <see cref="Initialize"/> at least once before first time using this method <b>*on each thread*</b>
 	/// </remarks>
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static int Compress(ReadOnlySpan<byte> buffer, Span<byte> output) {
 		if (output.Length < GetCompressedBufferSize(buffer.Length))
 			ThrowHelper.Throw<ArgumentException>("The output length must be at least GetCompressedBufferSize(buffer.Length) bytes", nameof(output) + ".Length");
@@ -316,6 +315,9 @@ public static unsafe class Oodle { // Current Oodle Version: 2.9.12
 		Invalid = Force32
 	}
 
+	/// <summary>
+	/// Use the parameterless constructor to get default settings.
+	/// </summary>
 	public struct Settings {
 #pragma warning disable CS1734
 		/// <summary>
@@ -338,7 +340,8 @@ public static unsafe class Oodle { // Current Oodle Version: 2.9.12
 		public CompressionLevel CompressionLevel = CompressionLevel.Normal;
 		/// <summary>
 		/// Allocates necessary memory for compressing.
-		/// Pass <see langword="true"/> if you will use any overload of Compress().
+		/// Default is <see langword="true"/>,
+		/// pass <see langword="false"/> if you'll never use any overload of Compress() to save memory.
 		/// </summary>
 		public bool EnableCompressing = true;
 		/// <summary>
@@ -352,7 +355,7 @@ public static unsafe class Oodle { // Current Oodle Version: 2.9.12
 		/// <exception cref="ArgumentOutOfRangeException" />
 		internal readonly void Validate() {
 			ArgumentOutOfRangeException.ThrowIfNegativeOrZero(ChunkSize);
-			if (unchecked((uint)Compressor > (uint)Compressor.Leviathan))
+			if (unchecked((uint)Compressor > (uint)Compressor.Leviathan)) // TODO: Disallow DEPRECATED
 				ThrowHelper.ThrowArgumentOutOfRange(Compressor, "Invalid compressor type");
 			if (CompressionLevel is > CompressionLevel.Max or < CompressionLevel.Min)
 				ThrowHelper.ThrowArgumentOutOfRange(CompressionLevel, "CompressionLevel is not defined");

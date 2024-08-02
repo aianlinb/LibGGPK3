@@ -6,8 +6,10 @@ Rewrite of https://github.com/aianlinb/LibGGPK2
 Expected to work on Windows, Linux and macOS
 
 ## Notice
-All projects in this repository are not thread-safe  
-Do not process a single ggpk file with more than one thread
+- All projects in this repository are not thread-safe.  
+Do not process a single ggpk file with more than one thread.
+- Each update does not necessarily guarantee forward compatibility.  
+Please read the commit messages carefully and check whether your project is working properly before updating to a new version.
 
 # LibGGPK3
 Handle the Content.ggpk

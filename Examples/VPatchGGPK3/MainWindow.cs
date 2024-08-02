@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Buffers;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Reflection;
@@ -13,8 +13,11 @@ using System.Threading.Tasks;
 using Eto.Drawing;
 using Eto.Forms;
 
+using LibBundledGGPK3;
+
 using LibGGPK3;
-using LibGGPK3.Records;
+
+using SystemExtensions.Collections;
 
 namespace VPatchGGPK3;
 public class MainWindow : Form {
@@ -143,8 +146,8 @@ public class MainWindow : Form {
 	private async void OnButtonClick(object? sender, EventArgs e) {
 		var path = ggpkPath.Text;
 		try {
-			File.WriteAllText("VPatchGGPK3.txt", path);
-		} catch { }
+			await File.WriteAllTextAsync("VPatchGGPK3.txt", path);
+		} catch { /*ignore*/ }
 
 		try {
 			output.Append("Getting patch information . . .\r\n", true);
@@ -174,36 +177,28 @@ public class MainWindow : Form {
 				return;
 			}
 			using var zip = new ZipArchive(new MemoryStream(b));
-			foreach (var entry in zip.Entries) {
-				if (entry.FullName.EndsWith('/')) // directory
-					continue;
-
-				var notExist = !ggpk.TryFindNode(entry.FullName, out var node);
-				FileRecord fr;
-				if (notExist) {
-					fr = ggpk.FindOrAddFile(entry.FullName, preallocatedSize: (int)entry.Length);
-				} else if ((fr = (node as FileRecord)!) is null) {
-					output.Append("Error: A directory exists with the same path of the file: " + entry.FullName + "\r\n", true);
-					continue;
-				}
-
-				await Task.Run(() => {
-					var len = (int)entry.Length;
-					var b = ArrayPool<byte>.Shared.Rent(len);
-					try {
-						using (var fs = entry.Open())
-							fs.ReadExactly(b, 0, len);
-						fr.Write(new(b, 0, len));
-					} finally {
-						ArrayPool<byte>.Shared.Return(b);
-					}
+			var total = zip.Entries.Count(e => !e.FullName.EndsWith('/')/* !dir */);
+			if (zip.Entries.Any(e => e.FullName.Equals("Bundles2/_.index.bin", StringComparison.OrdinalIgnoreCase))) {
+				total -= GGPK.Replace(ggpk.Root, zip.Entries, (fr, p, added) => {
+					output.Append($"{(added ? "Added: " : "Replaced: ")}{p}\r\n");
+					return false;
+				}, true);
+			} else {
+				ggpk.Dispose();
+				using var bggpk = new BundledGGPK(path, false);
+				total -= LibBundle3.Index.Replace(bggpk.Index, zip.Entries, (fr, p) => {
+					output.Append($"Replaced: {p}\r\n");
+					return false;
 				});
-				output.Append((notExist ? "Added: " : "Replaced: ") + entry.FullName + "\r\n", true);
 			}
-			output.Append("\r\nDone!\r\n", true);
-			output.Append("中文化完成!\r\n", true);
+			output.Append("\r\nAll finished!\r\n", true);
+			if (total > 0)
+				output.Append($"Error: {total} files failed to add/replace!\r\n", true);
+			else
+				output.Append("中文化完成!\r\n", true);
 		} catch (Exception ex) {
 			MessageBox.Show(this, ex.ToString(), "Error", MessageBoxType.Error);
+			output.Append("Error!\r\n", true);
 		}
 	}
 

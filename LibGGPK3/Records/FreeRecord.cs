@@ -92,14 +92,14 @@ public class FreeRecord : BaseRecord {
 
 		var s = Ggpk.baseStream;
 		lock (s) {
-			var lastFree = node is null ? Ggpk.FreeRecordList.Last?.Value : node.Previous?.Value;
-			if (lastFree is null) { // empty
+			var previousFree = node is null ? Ggpk.FreeRecordList.Last?.Value : node.Previous?.Value;
+			if (previousFree is null) { // empty
 				Ggpk.Record.FirstFreeRecordOffset = Offset;
 				s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
 				s.Write(Offset);
 			} else {
-				lastFree.NextFreeOffset = Offset;
-				s.Position = lastFree.Offset + sizeof(long);
+				previousFree.NextFreeOffset = Offset;
+				s.Position = previousFree.Offset + sizeof(long);
 				s.Write(Offset);
 			}
 			return node ?? Ggpk.FreeRecordList.AddLast(this);

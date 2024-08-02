@@ -45,7 +45,7 @@ public class BundleRecord {
 	}
 
 	/// <summary>
-	/// Try to get the bundle instance with <see cref="IBundleFileFactory.GetBundle"/>
+	/// Try to get the bundle instance with <see cref="IBundleFactory.GetBundle"/>
 	/// </summary>
 	/// <remarks>Must dispose the bundle after use</remarks>
 	/// <returns>Whether successfully get the instance</returns>
@@ -53,9 +53,9 @@ public class BundleRecord {
 		return TryGetBundle(out bundle, out _);
 	}
 	/// <summary>
-	/// Try to get the bundle instance with <see cref="IBundleFileFactory.GetBundle"/>
+	/// Try to get the bundle instance with <see cref="IBundleFactory.GetBundle"/>
 	/// </summary>
-	/// <param name="exception">Exception thrown by <see cref="IBundleFileFactory.GetBundle"/> if failed to get</param>
+	/// <param name="exception">Exception thrown by <see cref="IBundleFactory.GetBundle"/> if failed to get</param>
 	/// <remarks>Must dispose the bundle after use</remarks>
 	/// <returns>Whether successfully get the instance</returns>
 	public virtual bool TryGetBundle([NotNullWhen(true)] out Bundle? bundle, [MaybeNullWhen(true)] out Exception exception) {

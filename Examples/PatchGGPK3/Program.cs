@@ -1,11 +1,13 @@
 ﻿using System;
-using System.Buffers;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Reflection;
 
 using LibGGPK3;
 using LibGGPK3.Records;
+
+using SystemExtensions.Collections;
 
 namespace PatchGGPK3;
 public static class Program {
@@ -42,51 +44,17 @@ public static class Program {
 				return;
 			}
 			var allowAdd = args.Length == 3 && args[2].Equals("allowAdd", StringComparison.InvariantCultureIgnoreCase);
-
 			Console.WriteLine("GGPK: " + args[0]);
 			Console.WriteLine("Patch file: " + args[1]);
+
 			Console.WriteLine("Reading ggpk file . . .");
 			using var ggpk = new GGPK(args[0]);
 			Console.WriteLine("Replacing files . . .");
 			var zip = ZipFile.OpenRead(args[1]);
-
-			int successed = 0, failed = 0;
-			Console.WriteLine();
-			foreach (var entry in zip.Entries) {
-				if (entry.FullName.EndsWith('/'))
-					continue;
-
-				var notExist = !ggpk.TryFindNode(entry.FullName, out var node);
-				FileRecord fr;
-				if (notExist) {
-					if (!allowAdd) {
-						++failed;
-						Console.Error.WriteLine("Error: File not found in ggpk: " + entry.FullName);
-						continue;
-					}
-					fr = ggpk.FindOrAddFile(entry.FullName, preallocatedSize: (int)entry.Length);
-				} else if ((fr = (node as FileRecord)!) is null) {
-					++failed;
-					Console.Error.WriteLine("Error: A directory exists with the same path of the file: " + entry.FullName);
-					continue;
-				}
-
-				Console.Write((notExist ? "Adding: " : "Replacing: ") + entry.FullName + " . . . ");
-				var len = (int)entry.Length;
-				var b = ArrayPool<byte>.Shared.Rent(len);
-				try {
-					using (var fs = entry.Open())
-						fs.ReadExactly(b, 0, len);
-					fr.Write(new(b, 0, len));
-				} finally {
-					ArrayPool<byte>.Shared.Return(b);
-				}
-				++successed;
-				Console.WriteLine("Done");
-			}
-			Console.WriteLine();
-			Console.WriteLine("All finished!");
-			Console.WriteLine($"Replaced {successed} files, {failed} files failed");
+			Console.WriteLine($"Done! Replaced {GGPK.Replace(ggpk.Root, zip.Entries, (fr, p, added) => {
+				Console.WriteLine((added ? "Added: " : "Replaced: ") + p);
+				return false;
+			}, allowAdd)} files.");
 		} catch (Exception e) {
 			Console.Error.WriteLine(e);
 		}

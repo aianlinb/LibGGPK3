@@ -4,7 +4,7 @@ using System.Linq;
 using LibBundle3.Records;
 
 namespace LibBundle3;
-public class DriveBundleFactory : IBundleFileFactory {
+public class DriveBundleFactory : IBundleFactory {
 	/// <summary>
 	/// Path of "Bundles2" (parent of _.index.bin) on the drive. (ends with slash)
 	/// </summary>

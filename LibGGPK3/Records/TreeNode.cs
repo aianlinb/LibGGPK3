@@ -12,6 +12,13 @@ using SystemExtensions.Collections;
 using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records;
+
+/// <summary>
+/// Base class of <see cref="FileRecord"/> and <see cref="DirectoryRecord"/>, represents nodes of the file system tree in ggpk file.
+/// </summary>
+/// <remarks>
+/// Do not extend this class directly, use <see cref="FileRecord"/> or <see cref="DirectoryRecord"/> instead.
+/// </remarks>
 public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk) {
 	/// <summary>
 	/// File/Directory name
@@ -22,7 +29,10 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// SHA256 hash of the file content
 	/// </summary>
 	public Vector256<byte> Hash => _Hash;
-	public const int LENGTH_OF_HASH = 32; // sizeof(Vector256<byte>)
+	/// <summary>
+	/// Size of <see cref="Hash"/> in bytes == <see langword="sizeof"/>(<see cref="Vector256{T}"/>)
+	/// </summary>
+	protected const int SIZE_OF_HASH = 32; // sizeof(Vector256<byte>)
 	/// <summary>
 	/// Parent node
 	/// </summary>
@@ -140,7 +150,7 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 				if (i < 0)
 					ThrowHelper.Throw<KeyNotFoundException>($"{GetPath()} update offset failed: NameHash={NameHash}, Offset={Offset}");
 				dr.Entries[i].Offset = Offset;
-				s.Position = dr.EntriesOffset + sizeof(DirectoryRecord.Entry) * i + sizeof(uint);
+				s.Position = dr.Offset + (dr.Length - sizeof(DirectoryRecord.Entry) * (dr.Entries.Length - i) + sizeof(uint));
 				s.Write(Offset);
 			} else if (this == Ggpk.Root) {
 				Ggpk.Record.RootDirectoryOffset = Offset;
@@ -188,19 +198,17 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// <param name="directory">The new parent node to move to (which can't be <see cref="GGPK.Root"/>)</param>
 	/// <remarks>
 	/// <para><see cref="GGPK.Root"/> can't be moved.</para>
-	/// <para>Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.</para>
+	/// <para>Note that modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.</para>
 	/// </remarks>
 	[MemberNotNull(nameof(Parent))]
 	public virtual void MoveTo(DirectoryRecord directory) {
 		if (this == Ggpk.Root)
 			ThrowHelper.Throw<InvalidOperationException>("You can't move the root directory");
-		var i = directory.InsertEntry(new(NameHash, Offset));
+		var i = directory.InsertNode(this);
 		if (i < 0)
 			directory.ThrowExist(Name);
-		directory.Children[i] = this;
 		Parent!.RemoveEntry(NameHash);
 		Parent = directory;
-		directory.WriteWithNewLength();
 	}
 
 	/// <summary>
@@ -208,23 +216,23 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// </summary>
 	/// <remarks>
 	/// <para><see cref="GGPK.Root"/> can't be removed.</para>
-	/// <para>Modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.</para>
+	/// <para>Note that modifications made to children of <see cref="GGPK.Root"/> will be restored immediately when the game starts.</para>
 	/// <para>Do not use any record instance of the removed nodes or its children after calling this, otherwise it may break the ggpk.</para>
 	/// </remarks>
 	[MemberNotNull(nameof(Parent))]
 	public virtual void Remove() {
 		if (this == Ggpk.Root)
 			ThrowHelper.Throw<InvalidOperationException>("You can't remove the root directory");
-		RemoveRecursively();
+		MarkAsFreeRecursively();
 		Parent!.RemoveEntry(NameHash);
 	}
 	/// <summary>
 	/// Internal implementation of <see cref="Remove"/>
 	/// </summary>
-	protected virtual void RemoveRecursively() {
+	protected virtual void MarkAsFreeRecursively() {
 		if (this is DirectoryRecord dr)
 			foreach (var c in dr)
-				c.RemoveRecursively();
+				c.MarkAsFreeRecursively();
 		MarkAsFree();
 	}
 
@@ -261,7 +269,7 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	}
 
 	/// <summary>
-	/// Recursive all nodes under <paramref name="node"/> (contains self)
+	/// Recurse all nodes under <paramref name="node"/> (include self)
 	/// </summary>
 	public static IEnumerable<TreeNode> RecurseTree(TreeNode node) {
 		yield return node;
@@ -271,7 +279,8 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 					yield return tt;
 	}
 
-	protected void ThrowIfNameContainsSlash() {
+	protected void ThrowIfNameEmptyOrContainsSlash() {
+		ArgumentException.ThrowIfNullOrEmpty(Name, "name");
 		if (Name.Contains('/'))
 			Throw();
 
@@ -288,14 +297,15 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 		public static readonly NodeComparer Instance = new();
 		private NodeComparer() { }
 		/* Too Slow
-		[DllImport("shlwapi", CallingConvention = CallingConvention.Winapi, CharSet = CharSet.Unicode)]
+		[DllImport("shlwapi", CharSet = CharSet.Unicode)]
 		private static extern int StrCmpLogicalW(string x, string y);
 		private static readonly Func<string, string, int> FuncCompare = OperatingSystem.IsWindows() ? StrCmpLogicalW : string.Compare;
 		*/
 #pragma warning disable CS8767
 		public int Compare(TreeNode x, TreeNode y) {
+#pragma warning restore CS8767
 			if (x is DirectoryRecord) {
-				if (y is FileRecord)
+				if (y is not DirectoryRecord)
 					return -1;
 			} else {
 				if (y is DirectoryRecord)

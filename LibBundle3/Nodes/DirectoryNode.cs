@@ -1,36 +1,35 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace LibBundle3.Nodes;
-public class DirectoryNode : IDirectoryNode, IReadOnlyList<ITreeNode> {
+public class DirectoryNode : IDirectoryNode {
 	public virtual string Name { get; }
 	public virtual DirectoryNode? Parent { get; }
 	IDirectoryNode? ITreeNode.Parent => Parent;
-	protected List<ITreeNode>? _Children;
-	public virtual IList<ITreeNode> Children => _Children ??= [];
+	public virtual List<ITreeNode> Children { get; } = [];
 
 	protected DirectoryNode(string name, DirectoryNode? parent) {
 		Name = name;
 		Parent = parent;
 	}
 
-	public virtual int Count => Children.Count;
-	public virtual ITreeNode this[int index] => Children[index];
 	public virtual ITreeNode? this[ReadOnlySpan<char> name] {
-		get {
-			foreach (var child in Children)
-				if (child.Name.AsSpan().SequenceEqual(name))
-					return child;
+		get { // Binary search
+			int lo = 0;
+			int hi = Children.Count - 1;
+			while (lo <= hi) {
+				int i = (int)(((uint)hi + (uint)lo) >> 1);
+				var node = Children[i];
+				int c = name.CompareTo(node.Name, StringComparison.InvariantCultureIgnoreCase);
+				if (c == 0)
+					return node;
+				else if (c > 0)
+					lo = i + 1;
+				else
+					hi = i - 1;
+			}
 			return null;
 		}
-	}
-	public virtual IEnumerator<ITreeNode> GetEnumerator() {
-		return Children.GetEnumerator();
-	}
-	IEnumerator IEnumerable.GetEnumerator() {
-		return GetEnumerator();
 	}
 
 	/// <summary>

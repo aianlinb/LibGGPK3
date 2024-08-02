@@ -3,8 +3,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 
-using LibBundle3.Records;
-
 using LibBundledGGPK3;
 
 namespace PatchBundledGGPK3;
@@ -48,9 +46,10 @@ public static class Program {
 			using var ggpk = new BundledGGPK(args[0], false);
 			Console.WriteLine("Replacing files . . .");
 			using var zip = ZipFile.OpenRead(args[1]);
-			var count = LibBundle3.Index.Replace(ggpk.Index, zip.Entries);
-			Console.WriteLine("Done!");
-			Console.WriteLine($"Replced {count} files");
+			Console.WriteLine($"Done! Replced {LibBundle3.Index.Replace(ggpk.Index, zip.Entries, (fr, path) => {
+				Console.WriteLine("Replaced: " + path);
+				return false;
+			})} files");
 		} catch (Exception e) {
 			Console.Error.WriteLine(e);
 		}

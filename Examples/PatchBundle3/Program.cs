@@ -43,9 +43,11 @@ public static class Program {
 			Console.WriteLine("Reading index file . . .");
 			using var index = new LibBundle3.Index(args[0], false);
 			Console.WriteLine("Replacing files . . .");
-			using (var zip = ZipFile.OpenRead(args[1]))
-				LibBundle3.Index.Replace(index, zip.Entries);
-			Console.WriteLine("Done!");
+			using var zip = ZipFile.OpenRead(args[1]);
+			Console.WriteLine($"Done! Replaced {LibBundle3.Index.Replace(index, zip.Entries, (fr, path) => {
+				Console.WriteLine("Replaced: " + path);
+				return false;
+			})} files");
 		} catch (Exception e) {
 			Console.Error.WriteLine(e);
 		}

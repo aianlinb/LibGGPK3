@@ -16,6 +16,9 @@ public abstract class BaseRecord(int length, GGPK ggpk) {
 	/// <summary>
 	/// Length of the entire record in bytes
 	/// </summary>
+	/// <remarks>
+	/// If you're looking for the file length, <see cref="FileRecord.DataLength"/> may be what you want
+	/// </remarks>
 	public int Length { get; protected internal set; } = length;
 
 	/// <summary>

@@ -2,7 +2,6 @@
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.CompilerServices;
 
 using SystemExtensions;
 using SystemExtensions.Streams;
@@ -32,7 +31,7 @@ public class FileRecord {
 	/// <remarks>
 	/// This will be <see langword="null"/> if the <see cref="Index.ParsePaths"/> has never been called.
 	/// </remarks>
-	public virtual string Path { get; protected internal set; /* For Index.ParsePaths */ }
+	public virtual string Path { get; protected internal set; /* For Index.ParsePaths */}
 
 #pragma warning disable CS8618
 	protected internal FileRecord(ulong pathHash, BundleRecord bundleRecord, int offset, int size) {
@@ -43,12 +42,11 @@ public class FileRecord {
 	}
 
 	/// <summary>
-	/// Read the content of the file from a <paramref name="bundle"/> instance.
+	/// Read the content of the file.
 	/// </summary>
 	/// <param name="bundle">If specified, read from this bundle instance instead of creating a new one</param>
 	/// <remarks>
-	/// Do not use this function when reading multiple files in batches,
-	/// use <see cref="Index.Extract(IEnumerable{FileRecord})"/> instead.
+	/// When reading multiple files in batches, use <see cref="Index.Extract(IEnumerable{FileRecord}, Index.FileHandler)"/> instead for better performance.
 	/// </remarks>
 	public virtual ReadOnlyMemory<byte> Read(Bundle? bundle = null) {
 		if (bundle is not null)
@@ -61,20 +59,19 @@ public class FileRecord {
 	}
 
 	/// <summary>
-	/// Read a part of the content of the file from a <paramref name="bundle"/> instance.
+	/// Read a part of the content of the file.
 	/// </summary>
 	/// <param name="range">The range of the content to read</param>
 	/// <param name="bundle">If specified, read from this bundle instance instead of creating a new one</param>
 	/// <remarks>
-	/// Do not use this function when reading multiple files in batches,
-	/// use <see cref="Index.Extract(IEnumerable{FileRecord})"/> instead.
+	/// When reading multiple files in batches, use <see cref="Index.Extract(IEnumerable{FileRecord}, Index.FileHandler)"/> instead for better performance.
 	/// </remarks>
 	public virtual ReadOnlyMemory<byte> Read(Range range, Bundle? bundle = null) {
 		var (offset, length) = range.GetOffsetAndLength(Size);
 		if (bundle is not null)
 			return bundle.Read(Offset + offset, length);
 		if (BundleRecord.TryGetBundle(out bundle, out var ex))
-			using (bundle) // TODO: BundlePool implementation
+			using (bundle) // TODO: Bundle cache implementation
 				return bundle.ReadWithoutCache(Offset + offset, length);
 		ex?.ThrowKeepStackTrace();
 		throw new FileNotFoundException("Failed to get bundle: " + BundleRecord.Path);
@@ -82,30 +79,87 @@ public class FileRecord {
 
 	/// <summary>
 	/// Replace the content of the file.
-	/// This call <see cref="Index.Save"/> automatically.
 	/// </summary>
+	/// <param name="saveIndex">
+	/// Whether to call <see cref="Index.Save"/> automatically after writing.
+	/// This causes performance penalties when writing multiple files.
+	/// </param>
 	/// <remarks>
-	/// Do not use this function when writing multiple files in batches,
-	/// use <see cref="Index.Replace(IEnumerable{FileRecord}, Index.GetDataHandler, bool)"/> instead.
+	/// You must call <see cref="Index.Save"/> (unless <paramref name="saveIndex"/>) to save changes after editing all files you want.
 	/// </remarks>
-	[SkipLocalsInit]
-	public virtual void Write(scoped ReadOnlySpan<byte> newContent) {
-		using (var bundle = BundleRecord.Index.GetBundleToWrite(out var size)) {
-			var len = size + newContent.Length;
-			byte[]? rented = null;
-			try {
-				Span<byte> b = len <= 4096 ? stackalloc byte[len] : (rented = ArrayPool<byte>.Shared.Rent(len)).AsSpan(0, len);
-				bundle.ReadWithoutCache(0, size).AsSpan().CopyTo(b);
-				newContent.CopyTo(b[size..]);
-				bundle.Save(b);
-			} finally {
-				if (rented is not null)
-					ArrayPool<byte>.Shared.Return(rented);
+	public virtual void Write(scoped ReadOnlySpan<byte> newContent, bool saveIndex = false) {
+		var index = BundleRecord.Index;
+		lock (index) {
+			var b = index._BundleToWrite;
+			var ms = index._BundleStreamToWrite;
+			if (b is null) {
+				index._BundleToWrite = b = index.GetBundleToWrite(out var originalSize);
+				if (!index.WR_BundleStreamToWrite.TryGetTarget(out index._BundleStreamToWrite))
+					index._BundleStreamToWrite = new(originalSize + newContent.Length);
+				ms = index._BundleStreamToWrite;
+				ms.Write(index._BundleToWrite.ReadWithoutCache(0, originalSize)); // Read original data of bundle
 			}
-			Redirect(bundle.Record!, size, newContent.Length);
+
+			Redirect(b.Record!, (int)ms!.Length, newContent.Length);
+			ms.Write(newContent);
+
+			if (ms.Length >= index.MaxBundleSize) {
+				b.Save(new(ms.GetBuffer(), 0, (int)ms.Length));
+				b.Dispose();
+				index._BundleToWrite = null;
+				ms.SetLength(0);
+				index._BundleStreamToWrite = null;
+				index.WR_BundleStreamToWrite.SetTarget(ms);
+			}
 		}
-		BundleRecord.Index.Save();
+		if (saveIndex)
+			index.Save();
 	}
+	/// <inheritdoc cref="Write(ReadOnlySpan{byte}, bool)"/>
+	/// <param name="writer">
+	/// <see langword="delegate"/> that provide a <see cref="Span{T}"/> with <paramref name="newSize"/> length
+	/// to let you write the new content of the file
+	/// </param>
+	/// <param name="newSize">Size in bytes of the new content</param>
+#if NET9_0_OR_GREATER
+	public virtual void Write(Action<Span<byte>> writer, int newSize, bool saveIndex = false) {
+#else
+	public virtual void Write(WriteAction writer, int newSize, bool saveIndex = false) {
+#endif
+		var index = BundleRecord.Index;
+		lock (index) {
+			var b = index._BundleToWrite;
+			var ms = index._BundleStreamToWrite;
+			if (b is null) {
+				index._BundleToWrite = b = index.GetBundleToWrite(out var originalSize);
+				if (!index.WR_BundleStreamToWrite.TryGetTarget(out index._BundleStreamToWrite))
+					index._BundleStreamToWrite = new(originalSize + newSize);
+				ms = index._BundleStreamToWrite;
+				ms.Write(index._BundleToWrite.ReadWithoutCache(0, originalSize)); // Read original data of bundle
+			}
+
+			{
+				var ibw = ms!.AsIBufferWriter();
+				writer(ibw.GetSpan(newSize)[..newSize]);
+				Redirect(b.Record!, (int)ms!.Length, newSize);
+				ibw.Advance(newSize);
+			}
+
+			if (ms.Length >= index.MaxBundleSize) {
+				b.Save(new(ms.GetBuffer(), 0, (int)ms.Length));
+				b.Dispose();
+				index._BundleToWrite = null;
+				ms.SetLength(0);
+				index._BundleStreamToWrite = null;
+				index.WR_BundleStreamToWrite.SetTarget(ms);
+			}
+		}
+		if (saveIndex)
+			index.Save();
+	}
+#if !NET9_0_OR_GREATER
+	public delegate void WriteAction(scoped Span<byte> buffer);
+#endif
 
 	/// <summary>
 	/// Redirect the <see cref="FileRecord"/> to another section in specified bundle.

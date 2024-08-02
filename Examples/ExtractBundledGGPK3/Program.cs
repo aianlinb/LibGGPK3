@@ -50,8 +50,10 @@ public static class Program {
 				return;
 			}
 			Console.WriteLine("Extracting files . . .");
-			LibBundle3.Index.ExtractParallel(node, path);
-			Console.WriteLine("Done!");
+			Console.WriteLine($"Done! Extracted {LibBundle3.Index.ExtractParallel(node, path, (fr, path) => {
+				Console.WriteLine("Extracted: " + path);
+				return false;
+			})} files.");
 		} catch (Exception e) {
 			Console.Error.WriteLine(e);
 		}

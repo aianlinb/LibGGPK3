@@ -119,7 +119,7 @@ public static class Program {
 			Console.WriteLine("The national flag pattern in start menu won't be replaced");
 			Console.WriteLine("警告: 找不到 Art/UIImages1.txt，登入畫面的國旗圖案將不會改變");
 			Console.ForegroundColor = color;
-			lang.Write(data); // also saved the index
+			lang.Write(data, true); // also saved the index
 			return;
 		}
 
@@ -154,15 +154,7 @@ public static class Program {
 			}
 		}
 
-		// Save
-		Index.Replace([lang, uiImages], (FileRecord fr, int _, out ReadOnlySpan<byte> content) => {
-			if (fr == lang)
-				content = data;
-			else if (fr == uiImages)
-				content = memory.Span;
-			else
-				throw new UnreachableException();
-			return true;
-		});
+		lang.Write(data);
+		uiImages.Write(memory.Span, true); // Save index
 	}
 }

@@ -18,7 +18,7 @@ using VisualGGPK3.TreeItems;
 namespace VisualGGPK3;
 public sealed class MainWindow : Form {
 	private BundledGGPK? Ggpk;
-	private LibBundle3.Index? Index;
+	internal LibBundle3.Index? Index;
 #pragma warning disable CS0618
 	private readonly TreeView GGPKTree = new();
 	private readonly TreeView BundleTree = new();

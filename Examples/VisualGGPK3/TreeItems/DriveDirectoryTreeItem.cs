@@ -30,7 +30,7 @@ public class DriveDirectoryTreeItem : DirectoryTreeItem {
 		}
 	}
 
-	public override int Extract(string path) {
+	public override int Extract(string path) { // TODO: Progress
 		Directory.CreateDirectory(path);
 		var count = 0;
 		foreach (var f in ChildItems) {
@@ -45,7 +45,7 @@ public class DriveDirectoryTreeItem : DirectoryTreeItem {
 		return count;
 	}
 
-	public override int Replace(string path) {
+	public override int Replace(string path) { // TODO: Progress
 		var count = 0;
 		foreach (var f in ChildItems) {
 			if (f is DriveDirectoryTreeItem di) {

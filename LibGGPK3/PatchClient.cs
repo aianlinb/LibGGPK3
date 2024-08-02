@@ -244,7 +244,7 @@ public class PatchClient : IDisposable {
 	/// Updating <see cref="GGPK.Root"/> is equivalent to starting patching of the game.
 	/// </para>
 	/// </remarks>
-	public virtual async Task<int> UpdateNode(TreeNode node) {
+	public virtual async Task<int> UpdateNodeAsync(TreeNode node) {
 		string path;
 		if (node == node.Ggpk.Root) {
 			path = string.Empty;
@@ -301,7 +301,15 @@ public class PatchClient : IDisposable {
 			}
 			return count;
 
-			static TreeNode AddNode(DirectoryRecord dir, EntryInfo e) => e.FileSize == -1 ? dir.AddDirectory(e.Name) : dir.AddFile(e.Name, e.FileSize);
+			static TreeNode AddNode(DirectoryRecord dir, EntryInfo e) {
+				if (e.FileSize == -1) {
+					dir.AddDirectory(e.Name, out var result);
+					return result;
+				} else {
+					dir.AddFile(e.Name, out var result, e.FileSize);
+					return result;
+				}
+			}
 		}
 	}
 
@@ -316,7 +324,7 @@ public class PatchClient : IDisposable {
 		socket.Dispose();
 	}
 
-	public static async Task<string> GetPatchCdnUrl(EndPoint server) {
+	public static async Task<string> GetPatchCdnUrlAsync(EndPoint server) {
 		using var client = new PatchClient();
 		await client.ConnectAsync(server).ConfigureAwait(false);
 		return client.CdnUrl!;
