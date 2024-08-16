@@ -19,7 +19,7 @@ public class BundleFileTreeItem : FileTreeItem, IFileNode {
 	}
 
 	public override void Write(ReadOnlySpan<byte> content) {
-		Record.Write(content);
+		Record.Write(content, true);
 	}
 
 	protected internal static IFileNode CreateInstance(FileRecord record, IDirectoryNode parent) {

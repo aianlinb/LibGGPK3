@@ -51,8 +51,12 @@ public class FileRecord {
 	public virtual ReadOnlyMemory<byte> Read(Bundle? bundle = null) {
 		if (bundle is not null)
 			return bundle.Read(Offset, Size);
+		// TODO: Bundle cache implementation
+		bundle = BundleRecord.Index._BundleToWrite;
+		if (bundle?.Record == BundleRecord) // The bundle being written
+			return bundle.ReadWithoutCache(Offset, Size);
 		if (BundleRecord.TryGetBundle(out bundle, out var ex))
-			using (bundle) // TODO: Bundle cache implementation
+			using (bundle)
 				return bundle.ReadWithoutCache(Offset, Size);
 		ex?.ThrowKeepStackTrace();
 		throw new FileNotFoundException("Failed to get bundle: " + BundleRecord.Path);
@@ -70,6 +74,9 @@ public class FileRecord {
 		var (offset, length) = range.GetOffsetAndLength(Size);
 		if (bundle is not null)
 			return bundle.Read(Offset + offset, length);
+		bundle = BundleRecord.Index._BundleToWrite;
+		if (bundle?.Record == BundleRecord)
+			return bundle.ReadWithoutCache(Offset + offset, length);
 		if (BundleRecord.TryGetBundle(out bundle, out var ex))
 			using (bundle) // TODO: Bundle cache implementation
 				return bundle.ReadWithoutCache(Offset + offset, length);

@@ -25,4 +25,4 @@ For Standalone-Client users
 
 # Examples
 Sample programs to realize some simple features of the libraries  
-***VisualGGPK3 is still under development***
+***VisualGGPK3 is not yet complete***

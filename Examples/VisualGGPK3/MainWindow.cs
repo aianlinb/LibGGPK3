@@ -98,7 +98,7 @@ public sealed class MainWindow : Form {
 			Panel2 = new Splitter() {
 				Panel1 = BundleTree,
 				Panel1MinimumSize = 10,
-				Panel2 = new Label() { Text = "This program is still in development" },
+				Panel2 = new Label() { Text = "This program is not yet complete" },
 				Panel2MinimumSize = 10,
 				SplitterWidth = 4,
 				Position = 240
@@ -135,19 +135,35 @@ public sealed class MainWindow : Form {
 				path = ofd.FileName;
 			}
 
+			int failed;
 			if (path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)) {
-				await Task.Run(() => Index = new(path));
+				failed = await Task.Run(() => {
+					Index = new(path, false); // false to parsePaths manually
+					return Index.ParsePaths();
+				});
 				GGPKTree.DataStore = new DriveDirectoryTreeItem(Path.GetDirectoryName(path)!, null, GGPKTree) {
 					Expanded = true
 				};
+
+				if (failed != 0)
+					MessageBox.Show(this, $"There're {failed} files failed to parse the path, your ggpk file may be broken.", "Warning", MessageBoxType.Warning);
 			} else {
-				await Task.Run(() => Ggpk = new(path));
-				Index = Ggpk!.Index;
-				GGPKTree.DataStore = new GGPKDirectoryTreeItem(Ggpk.Root, null, GGPKTree) {
+				failed = await Task.Run(() => {
+					Ggpk = new(path, false); // false to parsePaths manually
+					Index = Ggpk.Index;
+					return Index.ParsePaths();
+				});
+				GGPKTree.DataStore = new GGPKDirectoryTreeItem(Ggpk!.Root, null, GGPKTree) {
 					Expanded = true
 				};
+
+				if (failed != 0)
+					MessageBox.Show(this, $"There're {failed} files failed to parse the path, your ggpk file may be broken.", "Warning", MessageBoxType.Warning);
 			}
-			var bundles = await Task.Run(() => (BundleDirectoryTreeItem)Index!.BuildTree(BundleDirectoryTreeItem.GetFuncCreateInstance(BundleTree), BundleFileTreeItem.CreateInstance));
+
+			if (failed == Index!.Files.Count) // All failed
+				return;
+			var bundles = await Task.Run(() => (BundleDirectoryTreeItem)Index!.BuildTree(BundleDirectoryTreeItem.GetFuncCreateInstance(BundleTree), BundleFileTreeItem.CreateInstance, true));
 			bundles.Expanded = true;
 			BundleTree.DataStore = bundles;
 		}

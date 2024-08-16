@@ -6,37 +6,33 @@
 	
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
-		<NoWarn>NU1701</NoWarn>
+		<NoWarn>$(NoWarn);NU1701</NoWarn>
 	</PropertyGroup>
 	
 	<Choose>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`win`))' == 'true' Or '$(RuntimeIdentifier)' == ''">
+		<When Condition="$(RuntimeIdentifier.StartsWith('win')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Windows')))">
 			<PropertyGroup>
 				<DefineConstants>Windows;$(DefineConstants)</DefineConstants>
-				<OperatorSystem>Windows</OperatorSystem>
-				<TargetFramework>$(TargetFramework)-windows</TargetFramework>
+				<TargetFramework Condition="!$(TargetFramework.EndsWith('-windows'))">$(TargetFramework)-windows</TargetFramework>
 			</PropertyGroup>
 			<ItemGroup>
 				<PackageReference Include="Eto.Platform.Wpf" Version="*" />
 			</ItemGroup>
 		</When>
 		
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`osx`))' == 'true'">
+		<When Condition="$(RuntimeIdentifier.StartsWith('osx')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('OSX')))">
 			<PropertyGroup>
+				<RuntimeIdentifiers Condition="$(RuntimeIdentifiers) == ''">$([System.Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier)</RuntimeIdentifiers>
 				<DefineConstants>Mac;$(DefineConstants)</DefineConstants>
-				<OperatorSystem>Mac</OperatorSystem>
-				<MacBundleDotNet>true</MacBundleDotNet>
 			</PropertyGroup>
 			<ItemGroup>
 				<PackageReference Include="Eto.Platform.Mac64" Version="*" />
-				<PackageReference Condition="'$(RuntimeIdentifier.Contains(`64`))' != 'true'" Include="Eto.Platform.Mac" Version="*" />
 			</ItemGroup>
 		</When>
 		
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`linux`))' == 'true'">
+		<When Condition="$(RuntimeIdentifier.StartsWith('linux')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Linux')))">
 			<PropertyGroup>
 				<DefineConstants>Linux;$(DefineConstants)</DefineConstants>
-				<OperatorSystem>Linux</OperatorSystem>
 			</PropertyGroup>
 			<ItemGroup>
 				<PackageReference Include="Eto.Platform.Gtk" Version="*" />

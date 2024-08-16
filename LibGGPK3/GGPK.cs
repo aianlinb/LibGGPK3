@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -14,9 +13,6 @@ using SystemExtensions;
 using SystemExtensions.Collections;
 using SystemExtensions.Spans;
 using SystemExtensions.Streams;
-using SystemExtensions.Tasks;
-
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 [module: SkipLocalsInit]
 [assembly: InternalsVisibleTo("LibBundledGGPK3")]
@@ -437,6 +433,23 @@ public class GGPK : IDisposable {
 				if (forceRenewRoot || dr.Parent != Root) // Keep the hash of directories under ROOT original to prevent the game from starting patching
 					dr.RenewHash();
 			dirtyHashes.Clear();
+		}
+	}
+
+	/// <summary>
+	/// Erase the hashes of <see cref="Root"/> and its children.
+	/// </summary>
+	/// <remarks>This will cause the game to start patching on startup
+	/// and revert all modifications to ggpk from this library.</remarks>
+	public virtual void EraseRootHash() {
+		EnsureNotDisposed();
+		lock (baseStream) {
+			foreach (var d in Root) {
+				d._Hash = default;
+				d.WriteWithNewLength(d.Length);
+			}
+			Root._Hash = default;
+			Root.WriteWithNewLength(Root.Length);
 		}
 	}
 

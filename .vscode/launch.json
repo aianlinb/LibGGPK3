@@ -1,0 +1,38 @@
+{
+	"configurations": [
+		{
+			"name": "VPatchGGPK3",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "${defaultBuildTask}",
+			"program": "${workspaceFolder}/bin/Debug/net8.0/VPatchGGPK3.app/Contents/MacOS/VPatchGGPK3",
+			"enableStepFiltering": false,
+			"sourceLinkOptions": {
+				"*": { "enabled": true }
+			}
+		},
+		{
+			"name": "VisualGGPK3",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "${defaultBuildTask}",
+			"program": "${workspaceFolder}/bin/Debug/net8.0/VisualGGPK3.app/Contents/MacOS/VisualGGPK3",
+			"enableStepFiltering": false,
+			"sourceLinkOptions": {
+				"*": { "enabled": true }
+			}
+		},
+		{
+			"name": "PoeChinese3",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "${defaultBuildTask}",
+			"program": "${workspaceFolder}/bin/Debug/PoeChinese3.dll",
+			"cwd": "${workspaceFolder}/bin/Debug",
+			"enableStepFiltering": false,
+			"sourceLinkOptions": {
+				"*": { "enabled": true }
+			}
+		}
+	]
+}

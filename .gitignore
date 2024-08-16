@@ -301,7 +301,7 @@ node_modules/
 *.dsw
 *.dsp
 
-# Visual Studio 6 technical files 
+# Visual Studio 6 technical files
 *.ncb
 *.aps
 
@@ -396,6 +396,9 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# macOS
+.DS_Store
 
 # oo2core libraries
 oo2core/

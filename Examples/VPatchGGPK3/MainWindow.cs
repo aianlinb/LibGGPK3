@@ -4,7 +4,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -16,8 +15,7 @@ using Eto.Forms;
 using LibBundledGGPK3;
 
 using LibGGPK3;
-
-using SystemExtensions.Collections;
+using SystemExtensions;
 
 namespace VPatchGGPK3;
 public class MainWindow : Form {
@@ -122,20 +120,25 @@ public class MainWindow : Form {
 		if (args.Length > 1 && TrySetPath(Path.GetFullPath(args[1])))
 			return;
 
-		if (File.Exists("VPatchGGPK3.txt")) {
+		var txt = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData,
+			Environment.SpecialFolderOption.DoNotVerify) + "/LibGGPK3/VPatchGGPK3.txt";
+		if (File.Exists(txt)) {
 			try {
-				if (TrySetPath(File.ReadAllText("VPatchGGPK3.txt")))
+				if (TrySetPath(File.ReadAllText(txt)))
 					return;
-			} catch { /*No permission ro read*/ }
+			} catch { /* No permission */ }
 		}
 
-		if (OperatingSystem.IsMacOS() && TrySetPath("~/Library/Application Support/Path of Exile/Content.ggpk"))
+		if (OperatingSystem.IsMacOS() && TrySetPath("~/Library/Application Support/Path of Exile/Content.ggpk", true))
 			return;
-		if (OperatingSystem.IsWindows())
-			TrySetPath(@"C:\Program Files (x86)\Grinding Gear Games\Path of Exile\Content.ggpk");
+		if (OperatingSystem.IsWindows() && TrySetPath(@"C:\Program Files (x86)\Grinding Gear Games\Path of Exile\Content.ggpk"))
+			return;
+		if (OperatingSystem.IsLinux())
+			TrySetPath("~/.steam/steam/steamapps/common/Path of Exile/Content.ggpk", true);
 
-		bool TrySetPath(string path) {
-			if (File.Exists(path)) {
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		bool TrySetPath(string path, bool expand = false) {
+			if (File.Exists(expand ? Utils.ExpandPath(path) : path)) {
 				ggpkPath.Text = path;
 				return true;
 			}
@@ -146,14 +149,16 @@ public class MainWindow : Form {
 	private async void OnButtonClick(object? sender, EventArgs e) {
 		var path = ggpkPath.Text;
 		try {
-			await File.WriteAllTextAsync("VPatchGGPK3.txt", path);
+			var dir = Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData,
+			Environment.SpecialFolderOption.DoNotVerify) + "/LibGGPK3").FullName;
+			await File.WriteAllTextAsync(dir + "/VPatchGGPK3.txt", path);
 		} catch { /*ignore*/ }
 
 		try {
 			output.Append("Getting patch information . . .\r\n", true);
 			using var jd = await JsonDocument.ParseAsync(await http.GetStreamAsync(tw.Checked ? "https://poedb.tw/fg/pin_tw.json" : "https://poedb.tw/fg/pin_cn.json"));
 			var json = jd.RootElement;
-			var url = await Task.Run(() => GetPatchServer());
+			var url = await PatchClient.GetPatchCdnUrlAsync(PatchClient.ServerEndPoints.US);
 			var officialVersion = url[(url.LastIndexOf('/', url.Length - 2) + 1)..^1];
 			if (json.GetProperty("version").GetString()! != officialVersion) {
 				MessageBox.Show(this, "Server Version not match Patch Version\r\n編年史中文化更新中，請稍後再嘗試", "Error", MessageBoxType.Error);
@@ -200,24 +205,5 @@ public class MainWindow : Form {
 			MessageBox.Show(this, ex.ToString(), "Error", MessageBoxType.Error);
 			output.Append("Error!\r\n", true);
 		}
-	}
-
-	/// <summary>
-	/// Get POE patch server url (Requires internet connection)
-	/// </summary>
-	/// <exception cref="SocketException" />
-	[SkipLocalsInit]
-	public static unsafe string GetPatchServer(bool tw = false) {
-		using var tcp = new Socket(SocketType.Stream, ProtocolType.Tcp);
-		if (tw)
-			tcp.Connect("patch.pathofexile.tw", 12999);
-		else
-			tcp.Connect("patch.pathofexile.com", 12995); // (us.)login.pathofexile.com
-		var b = stackalloc byte[256];
-		*(short*)b = 0x0601; // b[0] = 1, b[1] = 6
-		tcp.Send(new ReadOnlySpan<byte>(b, 2));
-		if (tcp.Receive(new Span<byte>(b, 256)) < 36)
-			throw new EndOfStreamException("Unable to get POE patch server url");
-		return new string((char*)(b + 35), 0, b[34]);
 	}
 }

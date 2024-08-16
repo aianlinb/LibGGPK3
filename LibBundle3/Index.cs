@@ -20,7 +20,6 @@ using SystemExtensions;
 using SystemExtensions.Collections;
 using SystemExtensions.Spans;
 using SystemExtensions.Streams;
-using SystemExtensions.Tasks;
 
 [module: SkipLocalsInit]
 
@@ -79,17 +78,22 @@ public class Index : IDisposable {
 	/// </summary>
 	/// <param name="createDirectory">Function to create a instance of <see cref="IDirectoryNode"/></param>
 	/// <param name="createFile">Function to create a instance of <see cref="IFileNode"/></param>
+	/// <param name="ignoreNullPath">Whether to ignore files with <see cref="FileRecord.Path"/> as <see langword="null"/> instead of throwing.
+	/// This happens when <see cref="ParsePaths"/> has not been called or failed to parse some paths (returns not 0).</param>
 	/// <returns>The root node of the built tree</returns>
 	/// <remarks>
 	/// You can implement your custom class and call this, or just use the default implementation by calling <see cref="Root"/>.
 	/// </remarks>
-	/// <exception cref="InvalidOperationException">Thrown when <see cref="ParsePaths"/> haven't been called</exception>
-	public virtual IDirectoryNode BuildTree(CreateDirectoryInstance createDirectory, CreateFileInstance createFile) {
+	/// <exception cref="InvalidOperationException">Thrown when <see cref="ParsePaths"/> haven't been called.</exception>
+	/// <exception cref="NullReferenceException">Thrown when a file has null path. See <paramref name="ignoreNullPath"/>.</exception>
+	public virtual IDirectoryNode BuildTree(CreateDirectoryInstance createDirectory, CreateFileInstance createFile, bool ignoreNullPath = false) {
 		EnsureNotDisposed();
-		if (!pathsParsed)
+		if (!ignoreNullPath && !pathsParsed)
 			ThrowHelper.Throw<InvalidOperationException>("ParsePaths() must be called before building the tree");
 		var root = createDirectory("", null);
 		foreach (var f in _Files.Values.OrderBy(f => f.Path)) {
+			if (ignoreNullPath && string.IsNullOrEmpty(f.Path))
+				ThrowHelper.Throw<NullReferenceException>("A file has null or empty path, the Index may be broken");
 			var splittedPath = f.Path.AsSpan().Split('/');
 			var parent = root;
 			if (splittedPath.MoveNext())
@@ -177,8 +181,11 @@ public class Index : IDisposable {
 			directoryBundleData = data[(int)((byte*)ptr - p)..];
 		}
 
-		if (parsePaths)
-			ParsePaths();
+		if (parsePaths) {
+			var failed = ParsePaths();
+			if (failed != 0)
+				ThrowHelper.Throw<InvalidDataException>($"Parsing path failed for {failed} files");
+		}
 	}
 
 	/// <summary>
@@ -186,16 +193,20 @@ public class Index : IDisposable {
 	/// </summary>
 	protected bool pathsParsed;
 	/// <summary>
-	/// Parse all the <see cref="FileRecord.Path"/> of each <see cref="Files"/>.
+	/// Parses all the <see cref="FileRecord.Path"/> of each <see cref="Files"/>.
 	/// </summary>
-	/// <remarks>This will automatically be called by constructor if <see langword="true"/> passed to the parsePaths parameter (default to <see langword="true"/>).</remarks>
-	public virtual unsafe void ParsePaths() {
+	/// <returns>Number of paths failed to parse, these files will have <see cref="FileRecord.Path"/> as <see langword="null"/><br />
+	/// If this method has been called before, skips parsing and returns 0 always no matter how many files have failed last time.</returns>
+	/// <remarks>This will automatically be called by constructor if <see langword="true"/> passed to the parsePaths parameter (default to <see langword="true"/>),
+	/// and throw if the returned value is not 0.</remarks>
+	public virtual unsafe int ParsePaths() {
 		EnsureNotDisposed();
 		if (pathsParsed)
-			return;
+			return 0;
 		ReadOnlySpan<byte> directory;
 		using (var directoryBundle = new Bundle(new MemoryStream(directoryBundleData), false))
 			directory = directoryBundle.ReadWithoutCache();
+		var failed = 0;
 		fixed (byte* p = directory) {
 			foreach (var d in _Directories) {
 				var temp = new List<IEnumerable<byte>>();
@@ -219,13 +230,20 @@ public class Index : IDisposable {
 							else {
 								var b = str2.ToArray();
 								fixed (byte* bp = b)
-									_Files[NameHash(b)].Path = new string((sbyte*)bp, 0, b.Length);
+									if (_Files.TryGetValue(NameHash(b), out var f))
+										f.Path = new string((sbyte*)bp, 0, b.Length);
+									else
+										++failed;
 							}
 						} else {
 							if (Base)
 								temp.Add(str.ToArray());
-							else
-								_Files[NameHash(str)].Path = new string((sbyte*)ptr, 0, str.Length);
+							else {
+								if (_Files.TryGetValue(NameHash(str), out var f))
+									f.Path = new string((sbyte*)ptr, 0, str.Length);
+								else
+									++failed;
+							}
 						}
 						ptr += str.Length + 1; // '\0'
 					}
@@ -233,6 +251,7 @@ public class Index : IDisposable {
 			}
 		}
 		pathsParsed = true;
+		return failed;
 	}
 
 	/// <summary>

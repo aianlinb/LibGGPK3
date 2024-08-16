@@ -25,81 +25,81 @@
 		<DirectPInvoke Include="oo2core" />
 	</ItemGroup>
 	<Choose>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`win`))' == 'true'">
+		<When Condition="$(RuntimeIdentifier.StartsWith('win'))">
 			<Choose>
 				<When Condition="'$(RuntimeIdentifier)' == 'win10-x64'">
 					<ItemGroup>
 						<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/oo2core_winuwp64.lib" />
 					</ItemGroup>
 				</When>
-				<When Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'">
+				<When Condition="$(RuntimeIdentifier.Contains('x64'))">
 					<ItemGroup>
 						<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/oo2core_win64.lib" />
 					</ItemGroup>
 				</When>
-				<When Condition="'$(RuntimeIdentifier.Contains(`arm64`))' == 'true'">
+				<When Condition="$(RuntimeIdentifier.Contains('arm64'))">
 					<ItemGroup>
 						<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/oo2core_winuwparm64.lib" />
 					</ItemGroup>
 				</When>
-				<When Condition="'$(RuntimeIdentifier.Contains(`x86`))' == 'true'">
+				<When Condition="$(RuntimeIdentifier.Contains('x86'))">
 					<ItemGroup>
 						<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/oo2core_win32.lib" />
 					</ItemGroup>
 				</When>
 			</Choose>
 		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`linux`))' == 'true'">
+		<When Condition="$(RuntimeIdentifier.StartsWith('linux'))">
 			<ItemGroup>
-				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2corelinux64.a" Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'" />
-				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2corelinuxarm64.a" Condition="'$(RuntimeIdentifier.Contains(`arm64`))' == 'true'" />
+				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2corelinux64.a" Condition="$(RuntimeIdentifier.Contains('x64'))" />
+				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2corelinuxarm64.a" Condition="$(RuntimeIdentifier.Contains('arm64'))" />
 			</ItemGroup>
 		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`osx`))' == 'true'">
+		<When Condition="$(RuntimeIdentifier.StartsWith('osx'))">
 			<ItemGroup>
-				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coremac64.a" Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'" />
+				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coremac64.a" Condition="$(RuntimeIdentifier.Contains('x64'))" />
 			</ItemGroup>
 		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`android`))' == 'true'">
+		<When Condition="$(RuntimeIdentifier.StartsWith('android'))">
 			<Choose>
-				<When Condition="'$(RuntimeIdentifier.Contains(`arm64`))' == 'true'">
+				<When Condition="$(RuntimeIdentifier.Contains('arm64'))">
 					<ItemGroup>
 						<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coreandroidarm64.a" />
 					</ItemGroup>
 				</When>
-				<When Condition="'$(RuntimeIdentifier.Contains(`arm`))' == 'true'">
+				<When Condition="$(RuntimeIdentifier.Contains('arm'))">
 					<ItemGroup>
 						<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coreandroidarm.a" />
 					</ItemGroup>
 				</When>
-				<When Condition="'$(RuntimeIdentifier.Contains(`x64`))' == 'true'">
+				<When Condition="$(RuntimeIdentifier.Contains('x64'))">
 					<ItemGroup>
 						<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coreandroid64.a" />
 					</ItemGroup>
 				</When>
-				<When Condition="'$(RuntimeIdentifier.Contains(`x86`))' == 'true'">
+				<When Condition="$(RuntimeIdentifier.Contains('x86'))">
 					<ItemGroup>
 						<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coreandroid.a" />
 					</ItemGroup>
 				</When>
 			</Choose>
 		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`iossimulator`))' == 'true'">
+		<When Condition="$(RuntimeIdentifier.StartsWith('iossimulator'))">
 			<ItemGroup>
 				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coreios.sim.a" />
 			</ItemGroup>
 		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`ios`))' == 'true'">
+		<When Condition="$(RuntimeIdentifier.StartsWith('ios'))">
 			<ItemGroup>
 				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coreios.a" />
 			</ItemGroup>
 		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`tvossimulator`))' == 'true'">
+		<When Condition="$(RuntimeIdentifier.StartsWith('tvossimulator'))">
 			<ItemGroup>
 				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coretvos.sim.a" />
 			</ItemGroup>
 		</When>
-		<When Condition="'$(RuntimeIdentifier.StartsWith(`tvos`))' == 'true'">
+		<When Condition="$(RuntimeIdentifier.StartsWith('tvos'))">
 			<ItemGroup>
 				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coretvos.a" />
 			</ItemGroup>

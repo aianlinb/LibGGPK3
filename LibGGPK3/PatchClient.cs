@@ -56,11 +56,6 @@ public class PatchClient : IDisposable {
 	/// </summary>
 	public string? CdnUrl { get; protected set; }
 
-	public PatchClient() {
-		socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-		socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 10000); // 10 seconds
-	}
-
 	public virtual Task ConnectAsync(EndPoint server) {
 		lock (socket) {
 			if (lastRequest is not null && !lastRequest.IsCompleted)
