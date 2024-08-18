@@ -52,9 +52,10 @@ public class MainWindow : Form {
 		layout.BeginVertical();
 		layout.Add(new Button((_, _) => {
 			var ofd = new OpenFileDialog() {
-				Title = "選擇 Content.ggpk"
+				Title = "選擇 Content.ggpk/_.index.bin",
 			};
-			ofd.Filters.Add(new FileFilter("GGPK File", ".ggpk"));
+			ofd.Filters.Add(new("GGPK File", ".ggpk"));
+			ofd.Filters.Add(new("Index File", ".bin"));
 			if (File.Exists(ggpkPath.Text))
 				ofd.FileName = ggpkPath.Text;
 			if (ofd.ShowDialog(this) == DialogResult.Ok)
@@ -129,12 +130,14 @@ public class MainWindow : Form {
 			} catch { /* No permission */ }
 		}
 
-		if (OperatingSystem.IsMacOS() && TrySetPath("~/Library/Application Support/Path of Exile/Content.ggpk", true))
+		if (OperatingSystem.IsMacOS() && (TrySetPath("~/Library/Application Support/Path of Exile/Content.ggpk", true)
+			|| TrySetPath("~/Library/Application Support/Steam/steamapps/common/Path of Exile/Bundles2/_.index.bin", true)))
 			return;
-		if (OperatingSystem.IsWindows() && TrySetPath(@"C:\Program Files (x86)\Grinding Gear Games\Path of Exile\Content.ggpk"))
+		if (OperatingSystem.IsWindows() && (TrySetPath(@"C:\Program Files (x86)\Grinding Gear Games\Path of Exile\Content.ggpk")
+			|| TrySetPath(@"C:\Program Files (x86)\Steam\steamapps\common\Path of Exile\Bundles2\_.index.bin")))
 			return;
 		if (OperatingSystem.IsLinux())
-			TrySetPath("~/.steam/steam/steamapps/common/Path of Exile/Content.ggpk", true);
+			TrySetPath("~/.steam/steam/steamapps/common/Path of Exile/Bundles2/_.index.bin", true);
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		bool TrySetPath(string path, bool expand = false) {
@@ -171,36 +174,51 @@ public class MainWindow : Form {
 				return;
 			}
 
-			output.Append("Reading ggpk: " + path + "\r\n", true);
-			using var ggpk = await Task.Run(() => new GGPK(path));
-			var md5 = json.GetProperty("md5").GetString()!;
-			output.Append("Downloading patch file . . .\r\n", true);
-			var b = await http.GetByteArrayAsync("https://poedb.tw/fg/" + md5 + ".zip");
-			if (!md5.Equals(Convert.ToHexString(System.Security.Cryptography.MD5.HashData(b)), StringComparison.OrdinalIgnoreCase)) {
-				MessageBox.Show(this, "下載檔案的MD5校驗失敗，請檢查網路環境後再重試", "Error", MessageBoxType.Error);
-				output.Append("\r\nMD5 verification failed!\r\n", true);
-				return;
-			}
-			using var zip = new ZipArchive(new MemoryStream(b));
-			var total = zip.Entries.Count(e => !e.FullName.EndsWith('/')/* !dir */);
-			if (zip.Entries.Any(e => e.FullName.Equals("Bundles2/_.index.bin", StringComparison.OrdinalIgnoreCase))) {
-				total -= GGPK.Replace(ggpk.Root, zip.Entries, (fr, p, added) => {
-					output.Append($"{(added ? "Added: " : "Replaced: ")}{p}\r\n");
-					return false;
-				}, true);
+			output.Append("Reading ggpk/index: " + path + "\r\n", true);
+			BundledGGPK? ggpk = null;
+			LibBundle3.Index index;
+			if (path.EndsWith(".bin")) {
+				index = await Task.Run(() => new LibBundle3.Index(path));
 			} else {
-				ggpk.Dispose();
-				using var bggpk = new BundledGGPK(path, false);
-				total -= LibBundle3.Index.Replace(bggpk.Index, zip.Entries, (fr, p) => {
-					output.Append($"Replaced: {p}\r\n");
-					return false;
-				});
+				ggpk =  await Task.Run(() => new BundledGGPK(path, false));
+				index = ggpk.Index;
 			}
-			output.Append("\r\nAll finished!\r\n", true);
-			if (total > 0)
-				output.Append($"Error: {total} files failed to add/replace!\r\n", true);
-			else
-				output.Append("中文化完成!\r\n", true);
+			try {
+				var md5 = json.GetProperty("md5").GetString()!;
+				output.Append("Downloading patch file . . .\r\n", true);
+				var b = await http.GetByteArrayAsync("https://poedb.tw/fg/" + md5 + ".zip");
+				if (!md5.Equals(Convert.ToHexString(System.Security.Cryptography.MD5.HashData(b)), StringComparison.OrdinalIgnoreCase)) {
+					MessageBox.Show(this, "下載檔案的MD5校驗失敗，請檢查網路環境後再重試", "Error", MessageBoxType.Error);
+					output.Append("\r\nMD5 verification failed!\r\n", true);
+					return;
+				}
+				using var zip = new ZipArchive(new MemoryStream(b));
+				var total = zip.Entries.Count(e => !e.FullName.EndsWith('/')/* !dir */);
+				if (zip.Entries.Any(e => e.FullName.Equals("Bundles2/_.index.bin", StringComparison.OrdinalIgnoreCase))) {
+					if (ggpk is null) {
+						zip.ExtractToDirectory(Path.GetDirectoryName(Path.GetDirectoryName(path))!, true);
+						total = 0;
+					} else {
+						total -= GGPK.Replace(ggpk.Root, zip.Entries, (fr, p, added) => {
+							output.Append($"{(added ? "Added: " : "Replaced: ")}{p}\r\n");
+							return false;
+						}, true);
+					}
+				} else {
+					total -= LibBundle3.Index.Replace(index, zip.Entries, (fr, p) => {
+						output.Append($"Replaced: {p}\r\n");
+						return false;
+					});
+				}
+				output.Append("\r\nAll finished!\r\n", true);
+				if (total > 0)
+					output.Append($"Error: {total} files failed to add/replace!\r\n", true);
+				else
+					output.Append("中文化完成!\r\n", true);
+			} finally {
+				index.Dispose();
+				ggpk?.Dispose();
+			}
 		} catch (Exception ex) {
 			MessageBox.Show(this, ex.ToString(), "Error", MessageBoxType.Error);
 			output.Append("Error!\r\n", true);

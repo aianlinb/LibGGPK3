@@ -85,6 +85,7 @@ public static class Program {
 	public static unsafe void Run(Index index) {
 		ApplyTraditionalChinese(index);
 
+		Environment.CurrentDirectory = AppContext.BaseDirectory;
 		if (File.Exists("Font.ttc"))
 			ApplyFont(index, Path.GetFullPath("Font.ttc"));
 		else if (File.Exists("Font.ttf"))

@@ -28,8 +28,10 @@ rmdir /s /q publish\osx-x64\VisualGGPK3.app\Contents\MacOS\VisualGGPK3.app
 rmdir /s /q publish\osx-x64\VPatchGGPK3.app\Contents\MacOS\VPatchGGPK3.app
 rmdir /s /q publish\osx-arm64\VisualGGPK3.app\Contents\MacOS\VisualGGPK3.app
 rmdir /s /q publish\osx-arm64\VPatchGGPK3.app\Contents\MacOS\VPatchGGPK3.app
-mkdir publish\osx-x64\VisualGGPK3.app\Contents\Resources
 mkdir publish\osx-x64\VPatchGGPK3.app\Contents\Resources
+mkdir publish\osx-x64\VisualGGPK3.app\Contents\Resources
+mkdir publish\osx-arm64\VPatchGGPK3.app\Contents\Resources
+mkdir publish\osx-arm64\VisualGGPK3.app\Contents\Resources
 copy /y Examples\Icon.icns publish\osx-x64\VisualGGPK3.app\Contents\Resources\Icon.icns
 copy /y Examples\Icon.icns publish\osx-x64\VPatchGGPK3.app\Contents\Resources\Icon.icns
 copy /y Examples\Icon.icns publish\osx-arm64\VisualGGPK3.app\Contents\Resources\Icon.icns
@@ -44,7 +46,7 @@ del /q publish\linux-x64\*.deps.json
 del /q publish\linux-arm64\*.deps.json
 del /q publish\osx-x64\*.deps.json
 del /q publish\osx-arm64\*.deps.json
-del /q publish\win-x64\Xceed.Wpf.AvalonDock.Themes.*
+del /q publish\win-x64\Xceed.Wpf.AvalonDock.*
 rmdir /s /q publish\win-x64\de
 rmdir /s /q publish\win-x64\es
 rmdir /s /q publish\win-x64\fr
@@ -55,7 +57,7 @@ rmdir /s /q publish\win-x64\ro
 rmdir /s /q publish\win-x64\ru
 rmdir /s /q publish\win-x64\sv
 rmdir /s /q publish\win-x64\zh-Hans
-del /q publish\win-arm64\Xceed.Wpf.AvalonDock.Themes.*
+del /q publish\win-arm64\Xceed.Wpf.AvalonDock.*
 rmdir /s /q publish\win-arm64\de
 rmdir /s /q publish\win-arm64\es
 rmdir /s /q publish\win-arm64\fr

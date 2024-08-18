@@ -18,16 +18,13 @@ dotnet publish Examples/VPatchGGPK3 -c Release -r osx-arm64 -o publish/osx-arm64
 rm -rf publish/osx*/*.app/Contents/MacOS/*.app
 mkdir -p publish/osx-x64/VisualGGPK3.app/Contents/Resources
 mkdir -p publish/osx-x64/VPatchGGPK3.app/Contents/Resources
-cp -f Examples/Icon.icns publish/osx-x64/VisualGGPK3.app/Contents/Resources/Icon.icns
-cp -f Examples/Icon.icns publish/osx-x64/VPatchGGPK3.app/Contents/Resources/Icon.icns
-cp -f Examples/Icon.icns publish/osx-arm64/VisualGGPK3.app/Contents/Resources/Icon.icns
-cp -f Examples/Icon.icns publish/osx-arm64/VPatchGGPK3.app/Contents/Resources/Icon.icns
-cp -f Examples/VisualGGPK3/Info.plist publish/osx-x64/VisualGGPK3.app/Contents/Info.plist
-cp -f Examples/VPatchGGPK3/Info.plist publish/osx-x64/VPatchGGPK3.app/Contents/Info.plist
-cp -f Examples/VisualGGPK3/Info.plist publish/osx-arm64/VisualGGPK3.app/Contents/Info.plist
-cp -f Examples/VPatchGGPK3/Info.plist publish/osx-arm64/VPatchGGPK3.app/Contents/Info.plist
+mkdir -p publish/osx-arm64/VisualGGPK3.app/Contents/Resources
+mkdir -p publish/osx-arm64/VPatchGGPK3.app/Contents/Resources
+cp -f Examples/Icon.icns publish/osx-*/*.app/Contents/Resources/Icon.icns
+cp -f Examples/VisualGGPK3/Info.plist publish/osx-*/VisualGGPK3.app/Contents/Info.plist
+cp -f Examples/VPatchGGPK3/Info.plist publish/osx-*/VPatchGGPK3.app/Contents/Info.plist
 rm -rf publish/*/*.deps.json
-rm -rf publish/win*/Xceed.Wpf.AvalonDock.Themes.*
+rm -rf publish/win*/Xceed.Wpf.AvalonDock.*
 rm -rf publish/win*/de
 rm -rf publish/win*/es
 rm -rf publish/win*/fr

@@ -57,7 +57,7 @@
 		</When>
 		<When Condition="$(RuntimeIdentifier.StartsWith('osx'))">
 			<ItemGroup>
-				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coremac64.a" Condition="$(RuntimeIdentifier.Contains('x64'))" />
+				<NativeLibrary Include="$(SolutionDir)LibBundle3/oo2core/liboo2coremac64.a" Condition="$(RuntimeIdentifier.Contains('64'))" />
 			</ItemGroup>
 		</When>
 		<When Condition="$(RuntimeIdentifier.StartsWith('android'))">

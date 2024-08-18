@@ -1,7 +1,7 @@
 <Project>
 	
 	<Target Name="OSVerification" BeforeTargets="BeforeBuild">
-		<Error Condition="'$(RuntimeIdentifier)' != '' And '$(RuntimeIdentifier.StartsWith(`win`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`linux`))' != 'true' And '$(RuntimeIdentifier.StartsWith(`osx`))' != 'true'" Text="Unsupported operating system: '$(RuntimeIdentifier)'" />
+		<Error Condition="$(RuntimeIdentifier) != '' And !$(RuntimeIdentifier.StartsWith('win')) And !$(RuntimeIdentifier.StartsWith('linux')) And !$(RuntimeIdentifier.StartsWith('osx'))" Text="Unsupported operating system: $(RuntimeIdentifier)" />
 	</Target>
 	
 	<PropertyGroup>
@@ -10,7 +10,7 @@
 	</PropertyGroup>
 	
 	<Choose>
-		<When Condition="$(RuntimeIdentifier.StartsWith('win')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Windows')))">
+		<When Condition="$(RuntimeIdentifier.StartsWith('win')) Or ($(RuntimeIdentifier) == '' And $([MSBuild]::IsOSPlatform('Windows')))">
 			<PropertyGroup>
 				<DefineConstants>Windows;$(DefineConstants)</DefineConstants>
 				<TargetFramework Condition="!$(TargetFramework.EndsWith('-windows'))">$(TargetFramework)-windows</TargetFramework>
@@ -20,7 +20,7 @@
 			</ItemGroup>
 		</When>
 		
-		<When Condition="$(RuntimeIdentifier.StartsWith('osx')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('OSX')))">
+		<When Condition="$(RuntimeIdentifier.StartsWith('osx')) Or ($(RuntimeIdentifier) == '' And $([MSBuild]::IsOSPlatform('OSX')))">
 			<PropertyGroup>
 				<RuntimeIdentifiers Condition="$(RuntimeIdentifiers) == ''">$([System.Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier)</RuntimeIdentifiers>
 				<DefineConstants>Mac;$(DefineConstants)</DefineConstants>
@@ -30,7 +30,7 @@
 			</ItemGroup>
 		</When>
 		
-		<When Condition="$(RuntimeIdentifier.StartsWith('linux')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Linux')))">
+		<When Condition="$(RuntimeIdentifier.StartsWith('linux')) Or ($(RuntimeIdentifier) == '' And $([MSBuild]::IsOSPlatform('Linux')))">
 			<PropertyGroup>
 				<DefineConstants>Linux;$(DefineConstants)</DefineConstants>
 			</PropertyGroup>
