@@ -64,14 +64,19 @@ public class Index : IDisposable {
 	public virtual int MaxBundleSize { get; set; } = 200 * 1024 * 1024;
 
 	protected DirectoryNode? _Root;
-	/// <summary>
-	/// Root node of the tree (This will call <see cref="BuildTree"/> with default implementation when first calling).
-	/// You can also implement your custom class and use <see cref="BuildTree"/>.
-	/// </summary>
-	/// <exception cref="InvalidOperationException">Thrown when <see cref="ParsePaths"/> haven't been called</exception>
-	public virtual DirectoryNode Root => _Root ??= (DirectoryNode)BuildTree(DirectoryNode.CreateInstance, FileNode.CreateInstance);
 
-	public delegate IDirectoryNode CreateDirectoryInstance(string name, IDirectoryNode? parent);
+#pragma warning disable CS1734
+    /// <summary>
+    /// Root node of the tree (This will call <see cref="BuildTree"/> with default implementation when first calling).
+    /// You can also implement your custom class and use <see cref="BuildTree"/> instead of using this.
+	/// <para>This will throw when any file have a null path (See <see cref="ParsePaths"/>)</para>
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when <see cref="ParsePaths"/> haven't been called</exception>
+    /// <exception cref="NullReferenceException">Thrown when a file has null path. See <paramref name="ignoreNullPath"/> of <see cref="ParsePaths"/>.</exception>
+#pragma warning restore CS1734
+    public virtual DirectoryNode Root => _Root ??= (DirectoryNode)BuildTree(DirectoryNode.CreateInstance, FileNode.CreateInstance);
+
+    public delegate IDirectoryNode CreateDirectoryInstance(string name, IDirectoryNode? parent);
 	public delegate IFileNode CreateFileInstance(FileRecord record, IDirectoryNode parent);
 	/// <summary>
 	/// Build a tree to represent the file and directory structure in bundles
@@ -79,7 +84,8 @@ public class Index : IDisposable {
 	/// <param name="createDirectory">Function to create a instance of <see cref="IDirectoryNode"/></param>
 	/// <param name="createFile">Function to create a instance of <see cref="IFileNode"/></param>
 	/// <param name="ignoreNullPath">Whether to ignore files with <see cref="FileRecord.Path"/> as <see langword="null"/> instead of throwing.
-	/// This happens when <see cref="ParsePaths"/> has not been called or failed to parse some paths (returns not 0).</param>
+	/// This happens when <see cref="ParsePaths"/> has not been called or failed to parse some paths (returns not 0).
+	/// <para>The ignored files won't appear in the returned tree</para></param>
 	/// <returns>The root node of the built tree</returns>
 	/// <remarks>
 	/// You can implement your custom class and call this, or just use the default implementation by calling <see cref="Root"/>.
@@ -92,7 +98,7 @@ public class Index : IDisposable {
 			ThrowHelper.Throw<InvalidOperationException>("ParsePaths() must be called before building the tree");
 		var root = createDirectory("", null);
 		foreach (var f in _Files.Values.OrderBy(f => f.Path)) {
-			if (ignoreNullPath && string.IsNullOrEmpty(f.Path))
+			if (!ignoreNullPath && string.IsNullOrEmpty(f.Path))
 				ThrowHelper.Throw<NullReferenceException>("A file has null or empty path, the Index may be broken");
 			var splittedPath = f.Path.AsSpan().Split('/');
 			var parent = root;

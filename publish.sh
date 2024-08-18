@@ -18,6 +18,8 @@ dotnet publish Examples/VPatchGGPK3 -c Release -r osx-arm64 -o publish/osx-arm64
 rm -rf publish/osx*/*.app/Contents/MacOS/*.app
 mkdir -p publish/osx-x64/VisualGGPK3.app/Contents/Resources
 mkdir -p publish/osx-x64/VPatchGGPK3.app/Contents/Resources
+mkdir -p publish/osx-arm64/VisualGGPK3.app/Contents/Resources
+mkdir -p publish/osx-arm64/VPatchGGPK3.app/Contents/Resources
 cp -f Examples/Icon.icns publish/osx-x64/VisualGGPK3.app/Contents/Resources/Icon.icns
 cp -f Examples/Icon.icns publish/osx-x64/VPatchGGPK3.app/Contents/Resources/Icon.icns
 cp -f Examples/Icon.icns publish/osx-arm64/VisualGGPK3.app/Contents/Resources/Icon.icns

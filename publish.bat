@@ -28,8 +28,10 @@ rmdir /s /q publish\osx-x64\VisualGGPK3.app\Contents\MacOS\VisualGGPK3.app
 rmdir /s /q publish\osx-x64\VPatchGGPK3.app\Contents\MacOS\VPatchGGPK3.app
 rmdir /s /q publish\osx-arm64\VisualGGPK3.app\Contents\MacOS\VisualGGPK3.app
 rmdir /s /q publish\osx-arm64\VPatchGGPK3.app\Contents\MacOS\VPatchGGPK3.app
-mkdir publish\osx-x64\VisualGGPK3.app\Contents\Resources
 mkdir publish\osx-x64\VPatchGGPK3.app\Contents\Resources
+mkdir publish\osx-x64\VisualGGPK3.app\Contents\Resources
+mkdir publish\osx-arm64\VPatchGGPK3.app\Contents\Resources
+mkdir publish\osx-arm64\VisualGGPK3.app\Contents\Resources
 copy /y Examples\Icon.icns publish\osx-x64\VisualGGPK3.app\Contents\Resources\Icon.icns
 copy /y Examples\Icon.icns publish\osx-x64\VPatchGGPK3.app\Contents\Resources\Icon.icns
 copy /y Examples\Icon.icns publish\osx-arm64\VisualGGPK3.app\Contents\Resources\Icon.icns
