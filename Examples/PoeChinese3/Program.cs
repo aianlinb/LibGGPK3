@@ -160,29 +160,18 @@ public static class Program {
 		}
 
 		var b = File.ReadAllBytes(fontFilePath);
-		if (font.Size != b.Length || !font.Read().Span.SequenceEqual(b))
-			font.Write(b); // not yet applied
+		if (font.Size != b.Length || !font.Read().Span.SequenceEqual(b)) // not yet applied
+			font.Write(b);
 
 		var str = MemoryMarshal.Cast<byte, char>(xml.Read().Span);
 		var i = str.IndexOf("\">\r\n") + 4;
 		if (str[i..].StartsWith("\t<!-- Added by aianlinb -->"))
 			return; // already applied
 		const string data = "\t<!-- Added by aianlinb -->\r\n"
-			+ "\t<InstalledFont id=\"Custom\" typeface=\"Microsoft JhengHei\" value=\"Art/2DArt/Fonts/Koruri-Regular.ttf\"/>\r\n";
+			+ "\t<InstalledFont id=\"Custom\" typeface=\"Custom\" value=\"Art/2DArt/Fonts/Koruri-Regular.ttf\"/>\r\n";
 		
-		var len = str.Length + data.Length;
-		var result = ArrayPool<char>.Shared.Rent(len);
-		try {
-			var span = result.AsSpan(0, len);
-			var span2 = span;
-			str.CopyToAndSlice(ref span2, i);
-			data.CopyTo(span2);
-			str.CopyTo(span2.Slice(data.Length));
-
-			xml.Write(MemoryMarshal.AsBytes(span));
-		} finally {
-			ArrayPool<char>.Shared.Return(result);
-		}
+		var result = $"{str[..i]}{data}{str[i..]}".Replace("Microsoft JhengHei", "Custom");
+		xml.Write(MemoryMarshal.AsBytes(result.AsSpan()));
 	}
 
 	public static void ApplyNationalFlag(Index index) {

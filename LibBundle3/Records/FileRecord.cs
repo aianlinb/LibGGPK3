@@ -116,7 +116,6 @@ public class FileRecord {
 				index._BundleToWrite = null;
 				ms.SetLength(0);
 				index._BundleStreamToWrite = null;
-				index.WR_BundleStreamToWrite.SetTarget(ms);
 			}
 		}
 		if (saveIndex)
@@ -139,8 +138,10 @@ public class FileRecord {
 			var ms = index._BundleStreamToWrite;
 			if (b is null) {
 				index._BundleToWrite = b = index.GetBundleToWrite(out var originalSize);
-				if (!index.WR_BundleStreamToWrite.TryGetTarget(out index._BundleStreamToWrite))
+				if (!index.WR_BundleStreamToWrite.TryGetTarget(out index._BundleStreamToWrite)) {
 					index._BundleStreamToWrite = new(originalSize + newSize);
+					index.WR_BundleStreamToWrite.SetTarget(index._BundleStreamToWrite);
+				}
 				ms = index._BundleStreamToWrite;
 				ms.Write(index._BundleToWrite.ReadWithoutCache(0, originalSize)); // Read original data of bundle
 			}
@@ -158,7 +159,6 @@ public class FileRecord {
 				index._BundleToWrite = null;
 				ms.SetLength(0);
 				index._BundleStreamToWrite = null;
-				index.WR_BundleStreamToWrite.SetTarget(ms);
 			}
 		}
 		if (saveIndex)

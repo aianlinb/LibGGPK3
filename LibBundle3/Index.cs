@@ -273,7 +273,7 @@ public class Index : IDisposable {
 				_BundleToWrite.Save(new(_BundleStreamToWrite!.GetBuffer(), 0, (int)_BundleStreamToWrite.Length));
 				_BundleToWrite.Dispose();
 				_BundleToWrite = null;
-				_BundleStreamToWrite.Dispose();
+				_BundleStreamToWrite.SetLength(0);
 			}
 			_BundleStreamToWrite = null;
 
@@ -867,6 +867,7 @@ public class Index : IDisposable {
 			}
 			_BundleStreamToWrite?.Dispose();
 			_BundleStreamToWrite = null;
+			WR_BundleStreamToWrite.SetTarget(null!);
 			baseBundle.Dispose();
 			_Bundles = null!;
 			_Root = null;
