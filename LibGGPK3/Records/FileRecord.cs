@@ -1,13 +1,9 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
-using SystemExtensions;
 using SystemExtensions.Spans;
 using SystemExtensions.Streams;
 
@@ -71,10 +67,10 @@ public class FileRecord : TreeNode {
 		if (Ggpk.Record.GGPKVersion == 4) {
 			Span<byte> span = stackalloc byte[Name.Length * sizeof(int)];
 			s.Write(span[..Encoding.UTF32.GetBytes(Name, span)]);
-			s.Seek(sizeof(int), SeekOrigin.Current); // Null terminator
+			s.Write(0); // Null terminator
 		} else {
 			s.Write(Name);
-			s.Seek(sizeof(char), SeekOrigin.Current); // Null terminator
+			s.Write<short>(0); // Null terminator
 		}
 		// Actual file content writing of FileRecord isn't here (see Write())
 	}
