@@ -62,4 +62,6 @@ public abstract class FileTreeItem : ITreeItem {
 			};
 		}
 	}
+
+	public abstract string GetPath();
 }

@@ -18,4 +18,6 @@ public class GGPKFileTreeItem : FileTreeItem {
 	public override void Write(ReadOnlySpan<byte> content) {
 		Record.Write(content);
 	}
+
+	public override string GetPath() => Record.GetPath();
 }

@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-	
+
 	<ItemGroup>
 		<EmbeddedResource Include="Resources/dir.ico" />
 		<EmbeddedResource Include="Resources/file.ico" />
 		<ProjectReference Include="../../LibBundledGGPK3/LibBundledGGPK3.csproj" />
-		<PackageReference Include="Magick.NET-Q8-AnyCPU" Version="*" />
+		<PackageReference Include="Pfim" Version="*" />
 	</ItemGroup>
-	
+
 	<Import Project="../EtoForms.props" />
-	
+
 </Project>

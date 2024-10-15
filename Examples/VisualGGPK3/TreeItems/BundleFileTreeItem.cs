@@ -22,6 +22,8 @@ public class BundleFileTreeItem : FileTreeItem, IFileNode {
 		Record.Write(content, true);
 	}
 
+	public override string GetPath() => Record.Path;
+
 	protected internal static IFileNode CreateInstance(FileRecord record, IDirectoryNode parent) {
 		return new BundleFileTreeItem(record, (BundleDirectoryTreeItem)parent);
 	}

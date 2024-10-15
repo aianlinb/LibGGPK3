@@ -4,11 +4,19 @@
 		{
 			"type": "dotnet",
 			"task": "build",
+			"label": "dotnet: build"
+		},
+		{
+			"type": "shell",
+			"label": "PostBuild",
+			"command": "cp -f bin/Debug/liboo2core.dylib bin/Debug/net8.0/VisualGGPK3.app/Contents/MacOS/ && cp -f bin/Debug/liboo2core.dylib bin/Debug/net8.0/VPatchGGPK3.app/Contents/MacOS/",
 			"group": {
 				"kind": "build",
 				"isDefault": true
 			},
-			"label": "dotnet: build"
+			"dependsOn": [
+                "dotnet: build"
+            ]
 		}
 	]
 }

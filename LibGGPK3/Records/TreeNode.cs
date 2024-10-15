@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using System.Text;
 
 using SystemExtensions;
 using SystemExtensions.Collections;
@@ -169,10 +170,10 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// Get the full path in GGPK of this File/Directory
 	/// </summary>
 	public string GetPath() {
-		var builder = new ValueList<char>(stackalloc char[256]);
+		var builder = new ValueList<char>(stackalloc char[128]);
 		try {
 			GetPath(ref builder);
-			return new(builder.AsSpan());
+			return new(builder.AsReadOnlySpan());
 		} finally {
 			builder.Dispose();
 		}
@@ -277,6 +278,42 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 			foreach (var t in dr)
 				foreach (var tt in RecurseTree(t))
 					yield return tt;
+	}
+
+	/// <summary>
+	/// Recurse all <see cref="FileRecord"/> under <paramref name="node"/> (include self)
+	/// </summary>
+	/// <returns>A tuple of <see cref="FileRecord"/> and its relative path to <paramref name="node"/>
+	/// (or <see cref="string.Empty"/> if <paramref name="node"/> is <see cref="FileRecord"/>)</returns>
+	public static IEnumerable<(FileRecord, string)> RecurseFiles(TreeNode node) {
+		var builder = new StringBuilder(128);
+		return RecurseFiles(node);
+
+		IEnumerable<(FileRecord, string)> RecurseFiles(TreeNode node) {
+			if (node is FileRecord f)
+				yield return (f, string.Empty);
+			else if (node is DirectoryRecord d)
+				foreach (var t in d) {
+					foreach (var c in Core(t))
+						yield return c;
+
+					IEnumerable<(FileRecord, string)> Core(TreeNode n) {
+						if (n is FileRecord fr) {
+							builder.Append(fr.Name);
+							var result = builder.ToString();
+							builder.Length -= fr.Name.Length;
+							yield return (fr, result);
+						} else if (n is DirectoryRecord dr) {
+							builder.Append(dr.Name);
+							builder.Append('/');
+							foreach (var tn in dr)
+								foreach (var e in Core(tn))
+									yield return e;
+							builder.Length -= dr.Name.Length + 1;
+						}
+					}
+				}
+		}
 	}
 
 	protected void ThrowIfNameEmptyOrContainsSlash() {

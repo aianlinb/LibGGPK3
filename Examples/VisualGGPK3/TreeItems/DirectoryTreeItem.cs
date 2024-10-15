@@ -5,6 +5,8 @@ using System.Reflection;
 using Eto.Drawing;
 using Eto.Forms;
 
+using SystemExtensions.Collections;
+
 namespace VisualGGPK3.TreeItems;
 public abstract class DirectoryTreeItem : ITreeItem {
 	protected internal static readonly Bitmap DirectoryIcon;
@@ -61,5 +63,28 @@ public abstract class DirectoryTreeItem : ITreeItem {
 
 	public abstract int Extract(string path);
 
+	public abstract int Extract(Action<string, ReadOnlyMemory<byte>> callback, string endsWith = "");
+
 	public abstract int Replace(string path);
+
+	public abstract string GetPath();
+
+	public static string GetPath(ITreeItem node) {
+		var builder = new ValueList<char>(stackalloc char[128]);
+		using (builder) {
+#pragma warning disable CS0728
+            GetPath(ref builder, node);
+#pragma warning restore CS0728
+            return new(builder.AsReadOnlySpan());
+		}
+	}
+
+	private static void GetPath(ref ValueList<char> builder, ITreeItem node) {
+		if (node.Parent is null) // Root
+			return;
+		GetPath(ref builder, node.Parent);
+		builder.AddRange(node.Text.AsSpan());
+		if (node is DirectoryTreeItem)
+			builder.Add('/');
+	}
 }

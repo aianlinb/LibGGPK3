@@ -394,7 +394,7 @@ public class Index : IDisposable {
 	}
 
 	/// <summary>
-	/// Extract files under a <paramref name="node"/> recursively (out of order). 
+	/// Extract files under a <paramref name="node"/> recursively (out of order).
 	/// </summary>
 	/// <param name="node">Node to extract</param>
 	/// <param name="callback">Function to execute on each file, see <see cref="FileHandler"/></param>
@@ -529,7 +529,7 @@ public class Index : IDisposable {
 
 			if (!index._Files.TryGetValue(index.NameHash(e.FullName), out var fr))
 				ThrowHelper.Throw<FileNotFoundException>("Could not found file in Index: " + e.FullName);
-			
+
 			var length = (int)e.Length;
 			using (var fs = e.Open())
 				fr.Write(span => fs.ReadAtLeast(span, length), length);
@@ -566,7 +566,7 @@ public class Index : IDisposable {
 				index.EnsureNotDisposed();
 			} else if (fr.BundleRecord.Index != index)
 				ThrowHelper.Throw<InvalidOperationException>("Attempt to mixedly use FileRecords come from different Index");
-			
+
 			var p = path + fn.Record.Path[trim..];
 			if (File.Exists(p)) {
 				fr.Write(File.ReadAllBytes(p));
@@ -826,13 +826,13 @@ public class Index : IDisposable {
 	}
 
 	/// <summary>
-	/// Sort files with index of their bundle (<see cref="BundleRecord.BundleIndex"/>) with CountingSort (stable) to get better performance for reading.
+	/// Sort files by index of their bundle (<see cref="BundleRecord.BundleIndex"/>) with CountingSort (stable) to get better performance for reading.
 	/// </summary>
 	/// <remarks>
 	/// <code>IEnumerable&lt;FileRecord&gt;.GroupBy(f => f.BundleRecord);</code> can also achieve similar purposes in some case.
 	/// </remarks>
 	/// <seealso cref="Enumerable.GroupBy{TSource, TKey}(IEnumerable{TSource}, Func{TSource, TKey})"/>
-	public static unsafe FileRecord[] SortWithBundle(IEnumerable<FileRecord> files) {
+	public static unsafe FileRecord[] SortByBundle(IEnumerable<FileRecord> files) {
 		var list = files is IReadOnlyList<FileRecord> irl ? irl : files is IList<FileRecord> il ? il.AsIReadOnly() : files.ToList();
 		if (list.Count <= 0)
 			return [];
@@ -841,7 +841,7 @@ public class Index : IDisposable {
 		var count = new int[bundleCount];
 		foreach (var f in list) {
 			if (f.BundleRecord.Index != index)
-				throw new InvalidOperationException("Attempt to mixedly use FileRecords come from different Index");
+				ThrowHelper.Throw<InvalidOperationException>("Attempt to mixedly use FileRecords come from different Index");
 			++count[f.BundleRecord.BundleIndex];
 		}
 		for (var i = 1; i < bundleCount; ++i)

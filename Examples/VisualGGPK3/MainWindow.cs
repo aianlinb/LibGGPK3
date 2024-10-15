@@ -1,17 +1,23 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Eto.Drawing;
 using Eto.Forms;
 
-using ImageMagick;
-
 using LibBundledGGPK3;
+using LibGGPK3;
+
+using Pfim;
+
+using SystemExtensions;
 
 using VisualGGPK3.TreeItems;
 
@@ -69,36 +75,13 @@ public sealed class MainWindow : Form {
 		GGPKTree.SelectionChanged += OnSelectionChanged;
 		BundleTree.SelectionChanged += OnSelectionChanged;
 
-		var menu = new ContextMenu(
-			new ButtonMenuItem(OnExtractClicked) { Text = "Extract" },
-			new ButtonMenuItem(OnReplaceClicked) { Text = "Replace" },
-			new ButtonMenuItem(OnCopyPathClicked) { Text = "Copy Path" }
-		);
-		GGPKTree.MouseUp += (s, e) => {
-			if (e.Buttons == MouseButtons.Alternate && GGPKTree.GetNodeAt(e.Location) is ITreeItem item) {
-				clickedItem = item;
-				menu.Show(GGPKTree);
-			}
-		};
-		BundleTree.MouseUp += (s, e) => {
-			if (e.Buttons == MouseButtons.Alternate && BundleTree.GetNodeAt(e.Location) is ITreeItem item) {
-				clickedItem = item;
-				menu.Show(BundleTree);
-			}
-		};
-		var menu2 = new ContextMenu(new ButtonMenuItem(OnSaveAsPngClicked) { Text = "Save as png" });
-		ImagePanel.MouseUp += (s, e) => {
-			if (e.Buttons == MouseButtons.Alternate)
-				menu2.Show(ImagePanel, e.Location);
-		};
-
 		var layout = new Splitter() {
 			Panel1 = GGPKTree,
 			Panel1MinimumSize = 10,
 			Panel2 = new Splitter() {
 				Panel1 = BundleTree,
 				Panel1MinimumSize = 10,
-				Panel2 = new Label() { Text = "This program is not yet complete" },
+				Panel2 = new Label() { Text = "This program hasn't been completed yet" },
 				Panel2MinimumSize = 10,
 				SplitterWidth = 4,
 				Position = 240
@@ -117,14 +100,14 @@ public sealed class MainWindow : Form {
 		Content = layout;
 		LoadComplete += OnLoadComplete;
 
-		async void OnLoadComplete(object? sender, EventArgs _) {
+		async void OnLoadComplete(object? sender, EventArgs e) {
 			LoadComplete -= OnLoadComplete;
 			await Task.Yield();
 			if (path is null || !File.Exists(path)) {
-				var ofd = new OpenFileDialog() {
+				using var ofd = new OpenFileDialog() {
 					FileName = "Content.ggpk",
 					Filters = {
-						new("GGPK/Index File", ".ggpk", ".index.bin"),
+						new("GGPK/Index File", ".ggpk", ".bin"),
 						allFilesFilters
 					}
 				};
@@ -141,12 +124,11 @@ public sealed class MainWindow : Form {
 					Index = new(path, false); // false to parsePaths manually
 					return Index.ParsePaths();
 				});
-				GGPKTree.DataStore = new DriveDirectoryTreeItem(Path.GetDirectoryName(path)!, null, GGPKTree) {
-					Expanded = true
-				};
-
-				if (failed != 0)
-					MessageBox.Show(this, $"There're {failed} files failed to parse the path, your ggpk file may be broken.", "Warning", MessageBoxType.Warning);
+				GGPKTree.DataStore = null;
+				GGPKTree.Visible = false;
+				GGPKTree.Enabled = false;
+				layout.Panel1MinimumSize = 0;
+				layout.Position = 0;
 			} else {
 				failed = await Task.Run(() => {
 					Ggpk = new(path, false); // false to parsePaths manually
@@ -156,14 +138,49 @@ public sealed class MainWindow : Form {
 				GGPKTree.DataStore = new GGPKDirectoryTreeItem(Ggpk!.Root, null, GGPKTree) {
 					Expanded = true
 				};
+			}
+			var buildTreeTask = failed == Index!.Files.Count ? Task.FromResult<BundleDirectoryTreeItem>(null!) :
+				Task.Run(() => (BundleDirectoryTreeItem)Index!.BuildTree(BundleDirectoryTreeItem.GetFuncCreateInstance(BundleTree), BundleFileTreeItem.CreateInstance, true));
+			if (failed != 0)
+				MessageBox.Show(this, $"There're {failed} files failed to parse the path, your ggpk file may be broken.", "Warning", MessageBoxType.Warning);
 
-				if (failed != 0)
-					MessageBox.Show(this, $"There're {failed} files failed to parse the path, your ggpk file may be broken.", "Warning", MessageBoxType.Warning);
+			var menu = new ContextMenu(
+				new ButtonMenuItem(OnExtractClicked) { Text = "Extract" },
+				new ButtonMenuItem(OnReplaceClicked) { Text = "Replace" },
+				new ButtonMenuItem(OnCopyPathClicked) { Text = "Copy Path" },
+				new ButtonMenuItem(OnExportDdsClicked) { Text = "Export .dds to .png" }
+			);
+			GGPKTree.MouseUp += (s, e) => {
+				if (e.Buttons == MouseButtons.Alternate && GGPKTree.GetNodeAt(e.Location) is ITreeItem item) {
+					clickedItem = item;
+					menu.Show(GGPKTree);
+				}
+			};
+			BundleTree.MouseUp += (s, e) => {
+				if (e.Buttons == MouseButtons.Alternate && BundleTree.GetNodeAt(e.Location) is ITreeItem item) {
+					clickedItem = item;
+					menu.Show(BundleTree);
+				}
+			};
+			var menu2 = new ContextMenu(new ButtonMenuItem(OnSaveAsPngClicked) { Text = "Save as png" });
+			ImagePanel.MouseUp += (s, e) => {
+				if (e.Buttons == MouseButtons.Alternate)
+					menu2.Show(ImagePanel, e.Location);
+			};
+
+			GGPKTree.DragEnter += OnDragEnter;
+			GGPKTree.DragDrop += OnDragDrop;
+			GGPKTree.AllowDrop = true;
+			BundleTree.DragEnter += OnDragEnter;
+			BundleTree.DragDrop += OnDragDrop;
+			BundleTree.AllowDrop = true;
+
+			if (failed == Index.Files.Count) { // All failed
+				BundleTree.DataStore = null;
+				return;
 			}
 
-			if (failed == Index!.Files.Count) // All failed
-				return;
-			var bundles = await Task.Run(() => (BundleDirectoryTreeItem)Index!.BuildTree(BundleDirectoryTreeItem.GetFuncCreateInstance(BundleTree), BundleFileTreeItem.CreateInstance, true));
+			var bundles = await buildTreeTask;
 			bundles.Expanded = true;
 			BundleTree.DataStore = bundles;
 		}
@@ -172,7 +189,7 @@ public sealed class MainWindow : Form {
 	private void OnSelectionChanged(object? sender, EventArgs _) {
 #pragma warning disable CS0618 // Obsolete
 		var item = (sender as TreeView)?.SelectedItem;
-#pragma warning restore CS0618 // Obsolete
+#pragma warning restore CS0618
 		if (item is null)
 			return;
 #if Windows
@@ -213,9 +230,6 @@ public sealed class MainWindow : Form {
 						imageName = Path.GetFileNameWithoutExtension(fileItem.Name);
 						if (fileItem is GGPKFileTreeItem g)
 							ImagePanel.Image = new Bitmap(g.Record.Read());
-						else if (fileItem is DriveFileTreeItem d)
-							using (var stream = File.OpenRead(d.Path))
-								ImagePanel.Image = new Bitmap(stream);
 						else
 							ImagePanel.Image = new Bitmap(fileItem.Read().ToArray());
 						panel.Panel2 = ImagePanel;
@@ -226,8 +240,6 @@ public sealed class MainWindow : Form {
 						ReadOnlySpan<byte> data;
 						if (fileItem is GGPKFileTreeItem g2)
 							data = g2.Record.Read();
-						else if (fileItem is DriveFileTreeItem d)
-							data = File.ReadAllBytes(d.Path);
 						else
 							data = fileItem.Read().Span;
 
@@ -247,18 +259,17 @@ public sealed class MainWindow : Form {
 							}
 						}
 
-						using (var image = new MagickImage(data))
-							ImagePanel.Image = new Bitmap(image.ToByteArray(MagickFormat.Bmp));
+						ImagePanel.Image = GetDdsBitmap(data);
 						panel.Panel2 = ImagePanel;
 						break;
 					case FileTreeItem.DataFormat.Dat:
-					// TODO
-					//panel.Panel2 = DatPanel;
-					//break;
+					// TODO: LibDat3
+					// 	panel.Panel2 = DatPanel;
+					// 	break;
 					default:
 						TextPanel.Text = "";
 						panel.Panel2 = TextPanel;
-						//DatPanel.DataStore = null;
+						// DatPanel.DataStore = null;
 						break;
 				}
 			} catch (Exception ex) {
@@ -280,6 +291,7 @@ public sealed class MainWindow : Form {
 			};
 			if (sfd.ShowDialog(this) != DialogResult.Ok)
 				return;
+			Directory.CreateDirectory(Path.GetDirectoryName(sfd.FileName)!);
 			var span = fi.Read().Span;
 			using (var f = File.OpenHandle(sfd.FileName, FileMode.Create, FileAccess.Write, FileShare.None, FileOptions.None, span.Length))
 				RandomAccess.Write(f, span, 0);
@@ -292,7 +304,7 @@ public sealed class MainWindow : Form {
 			};
 			if (sfd.ShowDialog(this) != DialogResult.Ok)
 				return;
-			var dir = Path.GetDirectoryName(sfd.FileName)!;
+			var dir = Directory.CreateDirectory(Path.GetDirectoryName(sfd.FileName)!).FullName;
 			MessageBox.Show(this, $"Extracted {di.Extract(dir)} files to\r\n{dir}", "Done", MessageBoxType.Information);
 		}
 	}
@@ -300,7 +312,7 @@ public sealed class MainWindow : Form {
 	private void OnReplaceClicked(object? sender, EventArgs _) {
 		if (clickedItem is FileTreeItem fi) {
 			var ext = "*" + Path.GetExtension(fi.Name);
-			var ofd = new OpenFileDialog() {
+			using var ofd = new OpenFileDialog() {
 				FileName = fi.Name,
 				Filters = {
 					new(ext, ext),
@@ -313,7 +325,7 @@ public sealed class MainWindow : Form {
 			fi.Write(b);
 			MessageBox.Show(this, $"Replaced {b.Length} bytes from\r\n{ofd.FileName}", "Done", MessageBoxType.Information);
 		} else if (clickedItem is DirectoryTreeItem di) {
-			var ofd = new OpenFileDialog() {
+			using var ofd = new OpenFileDialog() {
 				CheckFileExists = false,
 				FileName = "{OPEN IN A FOLDER}",
 				Filters = { allFilesFilters }
@@ -335,17 +347,9 @@ public sealed class MainWindow : Form {
 	private void OnCopyPathClicked(object? sender, EventArgs _) {
 		if (clickedItem is null)
 			return;
-		var builder = new StringBuilder(128);
-		GetPath(clickedItem, builder);
-		Clipboard.Instance.Text = builder.ToString();
-	}
-	private static void GetPath(ITreeItem node, StringBuilder builder) {
-		if (node.Parent is null) // Root
-			return;
-		GetPath(node.Parent, builder);
-		builder.Append(node.Text);
-		if (node is DirectoryTreeItem)
-			builder.Append('/');
+		Clipboard.Instance.Text = clickedItem is DirectoryTreeItem di
+			? di.GetPath()
+			: ((FileTreeItem)clickedItem).GetPath();
 	}
 
 	private void OnSaveAsPngClicked(object? sender, EventArgs _) {
@@ -358,8 +362,117 @@ public sealed class MainWindow : Form {
 		};
 		if (sfd.ShowDialog(this) != DialogResult.Ok)
 			return;
-		(ImagePanel.Image as Bitmap)!.Save(sfd.FileName, ImageFormat.Png);
+		Directory.CreateDirectory(Path.GetDirectoryName(sfd.FileName)!);
+		(ImagePanel.Image as Bitmap)!.Save(sfd.FileName, Eto.Drawing.ImageFormat.Png);
+	}
+
+	private void OnExportDdsClicked(object? sender, EventArgs _) {
+		if (clickedItem is FileTreeItem fi) {
+			if (fi.Format != FileTreeItem.DataFormat.Dds) {
+				MessageBox.Show(this, "Selected file is not a dds image", "Error", MessageBoxType.Error);
+				return;
+			}
+			var sfd = new SaveFileDialog() {
+				FileName = Path.GetFileNameWithoutExtension(fi.Name) + ".png",
+				Filters = {
+					new("*.png", "*.png"),
+					allFilesFilters
+				}
+			};
+			if (sfd.ShowDialog(this) != DialogResult.Ok)
+				return;
+			Directory.CreateDirectory(Path.GetDirectoryName(sfd.FileName)!);
+			GetDdsBitmap(fi.Read().Span).Save(sfd.FileName, Eto.Drawing.ImageFormat.Png);
+			MessageBox.Show(this, $"Saved {sfd.FileName}", "Done", MessageBoxType.Information);
+		} else if (clickedItem is DirectoryTreeItem di) {
+			var sfd = new SaveFileDialog() {
+				CheckFileExists = false,
+				FileName = di.Name + ".dir",
+				Filters = { allFilesFilters }
+			};
+			if (sfd.ShowDialog(this) != DialogResult.Ok)
+				return;
+			var dir = Path.Combine(Path.GetDirectoryName(sfd.FileName)!, di.Name);
+			int failed = 0;
+			var count = di.Extract((path, data) => {
+				var filename = Path.GetFileNameWithoutExtension(path);
+				path = Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(dir, path))!).FullName;
+				try {
+					var bitmap = GetDdsBitmap(data.Span);
+					bitmap.Save(Path.Combine(path, filename + ".png"), Eto.Drawing.ImageFormat.Png);
+				} catch {
+					Interlocked.Increment(ref failed);
+				}
+			}, ".dds");
+			if (failed == 0)
+				MessageBox.Show(this, $"Exported {count} files to\r\n{dir}", "Done", MessageBoxType.Information);
+			else
+				MessageBox.Show(this, $"Exported {count} files to\r\n{dir}\r\n{failed} files failed!", "Done", MessageBoxType.Warning);
+		}
 	}
 
 	private static readonly FileFilter allFilesFilters = new("All Files", "*");
+
+	private void OnDragEnter(object? sender, DragEventArgs e) {
+		if (Index is not null && e.Data.ContainsUris)
+			e.Effects = DragEffects.Copy;
+	}
+
+	private void OnDragDrop(object? sender, DragEventArgs e) {
+		if (Index is null || !e.Data.ContainsUris)
+			return;
+
+		try {
+			var uris = e.Data.Uris;
+			if (uris.Length != 1)
+				goto err;
+			var uri = uris[0];
+			if (!uri.IsFile)
+				goto err;
+			var path = uri.LocalPath;
+			if (!path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
+				goto err;
+
+			int count;
+			using (var zip = ZipFile.OpenRead(path)) {
+				if (sender == GGPKTree) {
+					if (Ggpk is null)
+						throw ThrowHelper.Create<InvalidOperationException>("GGPK replacing is not supported in Steam/Epic mode");
+					else
+						count = GGPK.Replace(Ggpk.Root, zip.Entries);
+				} else
+					count = LibBundle3.Index.Replace(Index!, zip.Entries);
+			}
+			MessageBox.Show(this, $"Replaced {count} files!", "Done", MessageBoxType.Information);
+		} catch (Exception ex) {
+			MessageBox.Show(this, ex.ToString(), "Error", MessageBoxType.Error);
+		}
+
+		return;
+	err:
+		MessageBox.Show(this, "Only a single zip file is allowed", "Error", MessageBoxType.Error);
+		return;
+	}
+
+	private static unsafe Bitmap GetDdsBitmap(ReadOnlySpan<byte> data) {
+		fixed (byte* p = data) {
+			using var image = Dds.Create(new UnmanagedMemoryStream(p, data.Length), new(allocator: ArrayPoolAllocator.Instance));
+			var format = image.Format switch {
+				Pfim.ImageFormat.Rgba32 => PixelFormat.Format32bppRgba,
+				Pfim.ImageFormat.Rgb24 => PixelFormat.Format24bppRgb,
+				_ => throw ThrowHelper.Create<NotSupportedException>()
+			};
+			return new Bitmap(image.Width, image.Height, format, ToColors(image.Data, format));
+		}
+
+		static IEnumerable<Color> ToColors(byte[] data, PixelFormat format) {
+			var argb = format == PixelFormat.Format32bppRgba;
+			var bpp = argb ? 4 : 3;
+
+			for (var i = 0; i < data.Length; i += bpp) {
+				var pixel = MemoryMarshal.Read<int>(new(data, i, sizeof(int)));
+				yield return argb ? Color.FromArgb(pixel) : Color.FromRgb(pixel);
+			}
+		}
+	}
 }

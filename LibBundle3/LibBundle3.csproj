@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-	
+
 	<PropertyGroup>
 		<Description>Library for bundles in Content.ggpk of game PathOfExile (Rewrite of LibBundle)</Description>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 	</PropertyGroup>
-	
+
 	<ItemGroup>
-		<PackageReference Include="aianlinb.SystemExtensions" Version="1.7.2" />
+		<PackageReference Include="aianlinb.SystemExtensions" Version="1.7.4" />
 	</ItemGroup>
-	
+
 </Project>

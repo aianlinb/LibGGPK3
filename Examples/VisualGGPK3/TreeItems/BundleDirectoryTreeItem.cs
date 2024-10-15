@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 using Eto;
@@ -42,12 +43,25 @@ public class BundleDirectoryTreeItem : DirectoryTreeItem, IDirectoryNode {
 	}
 
 	public override int Extract(string path) { // TODO: Progress
-		return Index.Extract(this, path);
+		return Index.ExtractParallel(this, path);
+	}
+
+	public override int Extract(Action<string, ReadOnlyMemory<byte>> callback, string endsWith = "") { // TODO: Progress
+		endsWith = endsWith.ToLowerInvariant();
+		var basePath = GetPath().Length;
+		return Index.ExtractParallel(Index.Recursefiles(this).Select(fn => fn.Record)
+			.Where(fr => fr.Path.EndsWith(endsWith, StringComparison.Ordinal)), (fr, data) => {
+			if (data.HasValue)
+				callback(fr.Path[basePath..], data.Value);
+			return false;
+		});
 	}
 
 	public override int Replace(string path) { // TODO: Progress
 		return Index.Replace(this, path);
 	}
+
+	public override string GetPath() => ITreeNode.GetPath(this);
 
 	protected internal static Index.CreateDirectoryInstance GetFuncCreateInstance(TreeView tree) {
 		IDirectoryNode CreateInstance(string name, IDirectoryNode? parent) {

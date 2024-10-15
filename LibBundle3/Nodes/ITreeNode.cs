@@ -20,10 +20,16 @@ public interface ITreeNode {
 	/// </summary>
 	[SkipLocalsInit]
 	public static string GetPath(ITreeNode node) {
-		var builder = new ValueList<char>(stackalloc char[256]);
-		node.GetPath(ref builder);
-		using (builder)
-			return builder.AsSpan().ToString();
+		if (node is IFileNode fn)
+			return fn.Record.Path;
+
+		var builder = new ValueList<char>(stackalloc char[128]);
+		try {
+			node.GetPath(ref builder);
+			return new(builder.AsReadOnlySpan());
+		} finally {
+			builder.Dispose();
+		}
 	}
 	private void GetPath(scoped ref ValueList<char> builder) {
 		if (Parent is null) // Root
