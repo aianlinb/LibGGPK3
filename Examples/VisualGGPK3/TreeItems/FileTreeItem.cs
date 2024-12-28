@@ -41,23 +41,26 @@ public abstract class FileTreeItem : ITreeItem {
 	public enum DataFormat {
 		Unknown,
 		Text,
-		Dat,
 		Image,
-		Dds,
-		OGG
+		DdsImage,
+		// Following are not implemented yet
+		Dat,
+		Sound,
+		Video
 	}
 	public DataFormat Format {
 		get {
 			var ext = Path.GetExtension(Name).ToLowerInvariant();
 			if (ext == ".header")
-				return Name.EndsWith(".dds.header", StringComparison.OrdinalIgnoreCase) ? DataFormat.Dds : DataFormat.Unknown;
+				return Name.EndsWith(".dds.header", StringComparison.OrdinalIgnoreCase) ? DataFormat.DdsImage : DataFormat.Unknown;
 			return ext switch {
-				".act" or ".ais" or ".amd" or ".ao" or ".aoc" or ".arl" or ".arm" or ".atlas" or ".cht" or ".clt" or ".dct" or ".ddt" or ".dgr" or ".dlp" or ".ecf" or ".edp" or ".env" or ".epk" or ".et" or ".ffx" or ".fxgraph" or ".gft" or ".gt" or ".idl" or ".idt" or ".json" or ".mat" or ".mtd" or ".ot" or ".otc" or ".pet" or ".red" or ".rs" or ".sm" or ".tgr" or ".tgt" or ".trl" or ".tsi" or ".tst" or ".ui" or ".xml" or ".it" or ".itc" // Unicode
-				or ".txt" or ".csv" or ".filter" or ".fx" or ".hlsl" or ".mel" or ".properties" or ".slt" => DataFormat.Text, // UTF8
-				".dat" or ".dat64" or ".datl" or ".datl64" => DataFormat.Dat,
-				".dds" => DataFormat.Dds,
+				".act" or ".ais" or ".amd" or ".ao" or ".aoc" or ".arl" or ".arm" or ".atlas" or ".cht" or ".clt" or ".dct" or ".ddt" or ".dgr" or ".dlp" or ".ecf" or ".edp" or ".env" or ".epk" or ".et" or ".ffx" or ".fxgraph" or ".gft" or ".gt" or ".idl" or ".idt" or ".json" or ".mat" or ".mtd" or ".ot" or ".otc" or ".pet" or ".red" or ".rs" or ".sm" or ".tgr" or ".tgt" or ".trl" or ".tsi" or ".tst" or ".ui" or ".xml" or ".it" or ".itc" or ".tmo"  or ".toy" // Unicode
+				or ".txt" or ".csv" or ".filter" or ".fx" or ".hlsl" or ".mel" or ".properties" or ".slt" or ".config" or ".h" => DataFormat.Text, // UTF8
+				".dat" or ".dat64" or ".datc" or ".datc64" or ".datl" or ".datl64" or "datlc" or "datlc64" => DataFormat.Dat,
+				".dds" => DataFormat.DdsImage,
 				".jpg" or ".png" or ".bmp" or ".gif" or ".jpeg" or ".ico" or ".tiff" => DataFormat.Image,
-				".ogg" or ".ogv" or ".oga" or ".spx" or ".ogx" => DataFormat.OGG,
+				".ogg" or ".bank" or ".wav" or ".mp3" => DataFormat.Sound,
+				".bk2" or ".mp4" => DataFormat.Video,
 				_ => DataFormat.Unknown
 			};
 		}

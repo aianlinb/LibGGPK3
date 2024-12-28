@@ -192,7 +192,7 @@ public class Index : IDisposable {
 
 		if (parsePaths) {
 			var failed = ParsePaths();
-			if (failed != 0)
+			if (failed != 0) // To ignore these files, pass false to parsePaths and call ParsePaths manually.
 				ThrowHelper.Throw<InvalidDataException>($"Parsing path failed for {failed} files");
 		}
 	}

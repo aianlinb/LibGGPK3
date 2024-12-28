@@ -44,6 +44,14 @@ public class PatchClient : IDisposable {
 		/// patch.pathofexile.tw:12999
 		/// </summary>
 		public static readonly DnsEndPoint TW = new("patch.pathofexile.tw", 12999);
+		/// <summary>
+		/// patch.pathofexile2.com:13064
+		/// </summary>
+		public static readonly DnsEndPoint US2 = new("patch.pathofexile2.com", 13064);
+		/// <summary>
+		/// patch.pathofexile2.tw:13070
+		/// </summary>
+		public static readonly DnsEndPoint TW2 = new("patch.pathofexile2.tw", 13070);
 	}
 
 	protected readonly Socket socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);

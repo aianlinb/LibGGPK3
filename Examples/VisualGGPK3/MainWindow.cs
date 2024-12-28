@@ -29,7 +29,7 @@ public sealed class MainWindow : Form {
 	private readonly TreeView GGPKTree = new();
 	private readonly TreeView BundleTree = new();
 #pragma warning restore CS0618
-	private readonly TextArea TextPanel = new() { ReadOnly = true };
+	private readonly TextArea TextPanel = new() { ReadOnly = true, Text = "This program hasn't been completed yet" };
 	private readonly ImageView ImagePanel = new();
 	private readonly GridView DatPanel = new();
 
@@ -81,7 +81,7 @@ public sealed class MainWindow : Form {
 			Panel2 = new Splitter() {
 				Panel1 = BundleTree,
 				Panel1MinimumSize = 10,
-				Panel2 = new Label() { Text = "This program hasn't been completed yet" },
+				Panel2 = TextPanel,
 				Panel2MinimumSize = 10,
 				SplitterWidth = 4,
 				Position = 240
@@ -142,7 +142,7 @@ public sealed class MainWindow : Form {
 			var buildTreeTask = failed == Index!.Files.Count ? Task.FromResult<BundleDirectoryTreeItem>(null!) :
 				Task.Run(() => (BundleDirectoryTreeItem)Index!.BuildTree(BundleDirectoryTreeItem.GetFuncCreateInstance(BundleTree), BundleFileTreeItem.CreateInstance, true));
 			if (failed != 0)
-				MessageBox.Show(this, $"There're {failed} files failed to parse the path, your ggpk file may be broken.", "Warning", MessageBoxType.Warning);
+				TextPanel.Text += $"\n\nWarning: There're {failed} files failed to parse the path, your ggpk file may be broken.";
 
 			var menu = new ContextMenu(
 				new ButtonMenuItem(OnExtractClicked) { Text = "Extract" },
@@ -234,7 +234,7 @@ public sealed class MainWindow : Form {
 							ImagePanel.Image = new Bitmap(fileItem.Read().ToArray());
 						panel.Panel2 = ImagePanel;
 						break;
-					case FileTreeItem.DataFormat.Dds:
+					case FileTreeItem.DataFormat.DdsImage:
 						imageName = Path.GetFileNameWithoutExtension(fileItem.Name);
 
 						ReadOnlySpan<byte> data;
@@ -368,7 +368,7 @@ public sealed class MainWindow : Form {
 
 	private void OnExportDdsClicked(object? sender, EventArgs _) {
 		if (clickedItem is FileTreeItem fi) {
-			if (fi.Format != FileTreeItem.DataFormat.Dds) {
+			if (fi.Format != FileTreeItem.DataFormat.DdsImage) {
 				MessageBox.Show(this, "Selected file is not a dds image", "Error", MessageBoxType.Error);
 				return;
 			}
