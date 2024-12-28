@@ -47,7 +47,7 @@ public class PatchClient : IDisposable {
 		/// <summary>
 		/// patch.pathofexile2.com:13064
 		/// </summary>
-		public static readonly DnsEndPoint US2 = new("patch.pathofexile2.com", 13064);
+		public static readonly DnsEndPoint US2 = new("patch.pathofexile2.com", 13060);
 		/// <summary>
 		/// patch.pathofexile2.tw:13070
 		/// </summary>
@@ -98,7 +98,9 @@ public class PatchClient : IDisposable {
 	}
 
 	/// <param name="directoryPath"><see cref="TreeNode.GetPath()"/> without trailing slash</param>
-	public virtual Task<EntryInfo[]> QueryDirectoryAsync(string directoryPath) {
+	/// <param name="throwIfNotFound">Throw <see cref="ArgumentException"/> if the given directory not found</param>
+	/// <returns>The entries of the given directory, or <see langword="null"/> if not found</returns>
+	public virtual Task<EntryInfo[]?> QueryDirectoryAsync(string directoryPath, bool throwIfNotFound = true) {
 		if (CdnUrl is null)
 			ThrowHelper.Throw<InvalidOperationException>("You must call ConnectAsync first before using this instance");
 
@@ -111,7 +113,7 @@ public class PatchClient : IDisposable {
 			return result;
 		}
 
-		async Task<EntryInfo[]> Core(Task? _ = null) {
+		async Task<EntryInfo[]?> Core(Task? _ = null) {
 			if (toWait is not null)
 				await toWait.ConfigureAwait(false);
 
@@ -124,8 +126,11 @@ public class PatchClient : IDisposable {
 			await socket.SendAsync(new ArraySegment<byte>(array, 0, len)).ConfigureAwait(false);
 
 			len = await socket.ReceiveAsync(new ArraySegment<byte>(array, 0, ResponseHeaderLength)).ConfigureAwait(false);
-			if (len == 0)
-				ThrowHelper.Throw<ArgumentException>("Directory not found", nameof(directoryPath));
+			if (len == 0) {
+				if (throwIfNotFound)
+					ThrowHelper.Throw<ArgumentException>("Directory not found", nameof(directoryPath));
+				return null;
+			}
 			int compressedLen;
 			int decompressedLen;
 			GetLength(new(array, 0, len));
@@ -253,7 +258,7 @@ public class PatchClient : IDisposable {
 			path = string.Empty;
 		} else {
 			path = node.Parent!.GetPath().TrimEnd('/');
-			if (node.Hash == (await QueryDirectoryAsync(path).ConfigureAwait(false)).First(e => e.Name == node.Name).Hash)
+			if (node.Hash == (await QueryDirectoryAsync(path).ConfigureAwait(false))!.First(e => e.Name == node.Name).Hash)
 				return 0; // Hash is matched, skip updating
 			path = $"{path}/{node.Name}";
 		}
@@ -270,7 +275,7 @@ public class PatchClient : IDisposable {
 			}
 
 			var root = path.Length == 0;
-			var entries = await QueryDirectoryAsync(path).ConfigureAwait(false);
+			var entries = (await QueryDirectoryAsync(path).ConfigureAwait(false))!;
 			if (root) {
 				// last updated version: 3.24.2.1.4
 				HashSet<string> outsideGgpk = ["Redist", "bink2w64.dll", "Client.exe", "d3dcomp_47_x64.dll", "d3dcompiler_47_ggg.dll",
