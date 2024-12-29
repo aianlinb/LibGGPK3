@@ -242,17 +242,20 @@ public class PatchClient : IDisposable {
 	/// if its <see cref="TreeNode.Hash"/> doesn't match or it is <see cref="GGPK.Root"/>.
 	/// </summary>
 	/// <returns>
-	/// Number of <see cref="FileRecord"/> updated/added/removed.
+	/// Total number of <see cref="FileRecord"/>s updated/added/removed.
 	/// </returns>
 	/// <remarks>
 	/// <para>
-	/// You should call <see cref="GGPK.RenewHashes"/> before this if you have modified the ggpk.
+	/// Updating <see cref="GGPK.Root"/> is equivalent to starting patching of the game.
 	/// </para>
 	/// <para>
-	/// Updating <see cref="GGPK.Root"/> is equivalent to starting patching of the game.
+	/// If you want to revert all changes done by this library,
+	/// you must call <see cref="GGPK.EraseRootHash"/> first and pass <see cref="GGPK.Root"/> to <paramref name="node"/>.
 	/// </para>
 	/// </remarks>
 	public virtual async Task<int> UpdateNodeAsync(TreeNode node) {
+		node.Ggpk.RenewHashes();
+
 		string path;
 		if (node == node.Ggpk.Root) {
 			path = string.Empty;
@@ -264,49 +267,49 @@ public class PatchClient : IDisposable {
 		}
 
 		var http = new HttpClient(new SocketsHttpHandler { UseCookies = false }) { BaseAddress = new(CdnUrl!) };
-		return await UpdateCore(node, path).ConfigureAwait(false);
+		return await UpdateCore(node, path, node.Hash).ConfigureAwait(false);
 
-		async Task<int> UpdateCore(TreeNode node, string path) {
+		async Task<int> UpdateCore(TreeNode node, string path, Vector256<byte> hash) {
 			if (node is FileRecord fr) {
 				using var res = await http.GetAsync(path).ConfigureAwait(false);
 				var b = await res.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
-				fr.Write(b);
+				fr.Write(b, hash);
 				return 1;
 			}
 
+			IEnumerable<EntryInfo> entrieInfos = (await QueryDirectoryAsync(path).ConfigureAwait(false))!;
 			var root = path.Length == 0;
-			var entries = (await QueryDirectoryAsync(path).ConfigureAwait(false))!;
-			if (root) {
-				// last updated version: 3.24.2.1.4
-				HashSet<string> outsideGgpk = ["Redist", "bink2w64.dll", "Client.exe", "d3dcomp_47_x64.dll", "d3dcompiler_47_ggg.dll",
-				"dxcompiler.dll", "dxil.dll", "fmod.dll", "fmodstudio.dll", "PackCheck.exe", "PathOfExile.exe", "PathOfExile_x64.exe", "xinput1_3.dll"];
-				entries = entries.Where(e => !e.Name.StartsWith("update.dat~") && !outsideGgpk.Contains(e.Name)).ToArray();
-			}
+			if (root)
+				entrieInfos = entrieInfos.Where(e => e.Name != "Redist" && e.Name != "signature.bin" && !e.Name.StartsWith("update.dat~")); // Special case files/directories placed outside ggpk
+			var entries = entrieInfos.Where(e => !e.Name.EndsWith(".dll") && !e.Name.EndsWith(".exe")) // Special case files placed outside ggpk
+				.Select(e => (Info: e, NameHash: TreeNode.GetNameHash(e.Name))).OrderBy(e => e.NameHash).ToArray();
 			var dir = (node as DirectoryRecord)!;
 			var count = 0;
 			for (var i = 0; i < entries.Length; ++i) {
-				var e = entries[i];
-				var namehash = TreeNode.GetNameHash(e.Name);
-				if (dir.Count == i) {
-					do {
-						count += await UpdateCore(AddNode(dir, entries[i]), root ? e.Name : $"{path}/{e.Name}");
-					} while (++i < entries.Length);
-					break;
-				}
-
-				var n = dir[i];
-				while (n.NameHash < namehash) {
-					n.Remove();
+				var (Info, NameHash) = entries[i];
+				TreeNode n;
+				if (i >= dir.Count)
+					n = AddNode(dir, Info);
+				else {
 					n = dir[i];
-					++count;
-				}
+					while (n.NameHash < NameHash) {
+						n.Remove();
+						n = dir[i];
+						++count;
+					}
 
-				if (n.NameHash > namehash)
-					n = AddNode(dir, e);
-				else if (n.Hash == e.Hash)
-					continue;
-				count += await UpdateCore(n, root ? e.Name : $"{path}/{e.Name}");
+					if (n.NameHash > NameHash)
+						n = AddNode(dir, Info);
+					else if (n.Hash == Info.Hash)
+						continue;
+				}
+				count += await UpdateCore(n, root ? Info.Name : $"{path}/{Info.Name}", Info.Hash).ConfigureAwait(false);
 			}
+
+			if (dir.Count == 0)
+				dir.Remove();
+			else if (count != 0)
+				dir.RenewHash(hash);
 			return count;
 
 			static TreeNode AddNode(DirectoryRecord dir, EntryInfo e) {

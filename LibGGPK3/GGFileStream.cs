@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.Intrinsics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -15,7 +16,7 @@ namespace LibGGPK3;
 /// </summary>
 /// <remarks>
 /// Use this class only when you have to use a <see cref="Stream"/>,
-/// otherwise use <see cref="FileRecord.Read()"/> and <see cref="FileRecord.Write"/> instead for better performance.
+/// otherwise use <see cref="FileRecord.Read()"/> and <see cref="FileRecord.Write(ReadOnlySpan{byte}, Vector256{byte}?)"/> instead for better performance.
 /// </remarks>
 public class GGFileStream : Stream {
 	private static readonly Dictionary<FileRecord, GGFileStream> instances = [];

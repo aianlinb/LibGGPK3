@@ -195,7 +195,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// <param name="path">Relative path (with forward slashes, but not starting or ending with slash) in ggpk under this directory</param>
 	/// <param name="record">The node found</param>
 	/// <param name="preallocatedSize">
-	/// Content size in bytes of the new created file which will be passed to <see cref="FileRecord.Write"/> of <paramref name="record"/> later by the caller.
+	/// Content size in bytes of the new created file which will be passed to <see cref="FileRecord.Write(ReadOnlySpan{byte}, Vector256{byte}?)"/> of <paramref name="record"/> later by the caller.
 	/// Not used when the file already exists.
 	/// </param>
 	/// <returns><see langword="true"/> if added a new file, <see langword="false"/> if found.</returns>
@@ -242,7 +242,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// <param name="name">Name of the file</param>
 	/// <param name="record">The <see cref="FileRecord"/> added/existed</param>
 	/// <param name="preallocatedSize">
-	/// Content size in bytes of the new created file which will be passed to <see cref="FileRecord.Write"/> of <paramref name="record"/> later by the caller.
+	/// Content size in bytes of the new created file which will be passed to <see cref="FileRecord.Write(ReadOnlySpan{byte}, Vector256{byte}?)"/> of <paramref name="record"/> later by the caller.
 	/// Not used when the file already exists.
 	/// </param>
 	/// <returns>
@@ -307,6 +307,8 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 		Entries = Entries.Insert(i, entry);
 		Children = Children.Insert(i, null);
 		WriteWithNewLength();
+		lock (Ggpk.baseStream)
+			Ggpk.dirtyHashes.Add(this);
 		return i;
 	}
 
@@ -325,6 +327,8 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 		Entries = Entries.RemoveAt(i);
 		Children = Children.RemoveAt(i);
 		WriteWithNewLength();
+		lock (Ggpk.baseStream)
+			Ggpk.dirtyHashes.Add(this);
 		return i;
 	}
 
@@ -363,19 +367,25 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	}
 
 	/// <summary>
-	/// Recalculate <see cref="TreeNode.Hash"/> of the directory
+	/// Recalculate <see cref="TreeNode.Hash"/> of the directory, or replace it with the given <paramref name="hash"/>.
 	/// </summary>
-	protected internal unsafe void RenewHash() {
-		var combination = stackalloc Vector256<byte>[Entries.Length];
-		var i = 0;
-		foreach (var n in this)
-			combination[i++] = n.Hash;
-		if (!SHA256.TryHashData(new ReadOnlySpan<byte>((byte*)combination, SIZE_OF_HASH * Entries.Length), _Hash.AsSpan(), out _))
-			ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // Hash.Length < LENGTH_OF_HASH (== sizeof(Vector256<byte>) == 32)
+	protected internal unsafe void RenewHash(Vector256<byte>? hash = null) {
+		if (hash.HasValue)
+			_Hash = hash.Value;
+		else {
+			var combination = stackalloc Vector256<byte>[Entries.Length];
+			var i = 0;
+			foreach (var n in this)
+				combination[i++] = n.Hash;
+			if (!SHA256.TryHashData(new ReadOnlySpan<byte>((byte*)combination, SIZE_OF_HASH * Entries.Length), _Hash.AsSpan(), out _))
+				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // Hash.Length < LENGTH_OF_HASH (== sizeof(Vector256<byte>) == 32)
+		}
+
 		var s = Ggpk.baseStream;
 		lock (s) {
 			s.Position = Offset + sizeof(int) * 4L;
-			s.Write(Hash);
+			s.Write(_Hash);
+			Ggpk.dirtyHashes.Remove(this);
 		}
 	}
 }

@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Buffers;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
 using System.Security.Cryptography;
 using System.Text;
+using SystemExtensions;
 
 using SystemExtensions.Spans;
 using SystemExtensions.Streams;
@@ -78,7 +81,7 @@ public class FileRecord : TreeNode {
 	/// <summary>
 	/// Get the file content of this record.
 	/// </summary>
-	/// <remarks>Use <see cref="Read(Span{byte})"/> instead to avoid memory allocation.</remarks>
+	/// <remarks>Use <see cref="Read(Span{byte}, int)"/> instead to avoid memory allocation.</remarks>
 	public byte[] Read() {
 		var buffer = GC.AllocateUninitializedArray<byte>(DataLength);
 		Read(buffer);
@@ -87,33 +90,27 @@ public class FileRecord : TreeNode {
 	/// <summary>
 	/// Get a part of the file content of this record.
 	/// </summary>
-	/// <remarks>Use <see cref="Read(Span{byte}, Range)"/> instead to avoid memory allocation.</remarks>
+	/// <remarks>Use <see cref="Read(Span{byte}, int)"/> instead to avoid memory allocation.</remarks>
 	public byte[] Read(Range range) {
-		var buffer = GC.AllocateUninitializedArray<byte>(DataLength);
-		Read(buffer, range);
+		var (offset, length) = range.GetOffsetAndLength(DataLength);
+		var buffer = GC.AllocateUninitializedArray<byte>(length);
+		Read(buffer, offset);
 		return buffer;
 	}
 	/// <summary>
-	/// Get the file content of this record.
+	/// Get a part of the file content starting from <paramref name="offset"/>.
 	/// </summary>
-	/// <param name="span">The span to write the content to, the <see cref="Span{T}.Length"/> must be at least <see cref="DataLength"/></param>
-	public virtual void Read(Span<byte> span) {
-		var s = Ggpk.baseStream;
-		lock (s) {
-			s.Position = DataOffset;
-			s.ReadExactly(span[..DataLength]);
-		}
-	}
-	/// <summary>
-	/// Get a part of the file content of this record.
-	/// </summary>
-	/// <param name="span">The span to write the content to, the <see cref="Span{T}.Length"/> must be at least <see cref="DataLength"/></param>
-	public virtual void Read(Span<byte> span, Range range) {
-		var (offset, length) = range.GetOffsetAndLength(DataLength);
+	/// <remarks>If the <paramref name="span"/> is too small, the result will be truncated.</remarks>
+	public virtual void Read(Span<byte> span, int offset = 0) {
+		if ((uint)offset > (uint)DataLength)
+			ThrowHelper.ThrowArgumentOutOfRange(offset);
+		var len = DataLength - offset;
+		if (span.Length > len)
+			span = span[..len];
 		var s = Ggpk.baseStream;
 		lock (s) {
 			s.Position = DataOffset + offset;
-			s.ReadExactly(span[..length]);
+			s.ReadExactly(span);
 		}
 	}
 
@@ -121,8 +118,16 @@ public class FileRecord : TreeNode {
 	/// Replace the file content with <paramref name="newContent"/>,
 	/// and move this record to a <see cref="FreeRecord"/> with most suitable size, or end of file if not found.
 	/// </summary>
-	public virtual void Write(ReadOnlySpan<byte> newContent) {
-		SHA256.HashData(newContent, _Hash.AsSpan());
+	/// <param name="hash">
+	/// The SHA-256 hash of the <paramref name="newContent"/>,
+	/// or <see langword="null"/> to calculate it with <see cref="SHA256.HashData(ReadOnlySpan{byte}, Span{byte})"/>.
+	/// </param>
+	public virtual void Write(ReadOnlySpan<byte> newContent, Vector256<byte>? hash = null) {
+		if (hash.HasValue)
+			_Hash = hash.Value;
+		else
+			SHA256.HashData(newContent, _Hash.AsSpan());
+
 		var s = Ggpk.baseStream;
 		lock (s) {
 			if (newContent.Length != DataLength) { // Replace a FreeRecord
@@ -132,10 +137,49 @@ public class FileRecord : TreeNode {
 				// Offset and DataOffset will be set by WriteRecordData() in above line
 			} else {
 				s.Position = Offset + sizeof(int) * 3;
-				s.Write(Hash);
+				s.Write(_Hash);
 			}
 			s.Position = DataOffset;
 			s.Write(newContent);
+			Ggpk.dirtyHashes.Add(Parent!);
+		}
+	}
+
+	/// <summary>
+	/// Write <paramref name="data"/> to the file content starting from <paramref name="offset"/>.
+	/// The <paramref name="offset"/> + <paramref name="data"/>.Length must be less than or equal to the <see cref="DataLength"/>.
+	/// </summary>
+	/// <param name="hash">
+	/// The SHA-256 hash of the final file content after writing the <paramref name="data"/>,
+	/// or <see langword="null"/> to calculate it with <see cref="SHA256.HashData(ReadOnlySpan{byte}, Span{byte})"/>.
+	/// </param>
+	public virtual void Write(ReadOnlySpan<byte> data, int offset, Vector256<byte>? hash = null) {
+		ArgumentOutOfRangeException.ThrowIfNegative(offset);
+		var end = checked(offset + data.Length);
+		ArgumentOutOfRangeException.ThrowIfGreaterThan(end, DataLength, "offset + data.Length");
+
+		var s = Ggpk.baseStream;
+		lock (s) {
+			if (hash.HasValue)
+				_Hash = hash.Value;
+			else {
+				var content = ArrayPool<byte>.Shared.Rent(DataLength);
+				var span = new Span<byte>(content, 0, DataLength);
+				try {
+					s.Position = DataOffset;
+					s.ReadExactly(span[..offset]);
+					s.Seek(data.Length, SeekOrigin.Current);
+					s.ReadExactly(span[end..]);
+					SHA256.HashData(span, _Hash.AsSpan());
+				} finally {
+					ArrayPool<byte>.Shared.Return(content);
+				}
+			}
+			s.Position = Offset + sizeof(int) * 3;
+			s.Write(_Hash);
+
+			s.Position = DataOffset + offset;
+			s.Write(data);
 			Ggpk.dirtyHashes.Add(Parent!);
 		}
 	}
