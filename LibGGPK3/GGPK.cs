@@ -427,14 +427,18 @@ public class GGPK : IDisposable {
 		EnsureNotDisposed();
 		lock (baseStream) {
 			dirtyHashes.Remove(null!); // Parent of Root
-			while (dirtyHashes.Count != 0) {
-				foreach (var dr in dirtyHashes.ToArray()) // Make a copy
-					if (forceRenewRoot || dr != Root && dr.Parent != Root) { // Keep the hash of ROOT and directories under ROOT original to prevent the game from starting patching
+			var count = 0;
+			while (dirtyHashes.Count != count) {
+				count = dirtyHashes.Count;
+				foreach (var dr in dirtyHashes.ToArray()) { // Make a copy
+
+					if (forceRenewRoot || dr != Root && dr.Parent != Root) { // Keep the hash of Root and directories under Root original to prevent the game from starting patching
 						dr.RenewHash(); // Will remove itself from dirtyHashes
-						dirtyHashes.Add(dr.Parent!);
+						dirtyHashes.Add(dr.Parent!); // Process in next round
 					}
+				}
 				dirtyHashes.Remove(null!);
-			}
+			};
 		}
 	}
 
