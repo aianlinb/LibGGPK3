@@ -98,7 +98,9 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 			var length = Length;
 			var right = false;
 			// Combine with FreeRecords nearby
-			foreach (var f in Ggpk._SortedFreeRecords ?? Ggpk.FreeRecords) {
+			FreeRecord? next;
+			for (var f = Ggpk.FirstFreeRecord; f is not null; f = next) {
+				next = f.Next;
 				if (f.Offset == Offset + length) {
 					length += f.Length;
 					if (previous is not null)
