@@ -40,7 +40,7 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	public virtual DirectoryRecord? Parent { get; protected internal set; }
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	protected LinkedListNode<FreeRecord>? WriteWithNewLength(LinkedListNode<FreeRecord>? specify = null) {
+	protected FreeRecord? WriteWithNewLength(FreeRecord? specify = null) {
 		return WriteWithNewLength(CaculateRecordLength(), specify);
 	}
 	/// <summary>
@@ -50,7 +50,7 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// <param name="specify">The specified <see cref="FreeRecord"/> to be written, <see langword="null"/> for finding a best one automatically</param>
 	/// <returns>The <see cref="FreeRecord"/> created at the original position if the record is moved, or <see langword="null"/> if replaced in place</returns>
 	/// <remarks>Don't set <see cref="BaseRecord.Length"/> before calling this method, the method will update it</remarks>
-	protected internal virtual LinkedListNode<FreeRecord>? WriteWithNewLength(int newLength, LinkedListNode<FreeRecord>? specify = null) {
+	protected internal virtual FreeRecord? WriteWithNewLength(int newLength, FreeRecord? specify = null) {
 		var s = Ggpk.baseStream;
 		lock (s) {
 			if (Offset != default && newLength == Length && specify is null) {
@@ -66,21 +66,21 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 				s.Seek(0, SeekOrigin.End); // Write to the end of GGPK
 				WriteRecordData();
 			} else {
-				var free = specify.Value;
-				if (free == original?.Value)
+				if (specify == original)
 					original = null;
 
-				if (free.Length < newLength + 16 && free.Length != newLength)
-					throw new ArgumentException("The length of specified FreeRecord must not be between Length and Length-16 (exclusive): " + free.Length, nameof(specify));
-				s.Position = free.Offset;
+				if (specify.Length < newLength + 16 && specify.Length != newLength)
+					ThrowHelper.Throw<ArgumentException>("The length of specified FreeRecord must not be between Length and Length-16 (exclusive): " + specify.Length, nameof(specify));
+				s.Position = specify.Offset;
 				WriteRecordData();
-				free.Length -= newLength;
-				if (free.Length >= 16) { // Update length of FreeRecord
-					s.Position = free.Offset + newLength;
-					free.WriteRecordData();
-					free.UpdateOffset();
-				} else // free.Length == 0
-					free.RemoveFromList(specify);
+				specify.Length -= newLength;
+				if (specify.Length >= 16) { // Update length of FreeRecord
+					s.Position = specify.Offset + newLength;
+					specify.WriteRecordData();
+					specify.UpdateOffset();
+					specify.UpdateLength();
+				} else // specify.Length == 0
+					specify.RemoveFromList();
 			}
 
 			UpdateOffset();
@@ -91,40 +91,39 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// <summary>
 	/// Set this record to a <see cref="FreeRecord"/>
 	/// </summary>
-	protected virtual LinkedListNode<FreeRecord>? MarkAsFree() {
+	protected virtual FreeRecord? MarkAsFree() {
 		var s = Ggpk.baseStream;
 		lock (s) {
-			LinkedListNode<FreeRecord>? previous = null;
+			FreeRecord? previous = null;
 			var length = Length;
 			var right = false;
 			// Combine with FreeRecords nearby
-			for (var fn = Ggpk.FreeRecordList.First; fn is not null; fn = fn.Next) {
-				var f = fn.Value;
+			foreach (var f in Ggpk._SortedFreeRecords ?? Ggpk.FreeRecords) {
 				if (f.Offset == Offset + length) {
 					length += f.Length;
 					if (previous is not null)
-						previous.Value.Length += f.Length;
-					f.RemoveFromList(fn);
+						previous.Length += f.Length;
+					f.RemoveFromList();
 					right = true;
 				} else if (previous is null && f.Offset + f.Length == Offset) {
 					f.Length += length;
-					previous = fn;
+					previous = f;
 				}
 				if (right && previous is not null) // In most cases, there won't be contiguous FreeRecords in GGPK
 					break;
 			}
 
 			if (previous is not null) {
-				var fPrevious = previous.Value;
-				if (fPrevious.Offset + fPrevious.Length >= s.Length) {
+				if (previous.Offset + previous.Length >= s.Length) {
 					// Trim if the record is at the end of the ggpk file
-					fPrevious.RemoveFromList(previous);
-					s.SetLength(fPrevious.Offset);
+					previous.RemoveFromList();
+					s.SetLength(previous.Offset);
 					return null;
 				}
 				// Update record length
-				s.Position = fPrevious.Offset;
-				s.Write(fPrevious.Length);
+				s.Position = previous.Offset;
+				s.Write(previous.Length);
+				previous.UpdateLength();
 				return previous;
 			} else if (Offset + length >= s.Length) {
 				// Trim if the record is at the end of the ggpk file
@@ -136,7 +135,9 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 			var free = new FreeRecord(Offset, length, 0, Ggpk);
 			s.Position = Offset;
 			free.WriteRecordData();
-			return free.UpdateOffset();
+			free.UpdateOffset();
+			free.UpdateLength();
+			return free;
 		}
 	}
 

@@ -33,7 +33,7 @@ public class FileRecord : TreeNode {
 		Offset = s.Position - 8;
 		var nameLength = s.Read<int>() - 1;
 		s.Read(out _Hash);
-		if (Ggpk.Record.GGPKVersion == 4) {
+		if (Ggpk.Version == 4) {
 			Span<byte> b = stackalloc byte[nameLength * sizeof(int)];
 			s.ReadExactly(b);
 			Name = Encoding.UTF32.GetString(b);
@@ -56,7 +56,7 @@ public class FileRecord : TreeNode {
 	}
 
 	protected override int CaculateRecordLength() {
-		return 12 + SIZE_OF_HASH + (Ggpk.Record.GGPKVersion == 4 ? sizeof(int) : sizeof(char)) * (Name.Length + 1) + DataLength; // (4 + 4 + 4 + Hash.Length + (Name + "\0").Length * sizeof(char/int)) + DataLength
+		return 12 + SIZE_OF_HASH + (Ggpk.Version == 4 ? sizeof(int) : sizeof(char)) * (Name.Length + 1) + DataLength; // (4 + 4 + 4 + Hash.Length + (Name + "\0").Length * sizeof(char/int)) + DataLength
 	}
 
 	[SkipLocalsInit]
@@ -67,7 +67,7 @@ public class FileRecord : TreeNode {
 		s.Write(Tag);
 		s.Write(Name.Length + 1);
 		s.Write(Hash);
-		if (Ggpk.Record.GGPKVersion == 4) {
+		if (Ggpk.Version == 4) {
 			Span<byte> span = stackalloc byte[Name.Length * sizeof(int)];
 			s.Write(span[..Encoding.UTF32.GetBytes(Name, span)]);
 			s.Write(0); // Null terminator

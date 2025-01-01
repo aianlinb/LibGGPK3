@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 
-using SystemExtensions;
 using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records;
@@ -18,7 +18,33 @@ public class FreeRecord : BaseRecord {
 	/// <summary>
 	/// Offset of next <see cref="FreeRecord"/> in the linked-list
 	/// </summary>
-	public long NextFreeOffset { get; protected internal set; }
+	public long NextFreeOffset { get; protected set; }
+
+	public FreeRecord? Previous { get; protected set; }
+
+	protected FreeRecord? _Next;
+	public virtual FreeRecord? Next {
+		get {
+			if (_Next is null && NextFreeOffset != 0) {
+				_Next = (FreeRecord)Ggpk.ReadRecord(NextFreeOffset);
+				_Next.Previous = this;
+			}
+			return _Next;
+		}
+		protected internal set {
+			if (_Next != null)
+				_Next.Previous = null;
+			if (value is null)
+				NextFreeOffset = 0;
+			else {
+				NextFreeOffset = value.Offset;
+				if (value.Previous != null)
+					value.Previous.Next = null;
+				value.Previous = this;
+			}
+			_Next = value;
+		}
+	}
 
 	protected internal FreeRecord(int length, GGPK ggpk) : base(length, ggpk) {
 		Offset = ggpk.baseStream.Position - 8;
@@ -28,7 +54,7 @@ public class FreeRecord : BaseRecord {
 
 	/// <summary>
 	/// Also calls the <see cref="WriteRecordData"/>.
-	/// Please calls <see cref="UpdateOffset"/> after this to add the FreeRecord to <see cref="GGPK.FreeRecordList"/>
+	/// Please calls <see cref="UpdateOffset"/> after this to add the FreeRecord to <see cref="GGPK.FreeRecords"/>
 	/// </summary>
 	protected internal FreeRecord(long offset, int length, long nextFreeOffset, GGPK ggpk) : base(length, ggpk) {
 		Offset = offset;
@@ -44,65 +70,113 @@ public class FreeRecord : BaseRecord {
 		s.Seek(Length - (sizeof(int) + sizeof(int) + sizeof(long)), SeekOrigin.Current);
 	}
 
+	/*internal int GetSortedIndex() {
+		var list = Ggpk._SortedFreeRecords;
+		if (list is null)
+			return -1;
+
+		var i = CollectionsMarshal.AsSpan(list).BinarySearch(new LengthWrapper(Length - 1));
+		if (i < 0)
+			i = ~i;
+		else if (++i == list.Count)
+			return ~i;
+
+		while (list[i] != this)
+			if (++i == list.Count || list[i].Length > Length)
+				return ~i;
+		return i;
+	}*/
+
 	/// <summary>
-	/// Remove this FreeRecord from the Linked FreeRecord List
+	/// Remove this FreeRecord from the Linked FreeRecord List of ggpk
 	/// </summary>
-	/// <param name="node">Node in <see cref="GGPK.FreeRecordList"/> to remove</param>
-	protected internal virtual void RemoveFromList(LinkedListNode<FreeRecord>? node = null) {
+	protected internal virtual void RemoveFromList() {
 		var s = Ggpk.baseStream;
 		lock (s) {
-			node ??= Ggpk.FreeRecordList.Find(this);
-			if (node is null)
-				return;
-			var previous = node.Previous?.Value;
-			var next = node.Next?.Value;
-			if (next is null)
-				if (previous is null) {
-					Ggpk.Record.FirstFreeRecordOffset = 0;
-					s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
-					s.Write((long)0);
+			Ggpk._SortedFreeRecords?.Remove(this);
+			if (Next is null) {
+				if (Previous is null) {
+					if (Ggpk.FirstFreeRecord == this) {
+						s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
+						s.Write(0L);
+						Ggpk.FirstFreeRecord = null;
+					}
 				} else {
-					previous.NextFreeOffset = 0;
-					s.Position = previous.Offset + sizeof(long);
-					s.Write((long)0);
+					s.Position = Previous.Offset + sizeof(long);
+					s.Write(0L);
+					Previous.Next = null;
 				}
-			else if (previous is null) {
-				Ggpk.Record.FirstFreeRecordOffset = next.Offset;
-				s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
-				s.Write(next.Offset);
+			} else if (Previous is null) {
+				if (Ggpk.FirstFreeRecord == this) {
+					s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
+					s.Write(Next.Offset);
+					Ggpk.FirstFreeRecord = Next;
+				}
 			} else {
-				previous.NextFreeOffset = next.Offset;
-				s.Position = previous.Offset + sizeof(long);
-				s.Write(next.Offset);
+				s.Position = Previous.Offset + sizeof(long);
+				s.Write(Next.Offset);
+				Previous.Next = Next;
 			}
-			Ggpk.FreeRecordList.Remove(node);
+			Debug.Assert(Previous is null && Next is null);
 		}
 	}
 
 	/// <summary>
 	/// Update the link after the Offset of this FreeRecord is changed
 	/// </summary>
-	/// <param name="node">Node in <see cref="GGPK.FreeRecordList"/> of this record</param>
-	protected internal virtual LinkedListNode<FreeRecord> UpdateOffset(LinkedListNode<FreeRecord>? node = null) {
-		if (node is not null) {
-			if (node.Value != this)
-				ThrowHelper.Throw<ArgumentException>("The provided node doesn't belong to this record", nameof(node));
-		} else
-			node = Ggpk.FreeRecordList.Find(this);
-
+	protected internal virtual void UpdateOffset() {
 		var s = Ggpk.baseStream;
 		lock (s) {
-			var previousFree = node is null ? Ggpk.FreeRecordList.Last?.Value : node.Previous?.Value;
-			if (previousFree is null) { // empty
-				Ggpk.Record.FirstFreeRecordOffset = Offset;
+			if (Previous is null) { // first
+				var old = Ggpk.FirstFreeRecord;
 				s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
 				s.Write(Offset);
-			} else {
-				previousFree.NextFreeOffset = Offset;
-				s.Position = previousFree.Offset + sizeof(long);
+				Ggpk.FirstFreeRecord = this;
+				if (old == this || old is null)
+					return;
+
+				// new inserted
+				var last = this;
+				while (last.Next is not null)
+					last = last.Next;
+				s.Position = last.Offset + sizeof(long);
+				s.Write(old.Offset);
+				last.Next = old;
+			} else { // except first
+				s.Position = Previous.Offset + sizeof(long);
 				s.Write(Offset);
+				Previous.Next = this;
 			}
-			return node ?? Ggpk.FreeRecordList.AddLast(this);
 		}
+	}
+
+	protected internal virtual void UpdateLength() {
+		var list = Ggpk._SortedFreeRecords;
+		if (list is not null) {
+			var span = CollectionsMarshal.AsSpan(Ggpk._SortedFreeRecords);
+			var i = span.BinarySearch(new LengthWrapper(Length));
+			if (i < 0)
+				i = ~i;
+
+			// Move existing one
+			var oi = list.IndexOf(this);
+			if (oi != -1) {
+				if (oi != i) {
+					if (oi < i) {
+						--i;
+						span[(oi + 1)..i].CopyTo(span[oi..]);
+					} else
+						span[i..oi].CopyTo(span[(i + 1)..]);
+					span[i] = this;
+				}
+				return;
+			}
+
+			list.Insert(i, this);
+		}
+	}
+
+    internal readonly struct LengthWrapper(int length) : IComparable<FreeRecord> {
+		public readonly int CompareTo(FreeRecord? other) => other is null ? -1 : length.CompareTo(other.Length);
 	}
 }

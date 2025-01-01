@@ -11,6 +11,7 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using System.Threading;
 using System.Threading.Tasks;
 
 using LibGGPK3.Records;
@@ -253,7 +254,8 @@ public class PatchClient : IDisposable {
 	/// you must call <see cref="GGPK.EraseRootHash"/> first and pass <see cref="GGPK.Root"/> to <paramref name="node"/>.
 	/// </para>
 	/// </remarks>
-	public virtual async Task<int> UpdateNodeAsync(TreeNode node) {
+	public virtual async Task<int> UpdateNodeAsync(TreeNode node, TimeSpan? timeoutEachFile = null, CancellationToken cancellationToken = default) {
+		cancellationToken.ThrowIfCancellationRequested();
 		node.Ggpk.RenewHashes();
 
 		string path;
@@ -266,18 +268,37 @@ public class PatchClient : IDisposable {
 			path = $"{path}/{node.Name}";
 		}
 
-		var http = new HttpClient(new SocketsHttpHandler { UseCookies = false }) { BaseAddress = new(CdnUrl!) };
-		return await UpdateCore(node, path, node.Hash).ConfigureAwait(false);
+		cancellationToken.ThrowIfCancellationRequested();
+		var endPoint = socket.RemoteEndPoint!;
+		using var http = new HttpClient(new SocketsHttpHandler { UseCookies = false }) { BaseAddress = new(CdnUrl!), Timeout = timeoutEachFile ?? Timeout.InfiniteTimeSpan };
+		try {
+			return await UpdateCore(node, path, node.Hash).ConfigureAwait(false);
+		} finally {
+			node.Ggpk.baseStream.Flush();
+		}
 
 		async Task<int> UpdateCore(TreeNode node, string path, Vector256<byte> hash) {
+			Debug.WriteLine(path);
 			if (node is FileRecord fr) {
-				using var res = await http.GetAsync(path).ConfigureAwait(false);
-				var b = await res.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
-				fr.Write(b, hash);
+				using var res = await http.GetAsync(path, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+				fr.Write(await res.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false), hash);
 				return 1;
 			}
 
-			IEnumerable<EntryInfo> entrieInfos = (await QueryDirectoryAsync(path).ConfigureAwait(false))!;
+			IEnumerable<EntryInfo> entrieInfos;
+			try {
+				entrieInfos = (await QueryDirectoryAsync(path).ConfigureAwait(false))!;
+			} catch (SocketException) {
+				cancellationToken.ThrowIfCancellationRequested();
+				// After download large files/directories from cdn, the connection of patch server may timeout here, so we retry once
+				if (socket.Connected) {
+					socket.Shutdown(SocketShutdown.Both);
+					await socket.DisconnectAsync(true, default).ConfigureAwait(false);
+				}
+				await ConnectAsync(endPoint).ConfigureAwait(false);
+				entrieInfos = (await QueryDirectoryAsync(path).ConfigureAwait(false))!;
+			}
+			cancellationToken.ThrowIfCancellationRequested();
 			var root = path.Length == 0;
 			if (root)
 				entrieInfos = entrieInfos.Where(e => e.Name != "Redist" && e.Name != "signature.bin" && !e.Name.StartsWith("update.dat~")); // Special case files/directories placed outside ggpk
@@ -304,6 +325,7 @@ public class PatchClient : IDisposable {
 						continue;
 				}
 				count += await UpdateCore(n, root ? Info.Name : $"{path}/{Info.Name}", Info.Hash).ConfigureAwait(false);
+				Debug.Assert(n is DirectoryRecord && Info.FileSize == -1 || n is FileRecord f && f.DataLength == Info.FileSize, Info.FileSize.ToString());
 			}
 
 			if (dir.Count == 0)
