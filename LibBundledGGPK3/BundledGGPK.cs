@@ -29,7 +29,7 @@ public class BundledGGPK : GGPK {
 	/// <param name="parsePathsInIndex">
 	/// Whether to call <see cref="Index.ParsePaths"/> automatically.
 	/// <see langword="false"/> to speed up reading, but all <see cref="LibBundle3.Records.FileRecord.Path"/> in each of <see cref="Index.Files"/> of <see cref="Index"/> will be <see langword="null"/>,
-	/// and <see cref="Index.Root"/> and <see cref="Index.BuildTree"/> will be unable to use until you call <see cref="Index.ParsePaths"/> manually.
+	/// and <see cref="Index.Root"/> and <see cref="Index.BuildTree(Index.CreateDirectoryInstance, Index.CreateFileInstance, bool)"/> will be unable to use until you call <see cref="Index.ParsePaths"/> manually.
 	/// </param>
 	/// <exception cref="FileNotFoundException" />
 	public BundledGGPK(string filePath, bool parsePathsInIndex = true) : base(filePath) {
@@ -40,7 +40,7 @@ public class BundledGGPK : GGPK {
 	/// <param name="parsePathsInIndex">
 	/// Whether to call <see cref="Index.ParsePaths"/> automatically.
 	/// <see langword="false"/> to speed up reading, but all <see cref="LibBundle3.Records.FileRecord.Path"/> in each of <see cref="Index.Files"/> of <see cref="Index"/> will be <see langword="null"/>,
-	/// and <see cref="Index.Root"/> and <see cref="Index.BuildTree"/> will be unable to use until you call <see cref="Index.ParsePaths"/> manually.
+	/// and <see cref="Index.Root"/> and <see cref="Index.BuildTree(Index.CreateDirectoryInstance, Index.CreateFileInstance, bool)"/> will be unable to use until you call <see cref="Index.ParsePaths"/> manually.
 	/// </param>
 	/// <exception cref="FileNotFoundException" />
 	public BundledGGPK(Stream stream, bool leaveOpen = false, bool parsePathsInIndex = true) : base(stream, leaveOpen) {

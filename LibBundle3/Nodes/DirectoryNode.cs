@@ -33,7 +33,7 @@ public class DirectoryNode : IDirectoryNode {
 	}
 
 	/// <summary>
-	/// See <see cref="Index.BuildTree"/>
+	/// See <see cref="Index.BuildTree(Index.CreateDirectoryInstance, Index.CreateFileInstance, bool)"/>
 	/// </summary>
 	protected internal static IDirectoryNode CreateInstance(string name, IDirectoryNode? parent) {
 		return new DirectoryNode(name, parent as DirectoryNode);

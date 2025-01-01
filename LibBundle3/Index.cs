@@ -67,17 +67,24 @@ public class Index : IDisposable {
 
 #pragma warning disable CS1734
     /// <summary>
-    /// Root node of the tree (This will call <see cref="BuildTree"/> with default implementation when first calling).
-    /// You can also implement your custom class and use <see cref="BuildTree"/> instead of using this.
+    /// Root node of the tree (This will call <see cref="BuildTree(bool)"/> with default implementation when first calling).
+    /// You can also implement your custom class and use <see cref="BuildTree(CreateDirectoryInstance, CreateFileInstance, bool)"/> instead of using this.
 	/// <para>This will throw when any file have a null path (See <see cref="ParsePaths"/>)</para>
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown when <see cref="ParsePaths"/> haven't been called</exception>
     /// <exception cref="NullReferenceException">Thrown when a file has null path. See <paramref name="ignoreNullPath"/> of <see cref="ParsePaths"/>.</exception>
 #pragma warning restore CS1734
-    public virtual DirectoryNode Root => _Root ??= (DirectoryNode)BuildTree(DirectoryNode.CreateInstance, FileNode.CreateInstance);
+    public virtual DirectoryNode Root => _Root ??= BuildTree();
 
     public delegate IDirectoryNode CreateDirectoryInstance(string name, IDirectoryNode? parent);
 	public delegate IFileNode CreateFileInstance(FileRecord record, IDirectoryNode parent);
+	/// <summary>
+	/// Default implementation of <see cref="BuildTree(CreateDirectoryInstance, CreateFileInstance, bool)"/> which <see cref="Root"/> use.
+	/// </summary>
+	/// <param name="ignoreNullPath">Whether to ignore files with <see cref="FileRecord.Path"/> as <see langword="null"/> instead of throwing.
+	/// This happens when <see cref="ParsePaths"/> has not been called or failed to parse some paths (returns not 0).
+	/// <para>The ignored files won't appear in the returned tree</para></param>
+	public DirectoryNode BuildTree(bool ignoreNullPath = false) => (DirectoryNode)BuildTree(DirectoryNode.CreateInstance, FileNode.CreateInstance, ignoreNullPath);
 	/// <summary>
 	/// Build a tree to represent the file and directory structure in bundles
 	/// </summary>
@@ -126,7 +133,7 @@ public class Index : IDisposable {
 	/// <param name="parsePaths">
 	/// Whether to call <see cref="ParsePaths"/> automatically.
 	/// <see langword="false"/> to speed up reading, but all <see cref="FileRecord.Path"/> in each of <see cref="Files"/> will be <see langword="null"/>,
-	/// and <see cref="Root"/> and <see cref="BuildTree"/> will be unable to use until you call <see cref="ParsePaths"/> manually.
+	/// and <see cref="Root"/> and <see cref="BuildTree(CreateDirectoryInstance, CreateFileInstance, bool)"/> will be unable to use until you call <see cref="ParsePaths"/> manually.
 	/// </param>
 	/// <param name="bundleFactory">Factory to handle .bin files of <see cref="Bundle"/></param>
 	/// <exception cref="FileNotFoundException" />
@@ -145,7 +152,7 @@ public class Index : IDisposable {
 	/// <param name="parsePaths">
 	/// Whether to call <see cref="ParsePaths"/> automatically.
 	/// <see langword="false"/> to speed up reading, but all <see cref="FileRecord.Path"/> in each of <see cref="Files"/> will be <see langword="null"/>,
-	/// and <see cref="Root"/> and <see cref="BuildTree"/> will be unable to use until you call <see cref="ParsePaths"/> manually.
+	/// and <see cref="Root"/> and <see cref="BuildTree(CreateDirectoryInstance, CreateFileInstance, bool)"/> will be unable to use until you call <see cref="ParsePaths"/> manually.
 	/// </param>
 	/// <param name="bundleFactory">Factory to handle .bin files of <see cref="Bundle"/></param>
 	/// <remarks>
@@ -596,7 +603,7 @@ public class Index : IDisposable {
 	/// If not, the search still runs but always return 0.
 	/// <para>
 	/// Although there's a <paramref name="nodePath"/> parameter,
-	/// this method doesn't require an actual <see cref="ITreeNode"/> (which requires <see cref="ParsePaths"/> and <see cref="BuildTree"/>) to work.
+	/// this method doesn't require an actual <see cref="ITreeNode"/> (which requires <see cref="ParsePaths"/> and <see cref="BuildTree(CreateDirectoryInstance, CreateFileInstance, bool)"/>) to work.
 	/// </para>
 	/// </remarks>
 	public static int Replace(Index index, string nodePath, string pathOnDisk, FileCallback? callback = null, bool saveIndex = true) {
