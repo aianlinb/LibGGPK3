@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -480,15 +481,28 @@ public class GGPK : IDisposable {
 		}
 	}
 
+	public virtual void Flush() {
+		RenewHashes();
+		baseStream.Flush();
+	}
+
 	protected virtual void EnsureNotDisposed() => ObjectDisposedException.ThrowIf(!baseStream.CanRead, this);
+
+	/// <summary>
+	/// Get the field of the base stream of this instance.
+	/// Using this method may cause dangerous unexpected behavior.
+	/// </summary>
+	[EditorBrowsable(EditorBrowsableState.Advanced)]
+	public ref Stream UnsafeGetStream() {
+		return ref Unsafe.AsRef(in baseStream);
+	}
 
 	public virtual void Dispose() {
 		GC.SuppressFinalize(this);
-		baseStream.Flush();
-		RenewHashes();
+		if (!baseStream.CanWrite)
+			return;
+		Flush();
 		if (!leaveOpen)
 			baseStream.Close();
-		else
-			baseStream.Flush();
 	}
 }

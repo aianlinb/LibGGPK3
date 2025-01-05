@@ -2,6 +2,7 @@
 using System.Buffers;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -161,40 +162,42 @@ public class Index : IDisposable {
 	/// </remarks>
 	public unsafe Index(Stream stream, bool leaveOpen = false, bool parsePaths = true, IBundleFactory? bundleFactory = null) {
 		ArgumentNullException.ThrowIfNull(stream);
-		baseBundle = new(stream, leaveOpen);
 		this.bundleFactory = bundleFactory ?? new DriveBundleFactory(string.Empty);
-		var data = baseBundle.ReadWithoutCache();
-		fixed (byte* p = data) {
-			var ptr = (int*)p;
+		lock (this) {
+			baseBundle = new(stream, leaveOpen);
+			var data = baseBundle.ReadWithoutCache();
+			fixed (byte* p = data) {
+				var ptr = (int*)p;
 
-			var bundleCount = *ptr++;
-			_Bundles = new BundleRecord[bundleCount];
-			for (var i = 0; i < bundleCount; i++) {
-				var pathLength = *ptr++;
-				var path = new string((sbyte*)ptr, 0, pathLength);
-				ptr = (int*)((byte*)ptr + pathLength);
-				var uncompressedSize = *ptr++;
-				_Bundles[i] = new BundleRecord(path, uncompressedSize, this, i);
-				if (path.StartsWith(CUSTOM_BUNDLE_BASE_PATH))
-					CustomBundles.Add(_Bundles[i]);
+				var bundleCount = *ptr++;
+				_Bundles = new BundleRecord[bundleCount];
+				for (var i = 0; i < bundleCount; i++) {
+					var pathLength = *ptr++;
+					var path = new string((sbyte*)ptr, 0, pathLength);
+					ptr = (int*)((byte*)ptr + pathLength);
+					var uncompressedSize = *ptr++;
+					_Bundles[i] = new BundleRecord(path, uncompressedSize, this, i);
+					if (path.StartsWith(CUSTOM_BUNDLE_BASE_PATH))
+						CustomBundles.Add(_Bundles[i]);
+				}
+
+				var fileCount = *ptr++;
+				_Files = new(fileCount);
+				for (var i = 0; i < fileCount; i++) {
+					var nameHash = *(ulong*)ptr;
+					ptr += 2;
+					var bundle = _Bundles[*ptr++];
+					var f = new FileRecord(nameHash, bundle, *ptr++, *ptr++);
+					_Files.Add(nameHash, f);
+					bundle._Files.Add(f);
+				}
+
+				var directoryCount = *ptr++;
+				_Directories = new ReadOnlySpan<DirectoryRecord>(ptr, directoryCount).ToArray();
+				ptr = (int*)((DirectoryRecord*)ptr + directoryCount);
+
+				directoryBundleData = data[(int)((byte*)ptr - p)..];
 			}
-
-			var fileCount = *ptr++;
-			_Files = new(fileCount);
-			for (var i = 0; i < fileCount; i++) {
-				var nameHash = *(ulong*)ptr;
-				ptr += 2;
-				var bundle = _Bundles[*ptr++];
-				var f = new FileRecord(nameHash, bundle, *ptr++, *ptr++);
-				_Files.Add(nameHash, f);
-				bundle._Files.Add(f);
-			}
-
-			var directoryCount = *ptr++;
-			_Directories = new ReadOnlySpan<DirectoryRecord>(ptr, directoryCount).ToArray();
-			ptr = (int*)((DirectoryRecord*)ptr + directoryCount);
-
-			directoryBundleData = data[(int)((byte*)ptr - p)..];
 		}
 
 		if (parsePaths) {
@@ -858,11 +861,20 @@ public class Index : IDisposable {
 			sorted[--count[list[i].BundleRecord.BundleIndex]] = list[i];
 		return sorted;
 	}
+	#endregion Helpers
 
 	protected virtual void EnsureNotDisposed() {
-		ObjectDisposedException.ThrowIf(_Bundles is null, this);
+		baseBundle.EnsureNotDisposed();
 	}
-	#endregion Helpers
+
+	/// <summary>
+	/// Get the field of the base stream of this instance.
+	/// Using this method may cause dangerous unexpected behavior.
+	/// </summary>
+	[EditorBrowsable(EditorBrowsableState.Advanced)]
+	public ref Stream UnsafeGetStream() {
+		return ref baseBundle.UnsafeGetStream();
+	}
 
 	public virtual void Dispose() {
 		GC.SuppressFinalize(this);
@@ -876,7 +888,6 @@ public class Index : IDisposable {
 			_BundleStreamToWrite = null;
 			WR_BundleStreamToWrite.SetTarget(null!);
 			baseBundle.Dispose();
-			_Bundles = null!;
 			_Root = null;
 		}
 	}

@@ -17,9 +17,6 @@ namespace LibBundle3;
 /// <summary>
 /// Class to handle the *.bundle.bin file.
 /// </summary>
-/// <remarks>
-/// Read/Save are not thread-safe.
-/// </remarks>
 public class Bundle : IDisposable {
 	/// <summary>
 	/// Metadata of a bundle file which is stored at the beginning of the file in 60 bytes.
@@ -104,11 +101,13 @@ public class Bundle : IDisposable {
 		baseStream = stream;
 		this.leaveOpen = leaveOpen;
 		Record = record;
-		stream.Position = 0;
-		stream.Read(out metadata);
-		if (record is not null)
-			record.UncompressedSize = metadata.uncompressed_size;
-		stream.Read(compressed_chunk_sizes = GC.AllocateUninitializedArray<int>(metadata.chunk_count));
+		lock (stream) {
+			stream.Position = 0;
+			stream.Read(out metadata);
+			if (record is not null)
+				record.UncompressedSize = metadata.uncompressed_size;
+			stream.Read(compressed_chunk_sizes = GC.AllocateUninitializedArray<int>(metadata.chunk_count));
+		}
 	}
 
 	/// <summary>
@@ -121,19 +120,23 @@ public class Bundle : IDisposable {
 		baseStream = stream;
 		Record = record;
 		compressed_chunk_sizes = [];
-		stream.Position = 0;
-		metadata = new();
-		stream.Write(in metadata);
-		stream.SetLength(stream.Position);
+		lock (stream) {
+			stream.Position = 0;
+			metadata = new();
+			stream.Write(in metadata);
+			stream.SetLength(stream.Position);
+		}
 	}
 
 	/// <summary>
 	/// Read the whole data of the bundle without caching.
 	/// </summary>
 	public byte[] ReadWithoutCache() {
-		var result = GC.AllocateUninitializedArray<byte>(metadata.uncompressed_size);
-		ReadChunks(result, 0, metadata.chunk_count);
-		return result;
+		lock (baseStream) {
+			var result = GC.AllocateUninitializedArray<byte>(metadata.uncompressed_size);
+			ReadChunks(result, 0, metadata.chunk_count);
+			return result;
+		}
 	}
 	/// <summary>
 	/// Read the whole data of the bundle without caching.
@@ -142,9 +145,11 @@ public class Bundle : IDisposable {
 	/// <returns>Size of the data read in bytes.</returns>
 	/// <exception cref="ArgumentOutOfRangeException"/>
 	public int ReadWithoutCache(Span<byte> span) {
-		ArgumentOutOfRangeException.ThrowIfLessThan(span.Length, metadata.uncompressed_size);
-		ReadChunks(span, 0, metadata.chunk_count);
-		return metadata.uncompressed_size;
+		lock (baseStream) {
+			ArgumentOutOfRangeException.ThrowIfLessThan(span.Length, metadata.uncompressed_size);
+			ReadChunks(span, 0, metadata.chunk_count);
+			return metadata.uncompressed_size;
+		}
 	}
 	/// <summary>
 	/// Read the data with the given <paramref name="offset"/> and <paramref name="length"/> without caching.
@@ -154,18 +159,20 @@ public class Bundle : IDisposable {
 	/// </returns>
 	/// <exception cref="ArgumentOutOfRangeException"/>
 	public ArraySegment<byte> ReadWithoutCache(int offset, int length) {
-		unchecked {
-			ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)offset, (uint)metadata.uncompressed_size);
-			if (length == 0)
-				return ArraySegment<byte>.Empty;
-			ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)length, (uint)(metadata.uncompressed_size - offset));
+		lock (baseStream) {
+			unchecked {
+				ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)offset, (uint)metadata.uncompressed_size);
+				if (length == 0)
+					return ArraySegment<byte>.Empty;
+				ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)length, (uint)(metadata.uncompressed_size - offset));
+			}
+			var start = Math.DivRem(offset, metadata.chunk_size, out var remainder);
+			var end = (offset + length - 1) / metadata.chunk_size + 1;
+			var result = GC.AllocateUninitializedArray<byte>(end == metadata.chunk_count // Contains the last chunk
+				? metadata.uncompressed_size - metadata.chunk_size * start : metadata.chunk_size * (end - start));
+			ReadChunks(result, start, end);
+			return new(result, remainder, length);
 		}
-		var start = Math.DivRem(offset, metadata.chunk_size, out var remainder);
-		var end = (offset + length - 1) / metadata.chunk_size + 1;
-		var result = GC.AllocateUninitializedArray<byte>(end == metadata.chunk_count // Contains the last chunk
-			? metadata.uncompressed_size - metadata.chunk_size * start : metadata.chunk_size * (end - start));
-		ReadChunks(result, start, end);
-		return new(result, remainder, length);
 	}
 
 	/// <summary>
@@ -173,9 +180,11 @@ public class Bundle : IDisposable {
 	/// </summary>
 	/// <remarks>Use <see cref="ReadWithoutCache()"/> instead if you'll read only once</remarks>
 	public ReadOnlyMemory<byte> Read() {
-		cachedContent ??= GC.AllocateUninitializedArray<byte>(metadata.uncompressed_size);
-		ReadChunks(cachedContent, 0, metadata.chunk_count);
-		return cachedContent;
+		lock (baseStream) {
+			cachedContent ??= GC.AllocateUninitializedArray<byte>(metadata.uncompressed_size);
+			ReadChunks(cachedContent, 0, metadata.chunk_count);
+			return cachedContent;
+		}
 	}
 	/// <summary>
 	/// Read the data with the given <paramref name="offset"/> and <paramref name="length"/> (use cached data if exists).
@@ -183,17 +192,19 @@ public class Bundle : IDisposable {
 	/// <remarks>Use <see cref="ReadWithoutCache(int, int)"/> instead if you'll read only once or the range is far apart each call</remarks>
 	/// <exception cref="ArgumentOutOfRangeException"/>
 	public ReadOnlyMemory<byte> Read(int offset, int length) {
-		unchecked {
-			ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)offset, (uint)metadata.uncompressed_size);
-			if (length == 0)
-				return ReadOnlyMemory<byte>.Empty;
-			ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)length, (uint)(metadata.uncompressed_size - offset));
+		lock (baseStream) {
+			unchecked {
+				ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)offset, (uint)metadata.uncompressed_size);
+				if (length == 0)
+					return ReadOnlyMemory<byte>.Empty;
+				ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)length, (uint)(metadata.uncompressed_size - offset));
+			}
+			var start = offset / metadata.chunk_size;
+			var end = (offset + length - 1) / metadata.chunk_size + 1;
+			cachedContent ??= GC.AllocateUninitializedArray<byte>(metadata.uncompressed_size);
+			ReadChunks(cachedContent.AsSpan(start * metadata.chunk_size), start, end);
+			return new(cachedContent, offset, length);
 		}
-		var start = offset / metadata.chunk_size;
-		var end = (offset + length - 1) / metadata.chunk_size + 1;
-		cachedContent ??= GC.AllocateUninitializedArray<byte>(metadata.uncompressed_size);
-		ReadChunks(cachedContent.AsSpan(start * metadata.chunk_size), start, end);
-		return new(cachedContent, offset, length);
 	}
 
 	/// <summary>
@@ -208,43 +219,46 @@ public class Bundle : IDisposable {
 	/// </remarks>
 	/// <exception cref="ArgumentOutOfRangeException"/>
 	protected virtual unsafe void ReadChunks(Span<byte> span, int start, int end, bool cached = false) {
-		EnsureNotDisposed();
-		if (start == end) // Shouldn't happen
-			return;
 		Debug.Assert(span.Length >= (end == metadata.chunk_count // Contains the last chunk
 			? metadata.uncompressed_size - metadata.chunk_size * start : metadata.chunk_size * (end - start)));
 		Debug.Assert((uint)start <= (uint)metadata.chunk_count);
 		Debug.Assert((uint)end <= (uint)metadata.chunk_count);
 
-		Oodle.Initialize(new() { ChunkSize = metadata.chunk_size, Compressor = metadata.compressor, EnableCompressing = false });
-		baseStream.Position = (sizeof(int) * 3) + metadata.head_size + compressed_chunk_sizes.Take(start).Sum();
-		if (cached)
-			cacheTable ??= new bool[metadata.chunk_count];
+		if (start == end) // Shouldn't happen
+			return;
 
-		var last = metadata.chunk_count - 1;
-		var compressed = ArrayPool<byte>.Shared.Rent(Oodle.GetCompressedBufferSize());
-		try {
-			fixed (byte* ptr = span, tmp = compressed) {
-				var p = ptr;
-				for (var i = start; i < end; ++i) {
-					if (cached && cacheTable![i]) {
-						baseStream.Seek(compressed_chunk_sizes[i], SeekOrigin.Current);
-					} else {
-						baseStream.ReadExactly(new(tmp, compressed_chunk_sizes[i]));
-						if (i == last) {
-							last = metadata.GetLastChunkSize();
-							if (Oodle.Decompress(tmp, compressed_chunk_sizes[i], p, last) != last)
-								ThrowHelper.Throw<Exception>("Failed to decompress last chunk with index: " + i);
+		lock (baseStream) {
+			EnsureNotDisposed();
+			Oodle.Initialize(new() { ChunkSize = metadata.chunk_size, Compressor = metadata.compressor, EnableCompressing = false });
+			baseStream.Position = (sizeof(int) * 3) + metadata.head_size + compressed_chunk_sizes.Take(start).Sum();
+			if (cached)
+				cacheTable ??= new bool[metadata.chunk_count];
+
+			var last = metadata.chunk_count - 1;
+			var compressed = ArrayPool<byte>.Shared.Rent(Oodle.GetCompressedBufferSize());
+			try {
+				fixed (byte* ptr = span, tmp = compressed) {
+					var p = ptr;
+					for (var i = start; i < end; ++i) {
+						if (cached && cacheTable![i]) {
+							baseStream.Seek(compressed_chunk_sizes[i], SeekOrigin.Current);
 						} else {
-							if (Oodle.Decompress(tmp, compressed_chunk_sizes[i], p) != metadata.chunk_size)
-								ThrowHelper.Throw<Exception>("Failed to decompress chunk with index: " + i);
+							baseStream.ReadExactly(new(tmp, compressed_chunk_sizes[i]));
+							if (i == last) {
+								last = metadata.GetLastChunkSize();
+								if (Oodle.Decompress(tmp, compressed_chunk_sizes[i], p, last) != last)
+									ThrowHelper.Throw<Exception>("Failed to decompress last chunk with index: " + i);
+							} else {
+								if (Oodle.Decompress(tmp, compressed_chunk_sizes[i], p) != metadata.chunk_size)
+									ThrowHelper.Throw<Exception>("Failed to decompress chunk with index: " + i);
+							}
 						}
+						p += metadata.chunk_size;
 					}
-					p += metadata.chunk_size;
 				}
+			} finally {
+				ArrayPool<byte>.Shared.Return(compressed);
 			}
-		} finally {
-			ArrayPool<byte>.Shared.Return(compressed);
 		}
 	}
 
@@ -260,62 +274,72 @@ public class Bundle : IDisposable {
 	/// Save the bundle with new contents.
 	/// </summary>
 	public virtual unsafe void Save(scoped ReadOnlySpan<byte> newContent, Oodle.CompressionLevel compressionLevel = Oodle.CompressionLevel.Normal) {
-		EnsureNotDisposed();
-		RemoveCache();
+		lock (baseStream) {
+			EnsureNotDisposed();
+			RemoveCache();
 
-		Oodle.Initialize(new() { ChunkSize = metadata.chunk_size, Compressor = metadata.compressor, CompressionLevel = compressionLevel, EnableCompressing = true });
-		metadata.uncompressed_size_long = metadata.uncompressed_size = newContent.Length;
-		metadata.chunk_count = metadata.uncompressed_size / metadata.chunk_size;
-		if (metadata.uncompressed_size > metadata.chunk_count * metadata.chunk_size)
-			++metadata.chunk_count;
-		metadata.head_size = metadata.chunk_count * sizeof(int) + (sizeof(Header) - sizeof(int) * 3);
-		baseStream.Position = sizeof(int) * 3 + metadata.head_size;
-		compressed_chunk_sizes = GC.AllocateUninitializedArray<int>(metadata.chunk_count);
-		metadata.compressed_size = 0;
-		var compressed = ArrayPool<byte>.Shared.Rent(Oodle.GetCompressedBufferSize());
-		try {
-			fixed (byte* ptr = newContent, tmp = compressed) {
-				var p = ptr;
-				var last = metadata.chunk_count - 1;
-				int l;
-				for (var i = 0; i < last; ++i) {
-					l = (int)Oodle.Compress(p, tmp);
-					compressed_chunk_sizes[i] = l;
+			Oodle.Initialize(new() { ChunkSize = metadata.chunk_size, Compressor = metadata.compressor, CompressionLevel = compressionLevel, EnableCompressing = true });
+			metadata.uncompressed_size_long = metadata.uncompressed_size = newContent.Length;
+			metadata.chunk_count = metadata.uncompressed_size / metadata.chunk_size;
+			if (metadata.uncompressed_size > metadata.chunk_count * metadata.chunk_size)
+				++metadata.chunk_count;
+			metadata.head_size = metadata.chunk_count * sizeof(int) + (sizeof(Header) - sizeof(int) * 3);
+			baseStream.Position = sizeof(int) * 3 + metadata.head_size;
+			compressed_chunk_sizes = GC.AllocateUninitializedArray<int>(metadata.chunk_count);
+			metadata.compressed_size = 0;
+			var compressed = ArrayPool<byte>.Shared.Rent(Oodle.GetCompressedBufferSize());
+			try {
+				fixed (byte* ptr = newContent, tmp = compressed) {
+					var p = ptr;
+					var last = metadata.chunk_count - 1;
+					int l;
+					for (var i = 0; i < last; ++i) {
+						l = (int)Oodle.Compress(p, tmp);
+						compressed_chunk_sizes[i] = l;
+						metadata.compressed_size += l;
+						p += metadata.chunk_size;
+						baseStream.Write(new(tmp, l));
+					}
+					l = (int)Oodle.Compress(p, metadata.GetLastChunkSize(), tmp);
+					compressed_chunk_sizes[last] = l;
 					metadata.compressed_size += l;
-					p += metadata.chunk_size;
 					baseStream.Write(new(tmp, l));
 				}
-				l = (int)Oodle.Compress(p, metadata.GetLastChunkSize(), tmp);
-				compressed_chunk_sizes[last] = l;
-				metadata.compressed_size += l;
-				baseStream.Write(new(tmp, l));
+			} finally {
+				ArrayPool<byte>.Shared.Return(compressed);
 			}
-		} finally {
-			ArrayPool<byte>.Shared.Return(compressed);
+			metadata.compressed_size_long = metadata.compressed_size;
+
+			baseStream.Position = 0;
+			baseStream.Write(in metadata);
+			baseStream.Write(compressed_chunk_sizes);
+
+			baseStream.SetLength((sizeof(int) * 3) + metadata.head_size + metadata.compressed_size);
+			baseStream.Flush();
+			if (Record is not null)
+				Record.UncompressedSize = metadata.uncompressed_size;
 		}
-		metadata.compressed_size_long = metadata.compressed_size;
-
-		baseStream.Position = 0;
-		baseStream.Write(in metadata);
-		baseStream.Write(compressed_chunk_sizes);
-
-		baseStream.SetLength((sizeof(int) * 3) + metadata.head_size + metadata.compressed_size);
-		baseStream.Flush();
-		if (Record is not null)
-			Record.UncompressedSize = metadata.uncompressed_size;
 	}
 
-	protected virtual void EnsureNotDisposed() {
-		ObjectDisposedException.ThrowIf(compressed_chunk_sizes is null, this);
+	protected internal virtual void EnsureNotDisposed() {
+		ObjectDisposedException.ThrowIf(!baseStream.CanRead, this);
+	}
+
+	/// <summary>
+	/// Get the field of the base stream of this instance.
+	/// Using this method may cause dangerous unexpected behavior.
+	/// </summary>
+	[EditorBrowsable(EditorBrowsableState.Advanced)]
+	public ref Stream UnsafeGetStream() {
+		return ref Unsafe.AsRef(in baseStream);
 	}
 
 	public virtual void Dispose() {
 		GC.SuppressFinalize(this);
-		compressed_chunk_sizes = null!;
-		RemoveCache();
-		try {
+		lock (baseStream) {
+			RemoveCache();
 			if (!leaveOpen)
-				baseStream?.Close();
-		} catch { /*Closing closed stream*/ }
+				baseStream.Close();
+		}
 	}
 }

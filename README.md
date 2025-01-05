@@ -6,8 +6,8 @@ Rewrite of https://github.com/aianlinb/LibGGPK2
 Expected to work on Windows, Linux and macOS
 
 ## Notice
-- All projects in this repository are not thread-safe.  
-Do not process a single ggpk file with more than one thread.
+- Projects in this repository may not be thread-safe.  
+Be careful when processing a single ggpk file with more than one thread.
 - Each update does not necessarily guarantee forward compatibility.  
 Please read the commit messages carefully and check whether your project is working properly before updating to a new version.
 
@@ -25,4 +25,4 @@ For Standalone-Client users
 
 # Examples
 Sample programs to realize some simple features of the libraries  
-***VisualGGPK3 is not yet complete***
+***VisualGGPK3 is not yet completed***
