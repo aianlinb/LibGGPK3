@@ -40,7 +40,15 @@ public static class Program {
 			Console.WriteLine("Path in ggpk to extract: " + nodePath);
 			Console.WriteLine("Path to save: " + path);
 			Console.WriteLine("Reading ggpk file . . .");
-			using var ggpk = new BundledGGPK(args[0]);
+			//using var ggpk = new BundledGGPK(args[0]);
+			using var ggpk = new BundledGGPK(args[0], false);
+			var failed = ggpk.Index.ParsePaths();
+			if (failed != 0) {
+				var tmp = Console.ForegroundColor;
+				Console.ForegroundColor = ConsoleColor.Yellow;
+				Console.WriteLine($"Warning: Failed to parse path of {failed} files in the index file");
+				Console.ForegroundColor = tmp;
+			}
 			Console.WriteLine("Searching files . . .");
 			if (!ggpk.Index.TryFindNode(nodePath, out var node)) {
 				Console.WriteLine("Not found in GGPK: " + nodePath);
