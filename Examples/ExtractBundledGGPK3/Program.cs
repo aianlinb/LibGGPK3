@@ -1,17 +1,21 @@
 ﻿using System;
 using System.IO;
 using System.Reflection;
+using LibBundle3.Nodes;
 
 using LibBundledGGPK3;
 
 namespace ExtractBundledGGPK3;
 public static class Program {
 	public static void Main(string[] args) {
+		var pause = false;
 		try {
 			var version = Assembly.GetExecutingAssembly().GetName().Version!;
 			Console.WriteLine($"ExtractBundledGGPK3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb"); // ©
 			Console.WriteLine();
+
 			if (args.Length == 0) {
+				pause = true;
 				args = new string[3];
 				Console.Write("Path to Content.ggpk: ");
 				args[0] = Console.ReadLine()!;
@@ -41,6 +45,7 @@ public static class Program {
 			Console.WriteLine("Path to save: " + path);
 			Console.WriteLine("Reading ggpk file . . .");
 			//using var ggpk = new BundledGGPK(args[0]);
+			DirectoryNode? root = null;
 			using var ggpk = new BundledGGPK(args[0], false);
 			var failed = ggpk.Index.ParsePaths();
 			if (failed != 0) {
@@ -48,9 +53,10 @@ public static class Program {
 				Console.ForegroundColor = ConsoleColor.Yellow;
 				Console.WriteLine($"Warning: Failed to parse path of {failed} files in the index file");
 				Console.ForegroundColor = tmp;
+				root = ggpk.Index.BuildTree(true); // ignoreNullPath
 			}
 			Console.WriteLine("Searching files . . .");
-			if (!ggpk.Index.TryFindNode(nodePath, out var node)) {
+			if (!ggpk.Index.TryFindNode(nodePath, out var node, root)) {
 				Console.WriteLine("Not found in GGPK: " + nodePath);
 				Console.WriteLine();
 				Console.WriteLine("Enter to exit . . .");
@@ -65,8 +71,11 @@ public static class Program {
 		} catch (Exception e) {
 			Console.Error.WriteLine(e);
 		}
-		Console.WriteLine();
-		Console.WriteLine("Enter to exit . . .");
-		Console.ReadLine();
+
+		if (pause) {
+			Console.WriteLine();
+			Console.WriteLine("Enter to exit . . .");
+			Console.ReadLine();
+		}
 	}
 }

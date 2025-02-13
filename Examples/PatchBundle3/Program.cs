@@ -6,11 +6,13 @@ using System.Reflection;
 namespace PatchBundle3;
 public static class Program {
 	public static void Main(string[] args) {
+		var pause = false;
 		try {
 			var version = Assembly.GetExecutingAssembly().GetName().Version!;
 			Console.WriteLine($"PatchBundle3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb"); // ©
 			Console.WriteLine();
 			if (args.Length == 0) {
+				pause = true;
 				args = new string[2];
 				Console.Write("Path To _.index.bin: ");
 				args[0] = Console.ReadLine()!;
@@ -51,8 +53,11 @@ public static class Program {
 		} catch (Exception e) {
 			Console.Error.WriteLine(e);
 		}
-		Console.WriteLine();
-		Console.WriteLine("Enter to exit . . .");
-		Console.ReadLine();
+
+		if (pause) {
+			Console.WriteLine();
+			Console.WriteLine("Enter to exit . . .");
+			Console.ReadLine();
+		}
 	}
 }
