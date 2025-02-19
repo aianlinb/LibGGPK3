@@ -153,7 +153,7 @@ public class FreeRecord : BaseRecord {
 	protected internal virtual void UpdateLength() {
 		var list = Ggpk._SortedFreeRecords;
 		if (list is not null) {
-			var span = CollectionsMarshal.AsSpan(Ggpk._SortedFreeRecords);
+			var span = CollectionsMarshal.AsSpan(list);
 			var i = span.BinarySearch(new LengthWrapper(Length));
 			if (i < 0)
 				i = ~i;
@@ -162,10 +162,9 @@ public class FreeRecord : BaseRecord {
 			var oi = list.IndexOf(this);
 			if (oi != -1) {
 				if (oi != i) {
-					if (oi < i) {
-						--i;
-						span[(oi + 1)..i].CopyTo(span[oi..]);
-					} else
+					if (oi < i)
+						span[(oi + 1)..i--].CopyTo(span[oi..]);
+					else
 						span[i..oi].CopyTo(span[(i + 1)..]);
 					span[i] = this;
 				}
