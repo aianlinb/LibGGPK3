@@ -6,8 +6,10 @@ import (
 	"os"
 	"testing"
 
-	encunicode "golang.org/x/text/encoding/unicode" // Aliased import
+	encunicode "golang.org/x/text/encoding/unicode"
+	utf32encoding "golang.org/x/text/encoding/unicode/utf32" // Specific for UTF32 function
 	"github.com/pierrec/lz4/v4"
+	"golang.org/x/text/transform"
 )
 
 // Helper function to create a temporary file with given bytes
@@ -94,11 +96,15 @@ func createFileRecordBytes(t *testing.T, name string, ggpkVersion uint32, fileDa
 
 	// Name (UTF-16 or UTF-32)
 	if ggpkVersion == 4 { // UTF-32
-		utf32Bytes, _ := encunicode.UTF32(encunicode.LittleEndian, encunicode.IgnoreBOM).NewEncoder().Bytes([]byte(name)) // Use alias
+		// UTF32 function and constants from utf32encoding package
+		utf32Encoder := utf32encoding.UTF32(utf32encoding.LittleEndian, utf32encoding.IgnoreBOM).NewEncoder()
+		utf32Bytes, _, _ := transform.Bytes(utf32Encoder, []byte(name))
 		recordBody.Write(utf32Bytes)
 		binary.Write(&recordBody, GGPKEndian, uint32(0)) // Null terminator for UTF-32
 	} else { // UTF-16
-		utf16Bytes, _ := encunicode.UTF16(encunicode.LittleEndian, encunicode.IgnoreBOM).NewEncoder().Bytes([]byte(name)) // Use alias
+		// UTF16 function and constants from encunicode (base unicode package)
+		utf16Encoder := encunicode.UTF16(encunicode.LittleEndian, encunicode.IgnoreBOM).NewEncoder()
+		utf16Bytes, _, _ := transform.Bytes(utf16Encoder, []byte(name))
 		recordBody.Write(utf16Bytes)
 		binary.Write(&recordBody, GGPKEndian, uint16(0)) // Null terminator for UTF-16
 	}
@@ -146,8 +152,8 @@ func TestParseFileRecordBody(t *testing.T) {
 			gf := &GGPKFile{
 				File: f,
 				Header: GGPKRecord{Version: tc.ggpkVersion}, // Crucial for string decoding
-				utf16LEDecoder: encunicode.UTF16(encunicode.LittleEndian, encunicode.IgnoreBOM).NewDecoder(), // Use alias
-				utf32LEDecoder: encunicode.UTF32(encunicode.LittleEndian, encunicode.IgnoreBOM).NewDecoder(), // Use alias
+				utf16LEDecoder: encunicode.UTF16(encunicode.LittleEndian, encunicode.IgnoreBOM).NewDecoder(),
+				utf32LEDecoder: utf32encoding.UTF32(utf32encoding.LittleEndian, utf32encoding.IgnoreBOM).NewDecoder(),
 				stringReadBuf:  make([]byte, 1024),
 			}
 
@@ -423,8 +429,8 @@ func TestParseDirectoryRecordBody(t *testing.T) {
 	gf := &GGPKFile{
 		File: f,
 		Header: GGPKRecord{Version: 3}, // PC version for UTF-16 names
-		utf16LEDecoder: encunicode.UTF16(encunicode.LittleEndian, encunicode.IgnoreBOM).NewDecoder(), // Use alias
-		utf32LEDecoder: encunicode.UTF32(encunicode.LittleEndian, encunicode.IgnoreBOM).NewDecoder(), // Use alias
+		utf16LEDecoder: encunicode.UTF16(encunicode.LittleEndian, encunicode.IgnoreBOM).NewDecoder(),
+		utf32LEDecoder: utf32encoding.UTF32(utf32encoding.LittleEndian, utf32encoding.IgnoreBOM).NewDecoder(),
 		stringReadBuf:  make([]byte, 256),
 	}
 

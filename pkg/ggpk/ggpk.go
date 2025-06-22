@@ -9,7 +9,8 @@ import (
 	"strings"
 
 	"github.com/pierrec/lz4/v4"
-	encunicode "golang.org/x/text/encoding/unicode" // Aliased import
+	encunicode "golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/encoding/unicode/utf32" // Specific import for UTF-32
 	"golang.org/x/text/transform"
 )
 
@@ -20,8 +21,8 @@ type GGPKFile struct {
 	Root            *DirectoryRecord // Parsed root directory
 	recordCache     map[int64]interface{}
 	stringReadBuf   []byte // Reusable buffer for string reading
-	utf16LEDecoder  transform.Transformer // Corrected type
-	utf32LEDecoder  transform.Transformer // Corrected type
+	utf16LEDecoder  transform.Transformer
+	utf32LEDecoder  transform.Transformer
 }
 
 // Open opens a GGPK file, reads its header, and returns a GGPKFile struct.
@@ -35,8 +36,9 @@ func Open(filepath string) (*GGPKFile, error) {
 		File:           f,
 		recordCache:    make(map[int64]interface{}),
 		stringReadBuf:  make([]byte, 1024), // Initial size, can grow
-		utf16LEDecoder: encunicode.UTF16(encunicode.LittleEndian, encunicode.IgnoreBOM).NewDecoder(), // Use alias
-		utf32LEDecoder: encunicode.UTF32(encunicode.LittleEndian, encunicode.IgnoreBOM).NewDecoder(), // Use alias
+		utf16LEDecoder: encunicode.UTF16(encunicode.LittleEndian, encunicode.IgnoreBOM).NewDecoder(),
+		// Try using constants from the utf32 package itself, assuming they are re-exported or defined compatibly.
+		utf32LEDecoder: utf32.UTF32(utf32.LittleEndian, utf32.IgnoreBOM).NewDecoder(),
 	}
 
 	// The GGPKRecord is always at offset 0
