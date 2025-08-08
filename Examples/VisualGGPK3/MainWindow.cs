@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -192,10 +192,7 @@ public sealed class MainWindow : Form {
 #pragma warning restore CS0618
 		if (item is null)
 			return;
-#if Windows
-		if (item.Expandable)
-			item.Expanded = !item.Expanded;
-#endif
+
 		if (item is FileTreeItem fileItem) {
 			var panel = (Splitter)((Splitter)Content).Panel2;
 			var format = fileItem.Format;

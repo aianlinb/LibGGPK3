@@ -1,5 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+	<PropertyGroup>
+		<Version>2.6.10.1</Version>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<EmbeddedResource Include="Resources/dir.ico" />
 		<EmbeddedResource Include="Resources/file.ico" />
