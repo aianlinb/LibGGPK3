@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 
 using LibBundle3;
 
@@ -16,13 +16,18 @@ public class BundledGGPK : GGPK {
 	public Index Index { get; }
 
 	private Index Ctor(bool parsePathsInIndex = true) {
-		var bundles2 = Root["Bundles2"] as DirectoryRecord;
-		if (bundles2 is null)
-			ThrowHelper.Throw<DirectoryNotFoundException>("Cannot find directory \"Bundles2\" in the ggpk");
-		var index = bundles2["_.index.bin"] as FileRecord;
-		if (index is null)
-			ThrowHelper.Throw<FileNotFoundException>("Cannot find file \"Bundles2/_.index.bin\" in the ggpk");
-		return new(new GGFileStream(index), false, parsePathsInIndex, new GGPKBundleFactory(this, bundles2));
+		try {
+			var bundles2 = Root["Bundles2"] as DirectoryRecord;
+			if (bundles2 is null)
+				ThrowHelper.Throw<DirectoryNotFoundException>("Cannot find directory \"Bundles2\" in the ggpk");
+			var index = bundles2["_.index.bin"] as FileRecord;
+			if (index is null)
+				ThrowHelper.Throw<FileNotFoundException>("Cannot find file \"Bundles2/_.index.bin\" in the ggpk");
+			return new(new GGFileStream(index), false, parsePathsInIndex, new GGPKBundleFactory(this, bundles2));
+		} catch {
+			Dispose();
+			throw;
+		}
 	}
 
 	/// <param name="filePath">Path to Content.ggpk on disk</param>
@@ -49,7 +54,7 @@ public class BundledGGPK : GGPK {
 
 #pragma warning disable CA1816
 	public override void Dispose() {
-		Index.Dispose();
+		Index?.Dispose();
 		base.Dispose(); // GC.SuppressFinalize(this) in here
 	}
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -97,8 +97,13 @@ public class GGPK : IDisposable {
 			ThrowHelper.Throw<NotSupportedException>("Big-endian architecture is not supported");
 		baseStream = stream;
 		this.leaveOpen = leaveOpen;
-		Record = (GGPKRecord)ReadRecord(0);
-		Root = (DirectoryRecord)ReadRecord(Record.RootDirectoryOffset);
+		try {
+			Record = (GGPKRecord)ReadRecord(0);
+			Root = (DirectoryRecord)ReadRecord(Record.RootDirectoryOffset);
+		} catch {
+			Dispose();
+			throw;
+		}
 	}
 
 	/// <summary>
@@ -499,7 +504,7 @@ public class GGPK : IDisposable {
 
 	public virtual void Dispose() {
 		GC.SuppressFinalize(this);
-		if (!baseStream.CanWrite)
+		if (baseStream is null || !baseStream.CanWrite)
 			return;
 		Flush();
 		if (!leaveOpen)

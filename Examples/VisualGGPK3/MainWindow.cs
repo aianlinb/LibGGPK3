@@ -23,7 +23,7 @@ using VisualGGPK3.TreeItems;
 
 namespace VisualGGPK3;
 public sealed class MainWindow : Form {
-	private BundledGGPK? Ggpk;
+	private GGPK? Ggpk;
 	internal LibBundle3.Index? Index;
 #pragma warning disable CS0618
 	private readonly TreeView GGPKTree = new();
@@ -118,6 +118,9 @@ public sealed class MainWindow : Form {
 				path = ofd.FileName;
 			}
 
+			if (!File.Exists(path))
+				throw new FileNotFoundException(path);
+
 			int failed;
 			if (path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)) {
 				failed = await Task.Run(() => {
@@ -131,16 +134,23 @@ public sealed class MainWindow : Form {
 				layout.Position = 0;
 			} else {
 				failed = await Task.Run(() => {
-					Ggpk = new(path, false); // false to parsePaths manually
-					Index = Ggpk.Index;
-					return Index.ParsePaths();
+					try {
+						var ggpk = new BundledGGPK(path, false); // false to parsePaths manually
+						Ggpk = ggpk;
+						Index = ggpk.Index;
+						return Index.ParsePaths();
+					} catch (FileNotFoundException ex) { // No _.index.bin
+						MessageBox.Show(this, ex.GetNameAndMessage(), "Error", MessageBoxType.Error);
+						Ggpk = new GGPK(path);
+						return 0;
+					}
 				});
 				GGPKTree.DataStore = new GGPKDirectoryTreeItem(Ggpk!.Root, null, GGPKTree) {
 					Expanded = true
 				};
 			}
-			var buildTreeTask = failed == Index!.Files.Count ? Task.FromResult<BundleDirectoryTreeItem>(null!) :
-				Task.Run(() => (BundleDirectoryTreeItem)Index!.BuildTree(BundleDirectoryTreeItem.GetFuncCreateInstance(BundleTree), BundleFileTreeItem.CreateInstance, true));
+			var buildTreeTask = Index is null || failed == Index.Files.Count ? Task.FromResult<BundleDirectoryTreeItem>(null!) :
+				Task.Run(() => (BundleDirectoryTreeItem)Index.BuildTree(BundleDirectoryTreeItem.GetFuncCreateInstance(BundleTree), BundleFileTreeItem.CreateInstance, true));
 			if (failed != 0)
 				TextPanel.Text += $"\n\nWarning: There're {failed} files failed to parse the path, your ggpk file may be broken.";
 
@@ -175,13 +185,9 @@ public sealed class MainWindow : Form {
 			BundleTree.DragDrop += OnDragDrop;
 			BundleTree.AllowDrop = true;
 
-			if (failed == Index.Files.Count) { // All failed
-				BundleTree.DataStore = null;
-				return;
-			}
-
 			var bundles = await buildTreeTask;
-			bundles.Expanded = true;
+			if (bundles is not null)
+				bundles.Expanded = true;
 			BundleTree.DataStore = bundles;
 		}
 	}
@@ -431,15 +437,11 @@ public sealed class MainWindow : Form {
 				goto err;
 
 			int count;
-			using (var zip = ZipFile.OpenRead(path)) {
-				if (sender == GGPKTree) {
-					if (Ggpk is null)
-						throw ThrowHelper.Create<InvalidOperationException>("GGPK replacing is not supported in Steam/Epic mode");
-					else
-						count = GGPK.Replace(Ggpk.Root, zip.Entries);
-				} else
-					count = LibBundle3.Index.Replace(Index!, zip.Entries);
-			}
+			using (var zip = ZipFile.OpenRead(path))
+				count = sender == GGPKTree
+					? GGPK.Replace((Ggpk ?? throw ThrowHelper.Create<InvalidOperationException>("GGPK replacing is not supported in Steam/Epic mode"))
+						.Root, zip.Entries)
+					: LibBundle3.Index.Replace(Index!, zip.Entries);
 			MessageBox.Show(this, $"Replaced {count} files!", "Done", MessageBoxType.Information);
 		} catch (Exception ex) {
 			MessageBox.Show(this, ex.ToString(), "Error", MessageBoxType.Error);
