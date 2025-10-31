@@ -48,23 +48,27 @@ public sealed class MainWindow : Form {
 		else
 			Title = $"VisualGGPK3 (v{version.Major}.{version.Minor}.{version.Build})";
 
-		var bounds = Screen.Bounds;
-		if (bounds.Width <= 1280 || bounds.Height <= 720)
-			Size = new(960, 540);
-		else
-			Size = new(1280, 720);
+		if (Screen is null) {
+			Size = new(640, 480);
+		} else {
+			var bounds = Screen.Bounds;
+			if (bounds.Width <= 1280 || bounds.Height <= 720)
+				Size = new(960, 540);
+			else
+				Size = new(1280, 720);
+		}
 #if Windows
 #pragma warning disable CS0618 // Obsolete
-		static void WindowsFix(TreeView tree) {
-			var etree = ((Eto.Wpf.Forms.Controls.TreeViewHandler)tree.Handler).Control; // EtoTreeView
+			static void WindowsFix(TreeView tree) {
+				var etree = ((Eto.Wpf.Forms.Controls.TreeViewHandler)tree.Handler).Control; // EtoTreeView
 #pragma warning restore CS0618
-			// Virtualizing
-			etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.IsVirtualizingProperty, true);
-			etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.VirtualizationModeProperty, System.Windows.Controls.VirtualizationMode.Recycling);
-			// Fix expand binding
-			var setter = (System.Windows.Setter)etree.ItemContainerStyle.Setters[0];
-			((System.Windows.Data.Binding)setter.Value).Mode = System.Windows.Data.BindingMode.TwoWay; // From OneTime
-		}
+				// Virtualizing
+				etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.IsVirtualizingProperty, true);
+				etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.VirtualizationModeProperty, System.Windows.Controls.VirtualizationMode.Recycling);
+				// Fix expand binding
+				var setter = (System.Windows.Setter)etree.ItemContainerStyle.Setters[0];
+				((System.Windows.Data.Binding)setter.Value).Mode = System.Windows.Data.BindingMode.TwoWay; // From OneTime
+			}
 		WindowsFix(GGPKTree);
 		WindowsFix(BundleTree);
 		// Virtualizing
