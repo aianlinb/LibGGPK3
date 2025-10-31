@@ -290,6 +290,7 @@ public class MainWindow : Form {
 				output.Append("Warning: Cannot find Bundles2/_.index.bin in GGPK!\n", true);
 		}
 		output.Append($"Done!\n\n", true);
+		output.ScrollToEnd();
 		MessageBox.Show(this, "已移除_.index.bin，請開啟遊戲讓它更新以完成還原", "Done", MessageBoxButtons.OK, MessageBoxType.Information);
 		Close();
 	}
