@@ -9,7 +9,7 @@ Expected to work on Windows, Linux and macOS
 - Projects in this repository may not be thread-safe.  
 Be careful when processing a single ggpk file with more than one thread.
 - Each update does not necessarily guarantee forward compatibility.  
-Please read the commit messages carefully and check whether your project is working properly before updating to a new version.
+Please read the commit messages carefully and check whether your project is working properly before upgrading to a new version.
 
 # LibGGPK3
 Handle the Content.ggpk
