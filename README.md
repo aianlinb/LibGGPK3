@@ -1,7 +1,7 @@
 [![NuGet](https://img.shields.io/nuget/v/LibGGPK3.LibBundledGGPK3)](https://www.nuget.org/packages?q=LibGGPK3)
 
 ## Overview
-A cross-platfrom library for working with Content.ggpk from the game Path of Exile. 
+A cross-platfrom library for working with Content.ggpk from the game Path of Exile.  
 Rewrite of: https://github.com/aianlinb/LibGGPK2
 
 ## Notice

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -111,7 +111,7 @@ public class Index : IDisposable {
 					ThrowHelper.Throw<NullReferenceException>("A file has null or empty path, the Index may be broken");
 				continue;
 			}
-			var splittedPath = f.Path.AsSpan().Split('/');
+			var splittedPath = SpanExtensions.Split(f.Path.AsSpan(), '/');
 			var parent = root;
 			if (splittedPath.MoveNext())
 				while (true) {
@@ -349,7 +349,7 @@ public class Index : IDisposable {
 			node = root;
 			return true;
 		}
-		foreach (var name in path.TrimEnd('/').Split('/')) {
+		foreach (var name in SpanExtensions.Split(path.TrimEnd('/'), '/')) {
 			var next = root[name];
 			if (next is not DirectoryNode dn)
 				return (node = next) is not null;
