@@ -28,6 +28,19 @@ public class GGPK : IDisposable {
 	protected readonly bool leaveOpen;
 	protected internal readonly HashSet<DirectoryRecord> dirtyHashes = [];
 
+	public long Position {
+		get {
+			EnsureNotDisposed();
+			return baseStream.Position;
+		}
+	}
+	public long Length {
+		get {
+			EnsureNotDisposed();
+			return baseStream.Length;
+		}
+	}
+
 	/// <summary>
 	/// Version of format of this ggpk file.
 	/// 3 for PC, 4 for Mac, 2 for gmae-version before 3.11.2 which has no bundle in ggpk.
@@ -111,9 +124,9 @@ public class GGPK : IDisposable {
 	/// </summary>
 	[SkipLocalsInit]
 	public virtual unsafe BaseRecord ReadRecord() {
+		EnsureNotDisposed();
 		lock (baseStream) {
-			EnsureNotDisposed();
-			var buffer = stackalloc int[2];
+			var buffer = stackalloc uint[2];
 			baseStream.ReadExactly(new(buffer, sizeof(int) + sizeof(int)));
 			var length = *buffer;
 			return buffer[1] switch {
@@ -142,7 +155,7 @@ public class GGPK : IDisposable {
 	/// Find the most suitable FreeRecord from <see cref="FreeRecords"/> to write a Record with length of <paramref name="length"/>,
 	/// or <see langword="null"/> if no one found (in this case, write at the end of the ggpk instead).
 	/// </summary>
-	protected internal virtual FreeRecord? FindBestFreeRecord(int length) {
+	protected internal virtual FreeRecord? FindBestFreeRecord(uint length) {
 		var list = SortedFreeRecords;
 		var i = CollectionsMarshal.AsSpan(list).BinarySearch(new FreeRecord.LengthWrapper(length));
 		if (i >= 0)
@@ -154,7 +167,7 @@ public class GGPK : IDisposable {
 
 		var result = list[i];
 		// The result length must equal to or 16 larger than the required length (For the remaining FreeRecord)
-		while (result.Length - length < 16) {
+		while (result.Length - length < 16U) {
 			if (++i == list.Count)
 				return null; // Not found
 			result = list[i];
@@ -167,7 +180,7 @@ public class GGPK : IDisposable {
 	/// </summary>
 	/// <param name="progress">returns the number of FreeRecords remaining to be filled.
 	/// This won't be always decreasing</param>
-	public virtual void FastCompact(CancellationToken? cancellation = null, IProgress<int>? progress = null) {
+	public void FastCompact(CancellationToken? cancellation = null, IProgress<int>? progress = null) {
 		lock (baseStream) {
 			cancellation?.ThrowIfCancellationRequested();
 			FreeRecordConcat();
@@ -190,7 +203,7 @@ public class GGPK : IDisposable {
 						break;
 					if (treeNode.Offset < free.Offset)
 						continue;
-					if (treeNode.Length > free.Length - 16 && treeNode.Length != free.Length)
+					if (treeNode.Length > free.Length - 16U && treeNode.Length != free.Length)
 						continue;
 
 					treeNodes.RemoveAt(i);
@@ -219,7 +232,7 @@ public class GGPK : IDisposable {
 	/// <remarks>
 	/// Currently not used
 	/// </remarks>
-	protected virtual void FixFreeRecordList() {
+	public void FixFreeRecordList() {
 		EnsureNotDisposed();
 		lock (baseStream) {
 			baseStream.Position = 0;
@@ -253,7 +266,7 @@ public class GGPK : IDisposable {
 	protected virtual void FreeRecordConcat() {
 		EnsureNotDisposed();
 		lock (baseStream) {
-			var list = (_SortedFreeRecords ?? FreeRecords).ToList();
+			var list = (_SortedFreeRecords ?? FreeRecords).ToList(); // make copy
 			if (list.Count <= 1)
 				return;
 			list.Sort(Comparer<FreeRecord>.Create((x, y) => x.Offset.CompareTo(y.Offset)));
@@ -264,8 +277,14 @@ public class GGPK : IDisposable {
 			while (@continue) {
 				var changed = false;
 				current = list[i];
+				if (current.Length >= int.MaxValue)
+					continue;
+
 				while ((@continue = ++i < list.Count) && current.Offset + current.Length == list[i].Offset) {
-					current.Length += list[i].Length;
+					uint newLen = current.Length + list[i].Length;
+					if (newLen < current.Length || newLen >= int.MaxValue) // Overflow or large than int
+						continue;
+					current.Length = newLen;
 					list[i].RemoveFromList();
 					changed = true;
 				}

@@ -143,9 +143,13 @@ public sealed class MainWindow : Form {
 						Ggpk = ggpk;
 						Index = ggpk.Index;
 						return Index.ParsePaths();
-					} catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { // No _.index.bin
-						Application.Instance.AsyncInvoke(() =>
-							MessageBox.Show(this, ex.GetNameAndMessage(), "Warning", MessageBoxType.Warning));
+					} catch (Exception ex) {
+						if (ex is FileNotFoundException or DirectoryNotFoundException) // No _.index.bin
+							Application.Instance.AsyncInvoke(() =>
+								MessageBox.Show(this, ex.GetNameAndMessage(), "Warning", MessageBoxType.Warning));
+						else
+							Application.Instance.Invoke(() =>
+								MessageBox.Show(this, ex.ToString(), "Error", MessageBoxType.Error));
 						Ggpk = new GGPK(path);
 						return 0;
 					}

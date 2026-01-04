@@ -1,21 +1,21 @@
 [![NuGet](https://img.shields.io/nuget/v/LibGGPK3.LibBundledGGPK3)](https://www.nuget.org/packages?q=LibGGPK3)
 
-Library for Content.ggpk of game: Path of Exile.  
-Rewrite of https://github.com/aianlinb/LibGGPK2
-
-Expected to work on Windows, Linux and macOS
+## Overview
+A cross-platfrom library for working with Content.ggpk from the game Path of Exile. 
+Rewrite of: https://github.com/aianlinb/LibGGPK2
 
 ## Notice
-- Projects in this repository may not be thread-safe.  
-Be careful when processing a single ggpk file with more than one thread.
-- Each update does not necessarily guarantee forward compatibility.  
-Please read the commit messages carefully and check whether your project is working properly before upgrading to a new version.
+- Unauthorized modification, redistribution, or commercial use without open-source is prohibited. Please contact the author if needed.  
+- Projects in this repository may not be fully thread-safe.  
+Exercise caution when processing a single ggpk file from multiple threads.  
+- Updates do not guarantee forward compatibility.  
+Please review the commit history carefully and verify that your project continues to function as expected before upgrading to a new version.
 
 # LibGGPK3
-Handle the Content.ggpk
+Handles the Content.ggpk
 
 # LibBundle3
-Handle the *.bundle.bin files under Bundles2 folder  
+Handles the *.bundle.bin files in the Bundles2 directory  
 For Steam/Epic users
 
 # LibBundledGGPK3

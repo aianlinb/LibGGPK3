@@ -1,4 +1,4 @@
-﻿using SystemExtensions.Streams;
+using SystemExtensions.Streams;
 
 namespace LibGGPK3.Records;
 /// <summary>
@@ -16,7 +16,7 @@ public class GGPKRecord : BaseRecord {
 	public long RootDirectoryOffset { get; protected internal set; }
 	public long FirstFreeRecordOffset { get; protected internal set; }
 
-	protected internal GGPKRecord(int length, GGPK ggpk) : base(length, ggpk) {
+	protected internal GGPKRecord(uint length, GGPK ggpk) : base(length, ggpk) {
 		Offset = ggpk.baseStream.Position - 8;
 		GGPKVersion = (uint)ggpk.baseStream.Read<int>(); // 3 for PC, 4 for Mac
 		RootDirectoryOffset = ggpk.baseStream.Read<long>();

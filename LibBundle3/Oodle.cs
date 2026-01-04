@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -57,7 +57,7 @@ public static unsafe class Oodle { // Current Oodle Version: 2.9.12
 			}
 		}
 
-		var l = OodleLZDecoder_MemorySizeNeeded(Compressor.Invalid /*any*/, settings.ChunkSize); // max 446680 on Oodle v2.9.12
+		var l = OodleLZDecoder_MemorySizeNeeded(settings.Compressor, settings.ChunkSize); // max 446680 on Oodle v2.9.12
 		if (settings.EnableCompressing) {
 			var l2 = (int)OodleLZ_GetCompressScratchMemBound(settings.Compressor, settings.CompressionLevel, settings.ChunkSize);
 			if (l2 < 0) // OODLELZ_SCRATCH_MEM_NO_BOUND(-1)

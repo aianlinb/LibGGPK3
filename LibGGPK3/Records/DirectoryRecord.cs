@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -66,7 +66,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// Read a DirectoryRecord from GGPK
 	/// </summary>
 	[SkipLocalsInit]
-	protected internal unsafe DirectoryRecord(int length, GGPK ggpk) : base(length, ggpk) {
+	protected internal unsafe DirectoryRecord(uint length, GGPK ggpk) : base(length, ggpk) {
 		var s = ggpk.baseStream;
 		Offset = s.Position - 8;
 		var nameLength = s.Read<int>() - 1; // '\0'
@@ -259,7 +259,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 			Parent = this,
 			DataLength = preallocatedSize
 		};
-		record.Length += preallocatedSize;
+		record.Length += (uint)preallocatedSize;
 		var i = InsertNode(record);
 		if (i < 0) { // Exist
 			record = (this[Entries[~i].NameHash] as FileRecord)!;
@@ -335,8 +335,11 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 	/// <summary>
 	/// Caculate the length of the record should be in ggpk file
 	/// </summary>
-	protected override unsafe int CaculateRecordLength() {
-		return sizeof(int) * 4 + SIZE_OF_HASH + (Ggpk.Record.GGPKVersion == 4 ? sizeof(int) : sizeof(char)) * (Name.Length + 1) + sizeof(Entry) * Entries.Length;
+	protected override unsafe uint CaculateRecordLength() {
+		return sizeof(int) * 4U + SIZE_OF_HASH
+			+ (Ggpk.Record.GGPKVersion == 4 ? (uint)sizeof(int) : sizeof(char))
+				* ((uint)Name.Length + 1U)
+			+ (uint)sizeof(Entry) * (uint)Entries.Length;
 	}
 
 	/// <summary>
@@ -377,7 +380,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 			var i = 0;
 			foreach (var n in this)
 				combination[i++] = n.Hash;
-			if (!SHA256.TryHashData(new ReadOnlySpan<byte>((byte*)combination, SIZE_OF_HASH * Entries.Length), _Hash.AsSpan(), out _))
+			if (!SHA256.TryHashData(new ReadOnlySpan<byte>((byte*)combination, checked((int)SIZE_OF_HASH * Entries.Length)), _Hash.AsSpan(), out _))
 				ThrowHelper.Throw<UnreachableException>("Unable to compute hash of the content"); // Hash.Length < LENGTH_OF_HASH (== sizeof(Vector256<byte>) == 32)
 		}
 

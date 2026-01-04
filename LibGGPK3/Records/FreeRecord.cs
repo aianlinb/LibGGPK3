@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -46,7 +46,7 @@ public class FreeRecord : BaseRecord {
 		}
 	}
 
-	protected internal FreeRecord(int length, GGPK ggpk) : base(length, ggpk) {
+	protected internal FreeRecord(uint length, GGPK ggpk) : base(length, ggpk) {
 		Offset = ggpk.baseStream.Position - 8;
 		NextFreeOffset = ggpk.baseStream.Read<long>();
 		ggpk.baseStream.Position = Offset + Length;
@@ -56,7 +56,7 @@ public class FreeRecord : BaseRecord {
 	/// Also calls the <see cref="WriteRecordData"/>.
 	/// Please calls <see cref="UpdateOffset"/> after this to add the FreeRecord to <see cref="GGPK.FreeRecords"/>
 	/// </summary>
-	protected internal FreeRecord(long offset, int length, long nextFreeOffset, GGPK ggpk) : base(length, ggpk) {
+	protected internal FreeRecord(long offset, uint length, long nextFreeOffset, GGPK ggpk) : base(length, ggpk) {
 		Offset = offset;
 		NextFreeOffset = nextFreeOffset;
 	}
@@ -97,7 +97,7 @@ public class FreeRecord : BaseRecord {
 			if (Next is null) {
 				if (Previous is null) {
 					if (Ggpk.FirstFreeRecord == this) {
-						s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
+						s.Position = Ggpk.Record.Offset + (sizeof(long) + sizeof(int) + sizeof(long)); // 20
 						s.Write(0L);
 						Ggpk.FirstFreeRecord = null;
 					}
@@ -107,8 +107,8 @@ public class FreeRecord : BaseRecord {
 					Previous.Next = null;
 				}
 			} else if (Previous is null) {
-				if (Ggpk.FirstFreeRecord == this) {
-					s.Position = Ggpk.Record.Offset + (sizeof(long) * 2 + sizeof(int));
+				if (Ggpk.Record.FirstFreeRecordOffset == Offset) {
+					s.Position = Ggpk.Record.Offset + (sizeof(long) + sizeof(int) + sizeof(long)); // 20
 					s.Write(Next.Offset);
 					Ggpk.FirstFreeRecord = Next;
 				}
@@ -157,6 +157,8 @@ public class FreeRecord : BaseRecord {
 			var i = span.BinarySearch(new LengthWrapper(Length));
 			if (i < 0)
 				i = ~i;
+			else if (list[i] == this)
+				return;
 
 			// Move existing one
 			var oi = list.IndexOf(this);
@@ -175,7 +177,7 @@ public class FreeRecord : BaseRecord {
 		}
 	}
 
-    internal readonly struct LengthWrapper(int length) : IComparable<FreeRecord> {
+    internal readonly struct LengthWrapper(uint length) : IComparable<FreeRecord> {
 		public readonly int CompareTo(FreeRecord? other) => other is null ? -1 : length.CompareTo(other.Length);
 	}
 }

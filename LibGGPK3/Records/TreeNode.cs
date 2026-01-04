@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -20,7 +20,7 @@ namespace LibGGPK3.Records;
 /// <remarks>
 /// Do not extend this class directly, use <see cref="FileRecord"/> or <see cref="DirectoryRecord"/> instead.
 /// </remarks>
-public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk) {
+public abstract class TreeNode(uint length, GGPK ggpk) : BaseRecord(length, ggpk) {
 	/// <summary>
 	/// File/Directory name
 	/// </summary>
@@ -33,7 +33,7 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// <summary>
 	/// Size of <see cref="Hash"/> in bytes == <see langword="sizeof"/>(<see cref="Vector256{T}"/>)
 	/// </summary>
-	protected const int SIZE_OF_HASH = 32; // sizeof(Vector256<byte>)
+	protected const uint SIZE_OF_HASH = 32; // sizeof(Vector256<byte>)
 	/// <summary>
 	/// Parent node
 	/// </summary>
@@ -50,7 +50,7 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// <param name="specify">The specified <see cref="FreeRecord"/> to be written, <see langword="null"/> for finding a best one automatically</param>
 	/// <returns>The <see cref="FreeRecord"/> created at the original position if the record is moved, or <see langword="null"/> if replaced in place</returns>
 	/// <remarks>Don't set <see cref="BaseRecord.Length"/> before calling this method, the method will update it</remarks>
-	protected internal virtual FreeRecord? WriteWithNewLength(int newLength, FreeRecord? specify = null) {
+	protected internal virtual FreeRecord? WriteWithNewLength(uint newLength, FreeRecord? specify = null) {
 		var s = Ggpk.baseStream;
 		lock (s) {
 			if (Offset != default && newLength == Length && specify is null) {
@@ -69,12 +69,12 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 				if (specify == original)
 					original = null;
 
-				if (specify.Length < newLength + 16 && specify.Length != newLength)
+				if (specify.Length < newLength + 16U && specify.Length != newLength)
 					ThrowHelper.Throw<ArgumentException>("The length of specified FreeRecord must not be between Length and Length-16 (exclusive): " + specify.Length, nameof(specify));
 				s.Position = specify.Offset;
 				WriteRecordData();
 				specify.Length -= newLength;
-				if (specify.Length >= 16) { // Update length of FreeRecord
+				if (specify.Length >= 16U) { // Update length of FreeRecord
 					s.Position = specify.Offset + newLength;
 					specify.WriteRecordData();
 					specify.UpdateOffset();
@@ -95,25 +95,30 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 		var s = Ggpk.baseStream;
 		lock (s) {
 			FreeRecord? previous = null;
-			var length = Length;
+			uint length = Length;
 			var right = false;
 			// Combine with FreeRecords nearby
-			FreeRecord? next;
-			for (var f = Ggpk.FirstFreeRecord; f is not null; f = next) {
-				next = f.Next;
+			for (var f = Ggpk.FirstFreeRecord; length < int.MaxValue && f is not null; f = f.Next) {
 				if (f.Offset == Offset + length) {
-					length += f.Length;
+					uint newLen = length + f.Length;
+					if (newLen < length || newLen >= int.MaxValue) // Overflow or large than int
+						continue;
+					length = newLen;
 					if (previous is not null)
 						previous.Length += f.Length;
 					f.RemoveFromList();
 					right = true;
 				} else if (previous is null && f.Offset + f.Length == Offset) {
-					f.Length += length;
+					uint newLen = length + f.Length;
+					if (newLen < length || newLen >= int.MaxValue) // Overflow or large than int
+						continue;
+					length = newLen;
 					previous = f;
 				}
 				if (right && previous is not null) // In most cases, there won't be contiguous FreeRecords in GGPK
 					break;
 			}
+			Debug.Assert(length >= 16U);
 
 			if (previous is not null) {
 				if (previous.Offset + previous.Length >= s.Length) {
@@ -134,7 +139,7 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 			}
 
 			// Write FreeRecord
-			var free = new FreeRecord(Offset, length, 0, Ggpk);
+			var free = new FreeRecord(Offset, length, 0L, Ggpk);
 			s.Position = Offset;
 			free.WriteRecordData();
 			free.UpdateOffset();
@@ -168,7 +173,7 @@ public abstract class TreeNode(int length, GGPK ggpk) : BaseRecord(length, ggpk)
 	/// <summary>
 	/// Caculate the length of the record should be in ggpk file
 	/// </summary>
-	protected abstract int CaculateRecordLength();
+	protected abstract uint CaculateRecordLength();
 	/// <summary>
 	/// Get the full path in GGPK of this File/Directory
 	/// </summary>

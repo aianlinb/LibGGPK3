@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -28,7 +28,7 @@ public class FileRecord : TreeNode {
 	public int DataLength { get; protected internal set; }
 
 	[SkipLocalsInit]
-	protected internal unsafe FileRecord(int length, GGPK ggpk) : base(length, ggpk) {
+	protected internal unsafe FileRecord(uint length, GGPK ggpk) : base(length, ggpk) {
 		var s = ggpk.baseStream;
 		Offset = s.Position - 8;
 		var nameLength = s.Read<int>() - 1;
@@ -42,7 +42,7 @@ public class FileRecord : TreeNode {
 			Name = s.ReadString(nameLength); // UTF16
 			s.Seek(sizeof(char), SeekOrigin.Current); // Null terminator
 		}
-		DataLength = Length - (int)(s.Position - Offset);
+		DataLength = checked((int)(Length - (uint)(s.Position - Offset)));
 		s.Seek(DataLength, SeekOrigin.Current);
 	}
 
@@ -55,8 +55,10 @@ public class FileRecord : TreeNode {
 		Length = CaculateRecordLength();
 	}
 
-	protected override int CaculateRecordLength() {
-		return 12 + SIZE_OF_HASH + (Ggpk.Version == 4 ? sizeof(int) : sizeof(char)) * (Name.Length + 1) + DataLength; // (4 + 4 + 4 + Hash.Length + (Name + "\0").Length * sizeof(char/int)) + DataLength
+	protected override uint CaculateRecordLength() {
+		return 12U + SIZE_OF_HASH
+			+ (uint)(Ggpk.Version == 4 ? sizeof(int) : sizeof(char)) * ((uint)Name.Length + 1U)
+			+ (uint)DataLength; // (4 + 4 + 4 + Hash.Length + (Name + "\0").Length * sizeof(char/int)) + DataLength
 	}
 
 	[SkipLocalsInit]
@@ -133,7 +135,7 @@ public class FileRecord : TreeNode {
 			if (newContent.Length != DataLength) { // Replace a FreeRecord
 				var diff = newContent.Length - DataLength;
 				DataLength = newContent.Length;
-				WriteWithNewLength(Length + diff);
+				WriteWithNewLength(Length + (uint)diff);
 				// Offset and DataOffset will be set by WriteRecordData() in above line
 			} else {
 				s.Position = Offset + sizeof(int) * 3;
