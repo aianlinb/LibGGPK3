@@ -1,5 +1,5 @@
 <Project>
-	
+
 	<PropertyGroup>
 		<PublishAOT>true</PublishAOT>
 		<IlcInvariantGlobalization>true</IlcInvariantGlobalization>
@@ -11,6 +11,9 @@
 		<MetadataUpdaterSupport>false</MetadataUpdaterSupport>
 		<StackTraceSupport>false</StackTraceSupport>
 		<UseNativeHttpHandler>true</UseNativeHttpHandler>
+		
+		<ObjCopyName Condition="'$(RuntimeIdentifier)' == 'linux-arm64' AND $([MSBuild]::IsOsPlatform('Linux')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' != 'Arm64'">aarch64-linux-gnu-objcopy</ObjCopyName>
+		<ObjCopyName Condition="'$(RuntimeIdentifier)' == 'linux-x64' AND $([MSBuild]::IsOsPlatform('Linux')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' != 'X64'">x86_64-linux-gnu-objcopy</ObjCopyName>
 	</PropertyGroup>
 	
 	<ItemGroup>
