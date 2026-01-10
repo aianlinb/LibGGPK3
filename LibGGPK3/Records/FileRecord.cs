@@ -104,7 +104,7 @@ public class FileRecord : TreeNode {
 	/// </summary>
 	/// <remarks>If the <paramref name="span"/> is too small, the result will be truncated.</remarks>
 	public virtual void Read(Span<byte> span, int offset = 0) {
-		if ((uint)offset > (uint)DataLength)
+		if (unchecked((uint)offset > (uint)DataLength))
 			ThrowHelper.ThrowArgumentOutOfRange(offset);
 		var len = DataLength - offset;
 		if (span.Length > len)
@@ -135,7 +135,7 @@ public class FileRecord : TreeNode {
 			if (newContent.Length != DataLength) { // Replace a FreeRecord
 				var diff = newContent.Length - DataLength;
 				DataLength = newContent.Length;
-				WriteWithNewLength(Length + (uint)diff);
+				WriteWithNewLength(unchecked(Length + (uint)diff));
 				// Offset and DataOffset will be set by WriteRecordData() in above line
 			} else {
 				s.Position = Offset + sizeof(int) * 3;

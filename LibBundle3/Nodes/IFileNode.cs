@@ -1,4 +1,4 @@
-﻿using LibBundle3.Records;
+using LibBundle3.Records;
 
 namespace LibBundle3.Nodes;
 public interface IFileNode : ITreeNode {

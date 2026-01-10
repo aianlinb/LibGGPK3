@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -27,7 +27,7 @@ public class Bundle : IDisposable {
 		public int uncompressed_size;
 		public int compressed_size;
 		public int head_size = 48; // chunk_count * 4 + 48
-		public Oodle.Compressor compressor = Oodle.Compressor.Leviathan; // Leviathan == 13
+		public Oodle.Compressor compressor = Oodle.Compressor.Mermaid; // Usually Hydra or Mermaid is used for different types of bundles by GGG
 		public int unknown = 1; // 1
 		public long uncompressed_size_long; // == uncompressed_size
 		public long compressed_size_long; // == compressed_size
@@ -65,6 +65,10 @@ public class Bundle : IDisposable {
 	/// Size of the compressed content in bytes.
 	/// </summary>
 	public virtual int CompressedSize => metadata.compressed_size;
+	/// <summary>
+	/// Compressor used to compress the contents in this bundle.
+	/// </summary>
+	public virtual Oodle.Compressor Compressor => metadata.compressor;
 
 	protected readonly Stream baseStream;
 	/// <summary>
@@ -221,8 +225,10 @@ public class Bundle : IDisposable {
 	protected virtual unsafe void ReadChunks(Span<byte> span, int start, int end, bool cached = false) {
 		Debug.Assert(span.Length >= (end == metadata.chunk_count // Contains the last chunk
 			? metadata.uncompressed_size - metadata.chunk_size * start : metadata.chunk_size * (end - start)));
-		Debug.Assert((uint)start <= (uint)metadata.chunk_count);
-		Debug.Assert((uint)end <= (uint)metadata.chunk_count);
+		unchecked {
+			Debug.Assert((uint)start <= (uint)metadata.chunk_count);
+			Debug.Assert((uint)end <= (uint)metadata.chunk_count);
+		}
 
 		if (start == end) // Shouldn't happen
 			return;
@@ -273,12 +279,19 @@ public class Bundle : IDisposable {
 	/// <summary>
 	/// Save the bundle with new contents.
 	/// </summary>
-	public virtual unsafe void Save(scoped ReadOnlySpan<byte> newContent, Oodle.CompressionLevel compressionLevel = Oodle.CompressionLevel.Normal) {
+	/// <param name="compressor">Compressor to use, <see cref="Oodle.Compressor.Invalid"/> to use <see cref="Compressor"/></param>
+	/// <param name="compressionLevel">Compression level to use</param>
+	public virtual unsafe void Save(scoped ReadOnlySpan<byte> newContent,
+		Oodle.Compressor compressor = Oodle.Compressor.Invalid, Oodle.CompressionLevel compressionLevel = Oodle.CompressionLevel.Normal) {
 		lock (baseStream) {
 			EnsureNotDisposed();
 			RemoveCache();
 
-			Oodle.Initialize(new() { ChunkSize = metadata.chunk_size, Compressor = metadata.compressor, CompressionLevel = compressionLevel, EnableCompressing = true });
+			if (compressor == Oodle.Compressor.Invalid)
+				compressor = metadata.compressor;
+			else
+				metadata.compressor = compressor;
+			Oodle.Initialize(new() { ChunkSize = metadata.chunk_size, Compressor = compressor, CompressionLevel = compressionLevel, EnableCompressing = true });
 			metadata.uncompressed_size_long = metadata.uncompressed_size = newContent.Length;
 			metadata.chunk_count = metadata.uncompressed_size / metadata.chunk_size;
 			if (metadata.uncompressed_size > metadata.chunk_count * metadata.chunk_size)

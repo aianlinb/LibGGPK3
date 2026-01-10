@@ -277,7 +277,9 @@ public class Index : IDisposable {
 	/// Save the _.index.bin file.
 	/// Call this after modifying the files or bundles.
 	/// </summary>
-	public virtual void Save() {
+	/// <param name="compressor">Compressor to use, <see cref="Oodle.Compressor.Invalid"/> to use the what it used last time</param>
+	/// <param name="compressionLevel">Compression level to use</param>
+	public virtual void Save(Oodle.Compressor compressor = Oodle.Compressor.Mermaid, Oodle.CompressionLevel compressionLevel = Oodle.CompressionLevel.Normal) {
 		lock (this) {
 			if (_BundleToWrite is not null) {
 				_BundleToWrite.Save(new(_BundleStreamToWrite!.GetBuffer(), 0, (int)_BundleStreamToWrite.Length));
@@ -317,7 +319,7 @@ public class Index : IDisposable {
 			ms.Write(_Directories);
 
 			ms.Write(directoryBundleData, 0, directoryBundleData.Length);
-			baseBundle.Save(new(ms.GetBuffer(), 0, (int)ms.Length));
+			baseBundle.Save(new(ms.GetBuffer(), 0, (int)ms.Length), compressor, compressionLevel);
 
 			foreach (var br in removed)
 				bundleFactory.DeleteBundle(br.Path);

@@ -1,7 +1,7 @@
 <Project>
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
-		<Version>2.7.1</Version>
+		<Version>2.7.2</Version>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<CheckForOverflowUnderflow Condition="$(Configuration) == 'Debug'">true</CheckForOverflowUnderflow>
@@ -12,6 +12,6 @@
 		<BaseOutputPath>$(SolutionDir)bin/</BaseOutputPath>
 		<OutDir>$(BaseOutputPath)$(Configuration)/</OutDir>
 		<NoWarn>1573;1591</NoWarn>
-        <PathMap>$(MSBuildProjectDirectory)=$(MSBuildProjectName)</PathMap>
+		<PathMap>$(MSBuildProjectDirectory)=$(MSBuildProjectName)</PathMap>
 	</PropertyGroup>
 </Project>

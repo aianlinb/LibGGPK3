@@ -18,7 +18,7 @@ public class GGPKRecord : BaseRecord {
 
 	protected internal GGPKRecord(uint length, GGPK ggpk) : base(length, ggpk) {
 		Offset = ggpk.baseStream.Position - 8;
-		GGPKVersion = (uint)ggpk.baseStream.Read<int>(); // 3 for PC, 4 for Mac
+		GGPKVersion = ggpk.baseStream.Read<uint>(); // 3 for PC, 4 for Mac
 		RootDirectoryOffset = ggpk.baseStream.Read<long>();
 		FirstFreeRecordOffset = ggpk.baseStream.Read<long>();
 	}

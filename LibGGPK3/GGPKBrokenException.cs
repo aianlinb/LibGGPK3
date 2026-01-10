@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace LibGGPK3;
 public class GGPKBrokenException : Exception {

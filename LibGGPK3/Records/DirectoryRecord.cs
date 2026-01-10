@@ -115,7 +115,7 @@ public class DirectoryRecord : TreeNode, IReadOnlyList<TreeNode> {
 		public readonly TreeNode Current => directory[index];
 		readonly object IEnumerator.Current => Current;
 
-		public bool MoveNext() => (uint)++index < (uint)directory.Count;
+		public bool MoveNext() => unchecked((uint)++index < (uint)directory.Count);
 		public void Reset() => index = -1;
 		public readonly void Dispose() { }
 	}
