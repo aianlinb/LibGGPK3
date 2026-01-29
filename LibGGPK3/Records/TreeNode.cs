@@ -79,8 +79,10 @@ public abstract class TreeNode(uint length, GGPK ggpk) : BaseRecord(length, ggpk
 					specify.WriteRecordData();
 					specify.UpdateOffset();
 					specify.UpdateLength();
-				} else // specify.Length == 0
+				} else {
+					Debug.Assert(specify.Length == 0);
 					specify.RemoveFromList();
+				}
 			}
 
 			UpdateOffset();

@@ -93,7 +93,30 @@ public class FreeRecord : BaseRecord {
 	protected internal virtual void RemoveFromList() {
 		var s = Ggpk.baseStream;
 		lock (s) {
-			Ggpk._SortedFreeRecords?.Remove(this);
+			var list = Ggpk._SortedFreeRecords;
+			// list?.Remove(this);
+			if (list is not null) { // Remove it from the sorted list
+				var i = CollectionsMarshal.AsSpan(list).BinarySearch(new LengthWrapper(Length));
+				if (i >= 0) {
+					var temp = i;
+					do {
+						if (list[i] == this) {
+							list.RemoveAt(i);
+							temp = -1;
+							break;
+						}
+						++i;
+					} while (i < list.Count && list[i].Length == Length);
+					if (temp != -1)
+						for (i = temp - 1; i >= 0 && list[i].Length == Length; i--) {
+							if (list[i] == this) {
+								list.RemoveAt(i);
+								break;
+							}
+						}
+				}
+			}
+
 			if (Next is null) {
 				if (Previous is null) {
 					if (Ggpk.FirstFreeRecord == this) {
@@ -153,6 +176,7 @@ public class FreeRecord : BaseRecord {
 	protected internal virtual void UpdateLength() {
 		var list = Ggpk._SortedFreeRecords;
 		if (list is not null) {
+			// Fix the order in the sorted list with the new Length
 			var span = CollectionsMarshal.AsSpan(list);
 			var i = span.BinarySearch(new LengthWrapper(Length));
 			if (i < 0)
@@ -164,8 +188,9 @@ public class FreeRecord : BaseRecord {
 			var oi = list.IndexOf(this);
 			if (oi != -1) {
 				if (oi != i) {
+					// Move element at oi to i
 					if (oi < i)
-						span[(oi + 1)..i--].CopyTo(span[oi..]);
+						span[(oi + 1)..(i + 1)].CopyTo(span[oi..]);
 					else
 						span[i..oi].CopyTo(span[(i + 1)..]);
 					span[i] = this;
@@ -174,6 +199,14 @@ public class FreeRecord : BaseRecord {
 			}
 
 			list.Insert(i, this);
+
+			// Test
+			FreeRecord? last = null;
+			Debug.Assert(list.TrueForAll(r => {
+				var result = last is null || r.Length >= last.Length;
+				last = r;
+				return result;
+			}));
 		}
 	}
 

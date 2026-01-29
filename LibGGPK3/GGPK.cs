@@ -167,7 +167,8 @@ public class GGPK : IDisposable {
 
 		var result = list[i];
 		// The result length must equal to or 16 larger than the required length (For the remaining FreeRecord)
-		while (result.Length - length < 16U) {
+		uint diff = result.Length - length;
+		while (diff < 16U || diff > result.Length) {
 			if (++i == list.Count)
 				return null; // Not found
 			result = list[i];
@@ -276,11 +277,11 @@ public class GGPK : IDisposable {
 			var i = 0;
 			while (@continue) {
 				var changed = false;
-				current = list[i];
+				current = list[i++];
 				if (current.Length >= int.MaxValue)
 					continue;
 
-				while ((@continue = ++i < list.Count) && current.Offset + current.Length == list[i].Offset) {
+				while ((@continue = i < list.Count) && current.Offset + current.Length == list[i].Offset) {
 					uint newLen = current.Length + list[i].Length;
 					if (newLen < current.Length || newLen >= int.MaxValue) // Overflow or large than int
 						continue;

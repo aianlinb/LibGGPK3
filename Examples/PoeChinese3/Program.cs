@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -23,9 +23,9 @@ public static class Program {
 		var assembly = Assembly.GetExecutingAssembly();
 		var version = assembly.GetName().Version!;
 		if (version.Revision != 0)
-			Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})  Copyright (C) 2022-2024 aianlinb"); // ©
+			Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})  Copyright (C) 2022-2026 aianlinb"); // ©
 		else
-			Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022-2024 aianlinb"); // ©
+			Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022-2026 aianlinb"); // ©
 		Console.WriteLine($"流亡黯道 - 啟用繁體中文語系  By aianlinb");
 		Console.WriteLine();
 
