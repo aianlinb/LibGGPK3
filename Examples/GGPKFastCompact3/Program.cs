@@ -1,18 +1,22 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
-
+using System.Threading.Tasks;
 using LibGGPK3;
 
 namespace GGPKFastCompact3;
 public static class Program {
 	public static void Main(string[] args) {
 		try {
-			var version = Assembly.GetExecutingAssembly().GetName().Version!;
-			Console.WriteLine($"GGPKFastCompact3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022 aianlinb");
+			Console.OutputEncoding = System.Text.Encoding.UTF8;
+			var asm = Assembly.GetExecutingAssembly();
+			var version = asm.GetName().Version!;
+			Console.WriteLine($"{asm.GetName().Name} (v{version.Major}.{version.Minor}.{version.Build}{(version.Revision == 0
+				? "" : "." + version.Revision)})  {asm.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright}");
 			Console.WriteLine();
+
 			if (args.Length == 0) {
 				Console.Write("Path to Content.ggpk: ");
 				args = [Console.ReadLine()!];
@@ -35,7 +39,7 @@ public static class Program {
 			using var ggpk = new GGPK(args[0]);
 			var max = -1;
 			var prog = -1;
-			Console.WriteLine("Start compaction . . .");
+			Console.WriteLine("Starting compaction . . .");
 			Console.WriteLine();
 			using (var cancel = new CancellationTokenSource()) {
 				void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e) {
@@ -43,22 +47,32 @@ public static class Program {
 					cancel.Cancel();
 				}
 				Console.CancelKeyPress += OnCancelKeyPress;
+				var running = true;
 				var lastTime = DateTime.UtcNow;
 				try {
+					Task.Run(async () => {
+						while (running) {
+							if (prog != -1) {
+								var now = DateTime.UtcNow;
+								if ((now - lastTime).TotalMilliseconds >= 600) {
+									Console.WriteLine($"Remaining FreeRecords to be filled: {prog}/{max}");
+									lastTime = now;
+								}
+							}
+							await Task.Delay(500);
+						}
+					});
 					ggpk.FastCompact(cancel.Token, new Progress<int>(i => {
+						// Here will be called by multiple threads.
 						prog = i;
 						if (prog > max)
 							max = prog;
-						var now = DateTime.UtcNow;
-						if ((now - lastTime).TotalMilliseconds >= 600) {
-							Console.WriteLine($"Remaining FreeRecords to be filled: {prog}/{max}");
-							lastTime = now;
-						}
 					}));
 				} catch (OperationCanceledException) {
 					Console.WriteLine("Cancelled!");
 				} finally {
 					Console.CancelKeyPress -= OnCancelKeyPress;
+					running = false;
 				}
 			}
 			Console.WriteLine($"Remaining FreeRecords to be filled: {prog}/{max}");

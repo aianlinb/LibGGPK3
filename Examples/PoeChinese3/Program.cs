@@ -20,16 +20,14 @@ public static class Program {
 		try {
 #endif
 		Console.OutputEncoding = Encoding.UTF8;
-		var assembly = Assembly.GetExecutingAssembly();
-		var version = assembly.GetName().Version!;
-		if (version.Revision != 0)
-			Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})  Copyright (C) 2022-2026 aianlinb"); // ©
-		else
-			Console.WriteLine($"PoeChinese3 (v{version.Major}.{version.Minor}.{version.Build})  Copyright (C) 2022-2026 aianlinb"); // ©
+		var asm = Assembly.GetExecutingAssembly();
+		var version = asm.GetName().Version!;
+		Console.WriteLine($"{asm.GetName().Name} (v{version.Major}.{version.Minor}.{version.Build}{(version.Revision == 0
+			? "" : "." + version.Revision)})  {asm.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright}");
 		Console.WriteLine($"流亡黯道 - 啟用繁體中文語系  By aianlinb");
 		Console.WriteLine();
 
-		using (var definitions = assembly.GetManifestResourceStream("PoeChinese3.DatDefinitions.json")!)
+		using (var definitions = asm.GetManifestResourceStream("PoeChinese3.DatDefinitions.json")!)
 			DatContainer.ReloadDefinitions(definitions);
 
 		string? path;

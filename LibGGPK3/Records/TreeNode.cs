@@ -48,7 +48,8 @@ public abstract class TreeNode(uint length, GGPK ggpk) : BaseRecord(length, ggpk
 	/// </summary>
 	/// <param name="newLength">New length of the record after modification</param>
 	/// <param name="specify">The specified <see cref="FreeRecord"/> to be written, <see langword="null"/> for finding a best one automatically</param>
-	/// <returns>The <see cref="FreeRecord"/> created at the original position if the record is moved, or <see langword="null"/> if replaced in place</returns>
+	/// <returns>The <see cref="FreeRecord"/> created at the original position if the record is moved, or <see langword="null"/> if replaced in place.
+	/// It may also return an existing one if it was expanded to cover the original position.</returns>
 	/// <remarks>Don't set <see cref="BaseRecord.Length"/> before calling this method, the method will update it</remarks>
 	protected internal virtual FreeRecord? WriteWithNewLength(uint newLength, FreeRecord? specify = null) {
 		var s = Ggpk.baseStream;
@@ -58,35 +59,43 @@ public abstract class TreeNode(uint length, GGPK ggpk) : BaseRecord(length, ggpk
 				WriteRecordData();
 				return null;
 			}
-			var original = Offset == default ? null : MarkAsFree();
+
+			if (specify is not null) {
+				if (specify.IsInvalid)
+					ThrowHelper.Throw<ArgumentException>("The specified FreeRecord is invalid, it may have already been removed from the ggpk", specify);
+				if (specify.Length < newLength + 16U && specify.Length != newLength)
+					ThrowHelper.Throw<ArgumentException>($"The length of specified FreeRecord must equal to newLength or larger than newLength + 16. specify: {specify.Length}, newLength: {newLength}", nameof(specify));
+			}
+
+			var newFree = Offset == default ? null : MarkAsFree();
+
+			if (specify is not null) {
+				if (specify.IsInvalid) // Becomes invalid after MarkAsFree, means that it must have been merged by newFree
+					specify = newFree;
+			} else
+				specify = Ggpk.FindBestFreeRecord(newLength); // Find a suitable if not provided
 
 			Length = newLength;
-			specify ??= Ggpk.FindBestFreeRecord(newLength);
 			if (specify is null) {
 				s.Seek(0, SeekOrigin.End); // Write to the end of GGPK
 				WriteRecordData();
 			} else {
-				if (specify == original)
-					original = null;
-
-				if (specify.Length < newLength + 16U && specify.Length != newLength)
-					ThrowHelper.Throw<ArgumentException>("The length of specified FreeRecord must not be between Length and Length-16 (exclusive): " + specify.Length, nameof(specify));
 				s.Position = specify.Offset;
 				WriteRecordData();
-				specify.Length -= newLength;
-				if (specify.Length >= 16U) { // Update length of FreeRecord
+				var newSpecifyLength = specify.Length - newLength;
+				if (newSpecifyLength >= 16U) { // Update length of FreeRecord
+					specify.UpdateLength(newSpecifyLength);
 					s.Position = specify.Offset + newLength;
 					specify.WriteRecordData();
 					specify.UpdateOffset();
-					specify.UpdateLength();
 				} else {
-					Debug.Assert(specify.Length == 0);
+					Debug.Assert(newSpecifyLength == 0);
 					specify.RemoveFromList();
 				}
 			}
 
 			UpdateOffset();
-			return original;
+			return newFree;
 		}
 	}
 
@@ -97,55 +106,64 @@ public abstract class TreeNode(uint length, GGPK ggpk) : BaseRecord(length, ggpk
 		var s = Ggpk.baseStream;
 		lock (s) {
 			FreeRecord? previous = null;
+			long offset = Offset;
 			uint length = Length;
 			var right = false;
 			// Combine with FreeRecords nearby
+		retry:
 			for (var f = Ggpk.FirstFreeRecord; length < int.MaxValue && f is not null; f = f.Next) {
-				if (f.Offset == Offset + length) {
-					uint newLen = length + f.Length;
+				if (f.IsInvalid)
+					continue;
+				if (f.Offset == offset + length) {
+					right = true;
+					uint newLen = unchecked(length + f.Length);
 					if (newLen < length || newLen >= int.MaxValue) // Overflow or large than int
 						continue;
 					length = newLen;
-					if (previous is not null)
-						previous.Length += f.Length;
+					var tmp = f.Next; // Cache Next or it will be null after RemoveFromList
 					f.RemoveFromList();
-					right = true;
-				} else if (previous is null && f.Offset + f.Length == Offset) {
-					uint newLen = length + f.Length;
+					if (tmp is null)
+						break;
+					if ((f = tmp.Previous) is null)
+						goto retry;
+				} else if (f.Offset + f.Length == offset) {
+					uint newLen = unchecked(length + f.Length);
 					if (newLen < length || newLen >= int.MaxValue) // Overflow or large than int
 						continue;
 					length = newLen;
 					previous = f;
+					offset = f.Offset;
 				}
-				if (right && previous is not null) // In most cases, there won't be contiguous FreeRecords in GGPK
-					break;
+				if (right && previous is not null)
+					break; // In most cases, there won't be contiguous FreeRecords in GGPK
 			}
 			Debug.Assert(length >= 16U);
 
 			if (previous is not null) {
-				if (previous.Offset + previous.Length >= s.Length) {
+				if (previous.Offset + length >= s.Length) {
 					// Trim if the record is at the end of the ggpk file
 					previous.RemoveFromList();
 					s.SetLength(previous.Offset);
 					return null;
 				}
+				Debug.Assert(!previous.IsInvalid);
 				// Update record length
+				previous.UpdateLength(length);
 				s.Position = previous.Offset;
-				s.Write(previous.Length);
-				previous.UpdateLength();
+				s.Write(length);
 				return previous;
-			} else if (Offset + length >= s.Length) {
+			} else if (offset + length >= s.Length) {
 				// Trim if the record is at the end of the ggpk file
-				s.SetLength(Offset);
+				s.SetLength(offset);
 				return null;
 			}
 
 			// Write FreeRecord
-			var free = new FreeRecord(Offset, length, 0L, Ggpk);
+			var free = new FreeRecord(Offset, 0L, Ggpk);
+			free.UpdateLength(length);
 			s.Position = Offset;
 			free.WriteRecordData();
 			free.UpdateOffset();
-			free.UpdateLength();
 			return free;
 		}
 	}

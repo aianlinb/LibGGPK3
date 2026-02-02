@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -77,14 +78,14 @@ public class GGPK : IDisposable {
 		}
 	}
 
-	/// <summary>
-	/// Free spaces in ggpk
-	/// </summary>
+	/// <summary>Free spaces in ggpk</summary>
+	/// <remarks>Note that you shouldn't cache the results, as they may be changed or become invalid with any write operation</remarks>
 	public virtual IEnumerable<FreeRecord> FreeRecords {
 		get {
 			var free = FirstFreeRecord;
 			while (free is not null) {
-				yield return free;
+				if (!free.IsInvalid) // just in case
+					yield return free;
 				free = free.Next;
 			}
 		}
@@ -152,26 +153,53 @@ public class GGPK : IDisposable {
 	}
 
 	/// <summary>
-	/// Find the most suitable FreeRecord from <see cref="FreeRecords"/> to write a Record with length of <paramref name="length"/>,
+	/// Find the most suitable FreeRecord from <see cref="FreeRecords"/> to write a <see cref="BaseRecord"/> with length of <paramref name="length"/>,
 	/// or <see langword="null"/> if no one found (in this case, write at the end of the ggpk instead).
 	/// </summary>
-	protected internal virtual FreeRecord? FindBestFreeRecord(uint length) {
-		var list = SortedFreeRecords;
-		var i = CollectionsMarshal.AsSpan(list).BinarySearch(new FreeRecord.LengthWrapper(length));
-		if (i >= 0)
-			return list[i]; // Same length
+	/// <param name="length"><see cref="BaseRecord.Length"/></param>
+	/// <param name="maxOffset">Limit the <see cref="BaseRecord.Offset"/> of returned <see cref="FreeRecord"/> to less than <paramref name="maxOffset"/></param>
+	protected internal virtual FreeRecord? FindBestFreeRecord(uint length, long maxOffset = long.MaxValue) {
+		if (length == 0U || maxOffset <= 0)
+			return null;
 
-		i = ~i;
-		if (i == list.Count)
+		FreeRecord result;
+		var list = SortedFreeRecords;
+		var span = CollectionsMarshal.AsSpan(list);
+		var i = span.BinarySearch(new BaseRecord.LengthWrapper(length));
+		if (i >= 0) { // Same length
+			var i2 = i;
+			result = span[i];
+			do {
+				if (result.Offset < maxOffset)
+					goto found;
+			} while (++i != span.Length && (result = span[i]).Length == length);
+			while (--i2 != -1 && (result = span[i2]).Length == length) {
+				if (result.Offset < maxOffset) {
+					i = i2;
+					goto found;
+				}
+			}
+		} else
+			i = ~i;
+
+		if (i == span.Length)
 			return null; // Not found
 
-		var result = list[i];
+		result = span[i];
 		// The result length must equal to or 16 larger than the required length (For the remaining FreeRecord)
-		uint diff = result.Length - length;
-		while (diff < 16U || diff > result.Length) {
-			if (++i == list.Count)
+		uint diff;
+		while ((diff = result.Length - length) < 16U || diff > result.Length || result.Offset >= maxOffset) {
+			if (++i == span.Length)
 				return null; // Not found
-			result = list[i];
+			result = span[i];
+			// Found
+		}
+
+	found:
+		Debug.Assert((result.Length == length || result.Length >= length + 16U) && result.Offset < maxOffset);
+		if (result.IsInvalid) { // just in case
+			list.RemoveAt(i);
+			return FindBestFreeRecord(length);
 		}
 		return result;
 	}
@@ -179,51 +207,94 @@ public class GGPK : IDisposable {
 	/// <summary>
 	/// Compact the ggpk to reduce its size
 	/// </summary>
-	/// <param name="progress">returns the number of FreeRecords remaining to be filled.
-	/// This won't be always decreasing</param>
+	/// <param name="progress">
+	/// returns the number of FreeRecords remaining to be filled.
+	/// This won't be always decreasing.
+	/// </param>
 	public void FastCompact(CancellationToken? cancellation = null, IProgress<int>? progress = null) {
+		cancellation?.ThrowIfCancellationRequested();
 		lock (baseStream) {
-			cancellation?.ThrowIfCancellationRequested();
 			FreeRecordConcat();
+			cancellation?.ThrowIfCancellationRequested();
 
 			var freeList = new PriorityQueue<FreeRecord, long>((_SortedFreeRecords ?? FreeRecords).Select(f => (f, f.Offset)));
 			progress?.Report(freeList.Count);
 			if (freeList.Count == 0)
 				return;
 			cancellation?.ThrowIfCancellationRequested();
-			var treeNodes = TreeNode.RecurseTree(Root).ToList();
-			cancellation?.ThrowIfCancellationRequested();
-			treeNodes.Sort(Comparer<TreeNode>.Create((x, y) => y.Length.CompareTo(x.Length))); // Descending
 
-			while (freeList.TryDequeue(out var free, out _)) {
+			var treeNodes = TreeNode.RecurseTree(Root).OrderBy(t => t.Length).ThenBy(t => t.Offset).ToList();
+			cancellation?.ThrowIfCancellationRequested();
+
+			FreeRecord? free;
+			uint lastFreeLength = 0U;
+			int i = -1;
+			void SearchNext() {
+				Debug.Assert(i < treeNodes.Count);
+				uint len = free.Length;
+				int count = len < lastFreeLength ? i + 1 : treeNodes.Count;
+				i = CollectionsMarshal.AsSpan(treeNodes).SliceUnchecked(0, count).BinarySearch(new BaseRecord.LengthWrapper(len));
+				i = CollectionsMarshal.AsSpan(treeNodes).BinarySearch(new BaseRecord.LengthWrapper(len));
+				if (i < 0) {
+					i = ~i;
+					len -= 16U; // Try find TreeNode with Length <= free.Length - 16U
+					while (--i >= 0 && treeNodes[i].Length > len) { }
+				} else { // found exactly same length
+					while (++i < treeNodes.Count && treeNodes[i].Length == len) { }
+					--i;
+				}
+				// found == i != -1
+			}
+
+			using var renter = new ArrayPoolRenter<byte>();
+			while (freeList.TryDequeue(out free, out _)) {
+				if (free.IsInvalid)
+					continue;
 				progress?.Report(freeList.Count);
-				for (var i = treeNodes.Count - 1; i >= 0; --i) {
-					cancellation?.ThrowIfCancellationRequested();
+
+				SearchNext();
+				while (i != -1) {
+					if (cancellation?.IsCancellationRequested ?? false) {
+						baseStream.Flush();
+						cancellation.Value.ThrowIfCancellationRequested();
+					}
+
 					var treeNode = treeNodes[i];
-					if (treeNode.Length > free.Length)
-						break;
-					if (treeNode.Offset < free.Offset)
+					if (treeNode.Offset < free.Offset) {
+						--i;
 						continue;
-					if (treeNode.Length > free.Length - 16U && treeNode.Length != free.Length)
+					}
+					lastFreeLength = free.Length;
+					if (treeNode.Length != lastFreeLength && treeNode.Length > lastFreeLength - 16U) {
+						--i;
 						continue;
+					}
+
+					// Move the TreeNode to the FreeRecord
+					FreeRecord? newFree;
+					if (treeNode is FileRecord file) {
+						renter.Resize(file.DataLength);
+						file.Read(renter.Array);
+						newFree = treeNode.WriteWithNewLength(treeNode.Length, free);
+						baseStream.Position = file.DataOffset;
+						baseStream.Write(renter.Array, 0, file.DataLength);
+					} else
+						newFree = treeNode.WriteWithNewLength(treeNode.Length, free);
 
 					treeNodes.RemoveAt(i);
-					if (treeNode is FileRecord file) {
-						var fileContent = file.Read();
-						var newFree = file.WriteWithNewLength(file.Length, free);
-						baseStream.Position = file.DataOffset;
-						baseStream.Write(fileContent, 0, fileContent.Length);
-						if (newFree is not null && newFree != free)
-							freeList.Enqueue(newFree, newFree.Offset);
-					} else {
-						var newFree = treeNode.WriteWithNewLength(treeNode.Length, free);
-						if (newFree is not null && newFree != free)
-							freeList.Enqueue(newFree, newFree.Offset);
-					}
+
+					if (newFree is not null)
+						freeList.Enqueue(newFree, newFree.Offset);
+
+					if (free.IsInvalid)
+						break;
+					SearchNext(); // Reset search index as free.Length might have changed
 				}
+				lastFreeLength = 0U; // Reset search state because we are going to use another FreeRecord
 			}
 			progress?.Report(freeList.Count);
-			baseStream.Flush();
+
+			FreeRecordConcat();
 		}
 	}
 
@@ -236,9 +307,13 @@ public class GGPK : IDisposable {
 	public void FixFreeRecordList() {
 		EnsureNotDisposed();
 		lock (baseStream) {
-			baseStream.Position = 0;
+			// Clear cache
 			FirstFreeRecord = null;
+			_SortedFreeRecords = null;
+
+			// Scan entire ggpk
 			FreeRecord? last = null;
+			baseStream.Position = 0;
 			while (baseStream.Position < baseStream.Length) {
 				var record = ReadRecord();
 				if (record is FreeRecord fr) {
@@ -251,6 +326,8 @@ public class GGPK : IDisposable {
 			}
 			if (last is not null)
 				last.Next = null;
+
+			// Write back to ggpk
 			baseStream.Position = Record.Offset + (sizeof(long) * 2 + sizeof(int));
 			baseStream.Write(Record.FirstFreeRecordOffset);
 			foreach (var fr in FreeRecords) {
@@ -267,37 +344,40 @@ public class GGPK : IDisposable {
 	protected virtual void FreeRecordConcat() {
 		EnsureNotDisposed();
 		lock (baseStream) {
-			var list = (_SortedFreeRecords ?? FreeRecords).ToList(); // make copy
+			var list = new List<FreeRecord>(_SortedFreeRecords ?? FreeRecords); // make copy
 			if (list.Count <= 1)
 				return;
-			list.Sort(Comparer<FreeRecord>.Create((x, y) => x.Offset.CompareTo(y.Offset)));
+			list.Sort(new BaseRecord.OffsetComparer()); // Sort by Offset
 
-			var @continue = true;
 			FreeRecord? current = default;
 			var i = 0;
+			bool @continue = i < list.Count;
 			while (@continue) {
-				var changed = false;
-				current = list[i++];
-				if (current.Length >= int.MaxValue)
+				current = list[i];
+				var currentLength = current.Length;
+				if (current.IsInvalid || currentLength >= int.MaxValue) {
+					@continue = ++i < list.Count;
 					continue;
-
-				while ((@continue = i < list.Count) && current.Offset + current.Length == list[i].Offset) {
-					uint newLen = current.Length + list[i].Length;
-					if (newLen < current.Length || newLen >= int.MaxValue) // Overflow or large than int
-						continue;
-					current.Length = newLen;
-					list[i].RemoveFromList();
-					changed = true;
 				}
-				if (changed) {
+
+				while ((@continue = ++i < list.Count) && current.Offset + currentLength == list[i].Offset) {
+					uint newLen = currentLength + list[i].Length;
+					if (newLen < currentLength || newLen >= int.MaxValue) // Overflow or large than int
+						break;
+					currentLength = newLen;
+					list[i].RemoveFromList();
+				}
+				if (current.Length != currentLength) {
+					current.UpdateLength(currentLength);
 					baseStream.Position = current.Offset;
-					baseStream.Write(current.Length);
-					current.UpdateLength();
+					baseStream.Write(currentLength);
 				}
 			}
 			if (current is not null && current.Offset + current.Length >= baseStream.Length) {
-				baseStream.SetLength(current.Offset);
-				current.RemoveFromList();
+				do {
+					baseStream.SetLength(current.Offset);
+					current.RemoveFromList();
+				} while (--i >= 0 && (current = list[i]).Offset + current.Length >= baseStream.Length);
 			}
 			baseStream.Flush();
 		}
@@ -427,7 +507,7 @@ public class GGPK : IDisposable {
 		foreach (var e in zipEntries) {
 			if (e.FullName.EndsWith('/')) // dir
 				continue;
-			
+
 			var len = (int)e.Length;
 			if (renter.Array.Length < len)
 				renter.Resize(len);
