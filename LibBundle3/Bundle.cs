@@ -300,26 +300,29 @@ public class Bundle : IDisposable {
 			baseStream.Position = sizeof(int) * 3 + metadata.head_size;
 			compressed_chunk_sizes = GC.AllocateUninitializedArray<int>(metadata.chunk_count);
 			metadata.compressed_size = 0;
-			var compressed = ArrayPool<byte>.Shared.Rent(Oodle.GetCompressedBufferSize());
-			try {
-				fixed (byte* ptr = newContent, tmp = compressed) {
-					var p = ptr;
-					var last = metadata.chunk_count - 1;
-					int l;
-					for (var i = 0; i < last; ++i) {
-						l = (int)Oodle.Compress(p, tmp);
-						compressed_chunk_sizes[i] = l;
+			if (metadata.chunk_count != 0)
+			{
+				var compressed = ArrayPool<byte>.Shared.Rent(Oodle.GetCompressedBufferSize());
+				try {
+					fixed (byte* ptr = newContent, tmp = compressed) {
+						var p = ptr;
+						var last = metadata.chunk_count - 1;
+						int l;
+						for (var i = 0; i < last; ++i) {
+							l = (int)Oodle.Compress(p, tmp);
+							compressed_chunk_sizes[i] = l;
+							metadata.compressed_size += l;
+							p += metadata.chunk_size;
+							baseStream.Write(new(tmp, l));
+						}
+						l = (int)Oodle.Compress(p, metadata.GetLastChunkSize(), tmp);
+						compressed_chunk_sizes[last] = l;
 						metadata.compressed_size += l;
-						p += metadata.chunk_size;
 						baseStream.Write(new(tmp, l));
 					}
-					l = (int)Oodle.Compress(p, metadata.GetLastChunkSize(), tmp);
-					compressed_chunk_sizes[last] = l;
-					metadata.compressed_size += l;
-					baseStream.Write(new(tmp, l));
+				} finally {
+					ArrayPool<byte>.Shared.Return(compressed);
 				}
-			} finally {
-				ArrayPool<byte>.Shared.Return(compressed);
 			}
 			metadata.compressed_size_long = metadata.compressed_size;
 
