@@ -9,6 +9,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Threading;
@@ -88,8 +89,7 @@ public class PatchClient : IDisposable {
 			}
 
 			void ParsePacket(ReadOnlySpan<byte> span) {
-				if (span.ReadAndSlice<byte>() != 2) // Opcode
-					ThrowInvalidOpcode();
+				ThrowIfNotMatched(span.ReadAndSlice<byte>(), 2); // Opcode
 				span = span.Slice(32); // 32 bytes empty
 				var length = span.ReadAndSlice<ushort>();
 				Utils.EnsureBigEndian(ref length);
@@ -153,8 +153,7 @@ public class PatchClient : IDisposable {
 			}
 
 			void GetLength(ReadOnlySpan<byte> span) {
-				if (span.ReadAndSlice<byte>() != 4) // Opcode
-					ThrowInvalidOpcode();
+				ThrowIfNotMatched(span.ReadAndSlice<byte>(), 4); // Opcode
 				compressedLen = span.ReadAndSlice<int>();
 				Utils.EnsureBigEndian(ref compressedLen);
 				decompressedLen = MemoryMarshal.Read<int>(span);
@@ -220,8 +219,7 @@ public class PatchClient : IDisposable {
 				return ParsePacket(new(array, 0, len));
 
 				string ParsePacket(ReadOnlySpan<byte> span) {
-					if (span.ReadAndSlice<byte>() != 6) // Opcode
-						ThrowInvalidOpcode();
+					ThrowIfNotMatched(span.ReadAndSlice<byte>(), 6); // Opcode
 					var length = span.ReadAndSlice<ushort>();
 					Utils.EnsureBigEndian(ref length);
 					return MemoryMarshal.Cast<byte, char>(span)[..length].ToString();
@@ -347,9 +345,15 @@ public class PatchClient : IDisposable {
 	}
 
 	/// <exception cref="InvalidDataException"/>
-	[DoesNotReturn, DebuggerNonUserCode]
-	protected static void ThrowInvalidOpcode() {
-		throw new InvalidDataException("Invalid response opcode");
+	protected static void ThrowIfNotMatched(byte value, byte excepted) {
+		if (value != excepted)
+			ThrowInvalidOpcode();
+
+		[MethodImpl(MethodImplOptions.NoInlining)]
+		[DoesNotReturn, DebuggerNonUserCode]
+		void ThrowInvalidOpcode() {
+			throw new InvalidDataException($"Invalid response opcode: {value}, excepted: {excepted}");
+		}
 	}
 
 	public virtual void Dispose() {

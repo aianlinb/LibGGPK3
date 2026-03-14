@@ -13,8 +13,7 @@ public static class Program {
 			Console.OutputEncoding = System.Text.Encoding.UTF8;
 			var asm = Assembly.GetExecutingAssembly();
 			var version = asm.GetName().Version!;
-			Console.WriteLine($"{asm.GetName().Name} (v{version.Major}.{version.Minor}.{version.Build}{(version.Revision == 0
-				? "" : "." + version.Revision)})  {asm.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright}");
+			Console.WriteLine($"{asm.GetName().Name} (v{version.ToString(version.Revision == 0 ? 3 : 4)})  {asm.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright}");
 			Console.WriteLine();
 
 			if (args.Length == 0) {

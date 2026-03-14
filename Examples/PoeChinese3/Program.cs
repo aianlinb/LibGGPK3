@@ -1,9 +1,10 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
-
+using System.Threading.Tasks;
 using LibBundledGGPK3;
 
 using LibDat2;
@@ -22,10 +23,31 @@ public static class Program {
 		Console.OutputEncoding = Encoding.UTF8;
 		var asm = Assembly.GetExecutingAssembly();
 		var version = asm.GetName().Version!;
-		Console.WriteLine($"{asm.GetName().Name} (v{version.Major}.{version.Minor}.{version.Build}{(version.Revision == 0
-			? "" : "." + version.Revision)})  {asm.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright}");
+		Console.WriteLine($"{asm.GetName().Name} (v{version.ToString(version.Revision == 0 ? 3 : 4)})  {asm.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright}");
 		Console.WriteLine($"流亡黯道 - 啟用繁體中文語系  By aianlinb");
 		Console.WriteLine();
+
+		Task.Run(async () => {
+			try {
+				using var http = new HttpClient() { DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher };
+				var r = await http.GetStringAsync("https://raw.githubusercontent.com/aianlinb/LibGGPK3/main/.github/Version.txt");
+				var array = r.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+				if (array.Length > 1 && Version.TryParse(array[1], out var minimum) && version < minimum) {
+					Console.WriteLine();
+					var tmp = Console.ForegroundColor;
+					Console.ForegroundColor = ConsoleColor.Yellow;
+					Console.WriteLine($"發現重大更新！ 強烈建議前往下載以避免舊版潛在的Bug：https://github.com/aianlinb/LibGGPK3/releases");
+					Console.ForegroundColor = tmp;
+					Console.WriteLine();
+				} else if (array.Length != 0 && Version.TryParse(array[0], out var latest) && version < latest) {
+					Console.WriteLine();
+					Console.WriteLine($"發現新版本(v{latest})！ 建議前往下載：https://github.com/aianlinb/LibGGPK3/releases");
+					Console.WriteLine();
+				}
+			} catch (Exception ex) {
+				System.Diagnostics.Debug.WriteLine(ex.GetNameAndMessage());
+			}
+		}).Wait(500);
 
 		using (var definitions = asm.GetManifestResourceStream("PoeChinese3.DatDefinitions.json")!)
 			DatContainer.ReloadDefinitions(definitions);
@@ -78,7 +100,7 @@ public static class Program {
 		Console.ReadLine();
 	}
 
-	public static unsafe void Run(Index index) {
+	public static void Run(Index index) {
 		ApplyTraditionalChinese(index);
 
 		Environment.CurrentDirectory = AppContext.BaseDirectory;

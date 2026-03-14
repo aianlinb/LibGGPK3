@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -35,6 +37,7 @@ public sealed class MainWindow : Form {
 
 	private string? imageName;
 	private ITreeItem? clickedItem;
+	private bool firstSelected;
 
 	public MainWindow(string? path = null) {
 #if Mac
@@ -43,10 +46,7 @@ public sealed class MainWindow : Form {
 		Application.Instance.Terminating += (s, e) => Closed -= closed;
 #endif
 		var version = Assembly.GetExecutingAssembly().GetName().Version!;
-		if (version.Revision != 0)
-			Title = $"VisualGGPK3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})";
-		else
-			Title = $"VisualGGPK3 (v{version.Major}.{version.Minor}.{version.Build})";
+		Title = $"VisualGGPK3 (v{version.ToString(version.Revision == 0 ? 3 : 4)})";
 
 		if (Screen is null) {
 			Size = new(640, 480);
@@ -59,16 +59,16 @@ public sealed class MainWindow : Form {
 		}
 #if Windows
 #pragma warning disable CS0618 // Obsolete
-			static void WindowsFix(TreeView tree) {
-				var etree = ((Eto.Wpf.Forms.Controls.TreeViewHandler)tree.Handler).Control; // EtoTreeView
+		static void WindowsFix(TreeView tree) {
+			var etree = ((Eto.Wpf.Forms.Controls.TreeViewHandler)tree.Handler).Control; // EtoTreeView
 #pragma warning restore CS0618
-				// Virtualizing
-				etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.IsVirtualizingProperty, true);
-				etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.VirtualizationModeProperty, System.Windows.Controls.VirtualizationMode.Recycling);
-				// Fix expand binding
-				var setter = (System.Windows.Setter)etree.ItemContainerStyle.Setters[0];
-				((System.Windows.Data.Binding)setter.Value).Mode = System.Windows.Data.BindingMode.TwoWay; // From OneTime
-			}
+			// Virtualizing
+			etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.IsVirtualizingProperty, true);
+			etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.VirtualizationModeProperty, System.Windows.Controls.VirtualizationMode.Recycling);
+			// Fix expand binding
+			var setter = (System.Windows.Setter)etree.ItemContainerStyle.Setters[0];
+			((System.Windows.Data.Binding)setter.Value).Mode = System.Windows.Data.BindingMode.TwoWay; // From OneTime
+		}
 		WindowsFix(GGPKTree);
 		WindowsFix(BundleTree);
 		// Virtualizing
@@ -103,6 +103,26 @@ public sealed class MainWindow : Form {
 
 		Content = layout;
 		LoadComplete += OnLoadComplete;
+
+		Task.Run(async () => {
+			try {
+				using var http = new HttpClient() { DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher };
+				var r = await http.GetStringAsync("https://raw.githubusercontent.com/aianlinb/LibGGPK3/main/.github/Version.txt");
+				var array = r.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+				if (array.Length != 0 && !firstSelected && Version.TryParse(array[0], out var latest) && version < latest)
+					_ = Application.Instance.InvokeAsync(() => TextPanel.Text = $"Found new version: v{latest},  Download here: https://github.com/aianlinb/LibGGPK3/releases");
+				if (array.Length > 1 && Version.TryParse(array[1], out var minimum) && version < minimum) {
+					_ = Application.Instance.InvokeAsync(() => {
+						if (MessageBox.Show(this, "Critical update found! Please download the latest version to continue.", MessageBoxButtons.OKCancel, MessageBoxType.Warning) == DialogResult.Ok)
+							Process.Start(new ProcessStartInfo("https://github.com/aianlinb/LibGGPK3/releases") { UseShellExecute = true });
+						Close();
+						Application.Instance.Quit();
+					});
+				}
+			} catch (Exception ex) {
+				Debug.WriteLine(ex.GetNameAndMessage());
+			}
+		});
 
 		async void OnLoadComplete(object? sender, EventArgs e) {
 			LoadComplete -= OnLoadComplete;
@@ -209,14 +229,15 @@ public sealed class MainWindow : Form {
 			return;
 
 		if (item is FileTreeItem fileItem) {
+			firstSelected = true;
+
 			var panel = (Splitter)((Splitter)Content).Panel2;
-			var format = fileItem.Format;
 			try {
 				if (ImagePanel.Image is not null) {
 					ImagePanel.Image.Dispose();
 					ImagePanel.Image = null;
 				}
-				switch (format) {
+				switch (fileItem.Format) {
 					case FileTreeItem.DataFormat.Text:
 						var span = fileItem.Read().Span;
 #if Windows

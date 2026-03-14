@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -25,6 +25,7 @@ public class MainWindow : Form {
 	private readonly TextBox ggpkPath;
 	private readonly TextBox pin;
 	private readonly TextArea output;
+	private readonly LinkButton updateLink;
 
 	public MainWindow() {
 #if Mac
@@ -38,11 +39,10 @@ public class MainWindow : Form {
 		http = new(handler) { DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher };
 
 		var version = Assembly.GetExecutingAssembly().GetName().Version!;
-		if (version.Revision != 0)
-			Title = $"VPatchGGPK3 (v{version.Major}.{version.Minor}.{version.Build}.{version.Revision})";
-		else
-			Title = $"VPatchGGPK3 (v{version.Major}.{version.Minor}.{version.Build})";
+		Title = $"VPatchGGPK3 (v{version.ToString(version.Revision == 0 ? 3 : 4)})";
 		ClientSize = new(650, 400);
+		MinimumSize = new(180, 355);
+
 		var layout = new DynamicLayout();
 		layout.BeginVertical(new Padding(5)).Spacing = new Size(5, 10);
 		layout.AddRow(new Label() {
@@ -101,17 +101,39 @@ public class MainWindow : Form {
 		layout.Add(output = new TextArea() {
 			ReadOnly = true
 		}, null, true);
-		layout.Add(new Label() {
-			Text = "Copyright © 2022-2024 aianlinb",
+		layout.AddSeparateRow(new Padding(2, 4, 2, 1), controls: [updateLink = new LinkButton() {
+			Size = new Size(-1, 16)
+		}, new Label() {
+			Text = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright,
 			TextAlignment = TextAlignment.Right,
-			VerticalAlignment = VerticalAlignment.Bottom,
-			Size = new Size(100, 20)
-		});
+			VerticalAlignment = VerticalAlignment.Center,
+			Size = new Size(-1, 16)
+		}]);
+		updateLink.Click += (_, _) => Process.Start(new ProcessStartInfo("https://github.com/aianlinb/LibGGPK3/releases") { UseShellExecute = true });
 		layout.EndVertical();
 		layout.EndHorizontal();
 		layout.EndVertical();
 		LoadComplete += OnLoadComplete;
 		Content = layout;
+
+		Task.Run(async () => {
+			try {
+				var r = await http.GetStringAsync("https://raw.githubusercontent.com/aianlinb/LibGGPK3/main/.github/Version.txt");
+				var array = r.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+				if (array.Length != 0 && Version.TryParse(array[0], out var latest) && version < latest)
+					_ = Application.Instance.InvokeAsync(() => updateLink.Text = $"發現新版本(v{latest})！ 點擊前往下載");
+				if (array.Length > 1 && Version.TryParse(array[1], out var minimum) && version < minimum) {
+					_ = Application.Instance.InvokeAsync(() => {
+						if (MessageBox.Show(this, "發現重大更新，請重新下載最新版本方可繼續使用！", MessageBoxButtons.OKCancel, MessageBoxType.Warning) == DialogResult.Ok)
+							Process.Start(new ProcessStartInfo("https://github.com/aianlinb/LibGGPK3/releases") { UseShellExecute = true });
+						Close();
+						Application.Instance.Quit();
+					});
+				}
+			} catch (Exception ex) {
+				Debug.WriteLine(ex.GetNameAndMessage());
+			}
+		});
 
 		void OnLoadComplete(object? sender, EventArgs e) {
 			LoadComplete -= OnLoadComplete;
@@ -171,7 +193,7 @@ public class MainWindow : Form {
 				return;
 			}
 			if (json.GetProperty("pin").GetString()! != pin.Text) {
-				MessageBox.Show(this, "無效的PIN碼\n請詳閱: https://poedb.tw/tw/chinese\n或: https://poedb.tw/cn/chinese", "Error", MessageBoxType.Error);
+				MessageBox.Show(this, "無效的PIN碼\n請詳閱: https://poedb.tw/chinese", "Error", MessageBoxType.Error);
 				output.Append("\nPIN verification failed!\n", true);
 				return;
 			}
