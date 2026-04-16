@@ -98,7 +98,7 @@ public class Bundle : IDisposable {
 	/// <param name="stream">Stream of the bundle file</param>
 	/// <param name="leaveOpen">If false, close the <paramref name="stream"/> when this instance is disposed</param>
 	/// <param name="record">Record of this bundle file</param>
-	public unsafe Bundle(Stream stream, bool leaveOpen = false, BundleRecord? record = null) {
+	public Bundle(Stream stream, bool leaveOpen = false, BundleRecord? record = null) {
 		ArgumentNullException.ThrowIfNull(stream);
 		if (!BitConverter.IsLittleEndian)
 			ThrowHelper.Throw<NotSupportedException>("Big-endian architecture is not supported");
@@ -119,7 +119,7 @@ public class Bundle : IDisposable {
 	/// </summary>
 	/// <param name="stream">Stream of the bundle to write (which will be cleared)</param>
 	/// <param name="record">Record of the bundle</param>
-	protected internal unsafe Bundle(Stream stream, BundleRecord? record) {
+	protected internal Bundle(Stream stream, BundleRecord? record) {
 		ArgumentNullException.ThrowIfNull(stream);
 		baseStream = stream;
 		Record = record;

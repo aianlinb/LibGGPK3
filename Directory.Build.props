@@ -12,6 +12,6 @@
 		<BaseOutputPath>$(SolutionDir)bin/</BaseOutputPath>
 		<OutDir>$(BaseOutputPath)$(Configuration)/</OutDir>
 		<NoWarn>1573;1591</NoWarn>
-		<PathMap>$(MSBuildProjectDirectory)=$(MSBuildProjectName)</PathMap>
+		<PathMap Condition="$(Configuration) != 'Debug'">$(MSBuildProjectDirectory)=$(MSBuildProjectName)</PathMap>
 	</PropertyGroup>
 </Project>
